@@ -1,0 +1,110 @@
+{
+  "name": "eve-trade-conductor",
+  "productName": "EVE Conductor",
+  "version": "0.191.0",
+  "description": "Cross-hub market price comparison and trading tool for EVE Online",
+  "main": "electron/main.cjs",
+  "private": true,
+  "scripts": {
+    "dev": "vite",
+    "dev:app": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
+    "build": "tsc --noEmit && vite build",
+    "build:typedb": "node scripts/build-typedb.mjs",
+    "build:mapdata": "node scripts/build-mapdata.mjs",
+    "build:skilldb": "node scripts/build-skilldb.mjs",
+    "build:esfdata": "node scripts/build-esfdata.mjs",
+    "start": "npm run build && electron .",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:win": "npm run build && node scripts/check-shareable.mjs && electron-builder --win",
+    "dist:all": "npm run build && electron-builder --mac --win",
+    "check:shareable": "node scripts/check-shareable.mjs",
+    "install:latest": "node scripts/install-latest.mjs",
+    "ship": "npm run build && node scripts/check-shareable.mjs && electron-builder --win && node scripts/check-shareable.mjs release && node scripts/install-latest.mjs",
+    "share": "node scripts/share.mjs",
+    "publish:beta": "node scripts/publish-release.mjs",
+    "baseline": "node scripts/build-baseline.mjs",
+    "export:source": "node scripts/export-public.mjs"
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9",
+    "protobufjs": "^8.7.1",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "zustand": "^5.0.3"
+  },
+  "devDependencies": {
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
+    "electron": "^33.2.1",
+    "electron-builder": "^25.1.8",
+    "typescript": "^5.7.2",
+    "vite": "^6.0.7",
+    "wait-on": "^8.0.1"
+  },
+  "build": {
+    "appId": "org.gavtron.evetradeconductor",
+    "productName": "EVE Conductor",
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "gavtron-ai",
+        "repo": "eve-conductor-releases"
+      }
+    ],
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "build/icon.png",
+      "build/icon.icns"
+    ],
+    "directories": {
+      "output": "release"
+    },
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.utilities",
+      "icon": "build/icon.icns"
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "artifactName": "EVE-Conductor-Setup-${version}.${ext}"
+    },
+    "icon": "build/icon.png",
+    "portable": {
+      "artifactName": "EVE-Conductor-Portable-${version}.${ext}"
+    },
+    "extraResources": [
+      {
+        "from": "baseline",
+        "to": "baseline"
+      }
+    ]
+  },
+  "allowScripts": {
+    "electron@33.4.11": true,
+    "esbuild@0.25.12": true
+  }
+}

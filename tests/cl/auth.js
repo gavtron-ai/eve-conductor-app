@@ -1,0 +1,1 @@
+exports.useAuth = { getState: () => ({ characters: [] }) };

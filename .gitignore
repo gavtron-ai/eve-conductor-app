@@ -1,0 +1,10 @@
+node_modules/
+dist/
+release/
+handout/
+baseline/
+.sde-cache/
+tests/sim/
+tests/pi/
+scripts/owner-patterns.local.json
+*.log
