@@ -11,7 +11,7 @@ import { useApp } from '../lib/store';
 import { syncSkills, resyncSkillsAndImplants } from '../lib/esiChar';
 import { getType } from '../lib/typedb';
 import {
-  parseFit, relevantForFit, TIER_LABEL,
+  parseFit, relevantForFit, TIER_LABEL, spAtLevel, spMissing, spShort,
   type SkillRelevance, type RelevanceTier,
 } from '../lib/skillRelevance';
 import { fitAttributeSets, DOGMA_ENGINE_LICENSE } from '../lib/dogmaStats';
@@ -136,22 +136,31 @@ function CompareColumn({ c, other }: { c: CharAccount; other: CharAccount }) {
  * Nothing is shown when they are level with or above the mark, so the eye
  * only lands on what is actually missing.
  */
-function LevelCell({ c, skillId, need, best, peak }: {
+function LevelCell({ c, skillId, need, best, peak, rank }: {
   c: CharAccount; skillId: number; need?: number;
   /** the Best-column level for this skill */
   best?: number;
   /** the highest level any selected character has for this skill */
   peak?: number;
+  /** the skill's training rank — turns level gaps into SP numbers */
+  rank: number;
 }) {
   if (!c.skills) return <td className="dim" title="skills not synced — Settings → character → Sync">?</td>;
   const l = levelOf(c, skillId);
   const cls = need && l < need ? 'neg' : l === 0 ? 'dim' : l >= 5 ? 'pos' : '';
   const vsBest = best !== undefined && best > l ? best - l : 0;
   const vsPeak = peak !== undefined && peak > l ? peak - l : 0;
+  const spBest = vsBest > 0 ? spMissing(rank, l, best!) : 0;
+  const spNeed = need !== undefined && need > l ? spMissing(rank, l, need) : 0;
   return (
     <td className={cls}>
       {lvl(l)}
-      {vsBest > 0 && <span className="gap-vs" title={`${vsBest} level(s) below Best (${lvl(best!)})`}> (+{vsBest})</span>}
+      {vsBest > 0 && (
+        <span className="gap-vs"
+          title={`${vsBest} level(s) below Best (${lvl(best!)}) — ${spBest.toLocaleString()} SP to train${spNeed > 0 ? ` (${spNeed.toLocaleString()} SP of that reaches Need ${lvl(need!)})` : ''}. Partial progress into the next level is not visible to the app, so this is the ceiling.`}>
+          {' '}(+{vsBest} · {spShort(spBest)})
+        </span>
+      )}
       {vsPeak > 0 && <span className="gap-vs" title={`${vsPeak} level(s) below the best selected character (${lvl(peak!)})`}> (+{vsPeak})</span>}
     </td>
   );
@@ -427,15 +436,23 @@ function FitView({ chars }: { chars: CharAccount[] }) {
                     ...(collapsed ? [] : rows.map((r) => (
                       <tr key={r.skill.id}>
                         <td className="hub-name" title={r.skill.desc}>{r.skill.name}</td>
-                        <td>{r.requiredLevel > 0 ? lvl(r.requiredLevel) : <span className="dim">—</span>}</td>
-                        <td title={r.boosts.length > 0 ? 'improves the fit — max it' : 'pure prerequisite — levels past the requirement do nothing for this fit'}>
-                          {bestLevel(r) > 0 ? lvl(bestLevel(r)) : <span className="dim">—</span>}
+                        <td title={r.requiredLevel > 0 ? `${spAtLevel(r.skill.rank, r.requiredLevel).toLocaleString()} total SP at ${lvl(r.requiredLevel)} (rank ${r.skill.rank})` : undefined}>
+                          {r.requiredLevel > 0
+                            ? <>{lvl(r.requiredLevel)} <span className="dim" style={{ fontSize: 11 }}>{spShort(spAtLevel(r.skill.rank, r.requiredLevel))}</span></>
+                            : <span className="dim">—</span>}
+                        </td>
+                        <td title={(r.boosts.length > 0 ? 'improves the fit — max it' : 'pure prerequisite — levels past the requirement do nothing for this fit')
+                          + (bestLevel(r) > 0 ? ` · ${spAtLevel(r.skill.rank, bestLevel(r)).toLocaleString()} total SP at ${lvl(bestLevel(r))} (rank ${r.skill.rank})` : '')}>
+                          {bestLevel(r) > 0
+                            ? <>{lvl(bestLevel(r))} <span className="dim" style={{ fontSize: 11 }}>{spShort(spAtLevel(r.skill.rank, bestLevel(r)))}</span></>
+                            : <span className="dim">—</span>}
                         </td>
                         {chars.map((c) => (
                           <LevelCell key={c.characterId} c={c} skillId={r.skill.id}
                             need={r.requiredLevel > 0 ? r.requiredLevel : undefined}
                             best={bestLevel(r) > 0 ? bestLevel(r) : undefined}
-                            peak={Math.max(0, ...chars.map((x) => levelOf(x, r.skill.id)))} />
+                            peak={Math.max(0, ...chars.map((x) => levelOf(x, r.skill.id)))}
+                            rank={r.skill.rank} />
                         ))}
                         <td className="dim" style={{ fontSize: 12, maxWidth: 380 }}
                           title={[...r.requiredBy.map((x) => (x.startsWith('prerequisite of') ? x : `required by ${x}`)), ...r.boosts].join('\n')}>
@@ -446,6 +463,35 @@ function FitView({ chars }: { chars: CharAccount[] }) {
                     ))),
                   ];
                 })}
+                {/* THE BOTTOM LINE PER CHARACTER: total SP still to train.
+                    Sums EVERY listed skill (fit-wide tier included, exactly
+                    like the Best copy-plan) from each character's trained
+                    levels; partial next-level progress is invisible to the
+                    app, so these are honest ceilings. */}
+                <tr key="sp-total">
+                  <td style={{ fontWeight: 600, paddingTop: 12 }}>SP still to train</td>
+                  <td className="dim" style={{ fontSize: 11, paddingTop: 12 }}>to Need</td>
+                  <td className="dim" style={{ fontSize: 11, paddingTop: 12 }}>to Best</td>
+                  {chars.map((c) => {
+                    const needSp = rel.reduce((n, r) => n + (r.requiredLevel > 0
+                      ? spMissing(r.skill.rank, levelOf(c, r.skill.id), r.requiredLevel) : 0), 0);
+                    const bestSp = rel.reduce((n, r) => n + (bestLevel(r) > 0
+                      ? spMissing(r.skill.rank, levelOf(c, r.skill.id), bestLevel(r)) : 0), 0);
+                    return (
+                      <td key={c.characterId} style={{ paddingTop: 12, fontVariantNumeric: 'tabular-nums' }}
+                        title={`${c.characterName}: ${needSp.toLocaleString()} SP to meet every requirement · ${bestSp.toLocaleString()} SP to the full Best plan (every listed skill incl. fit-wide). Ceilings — partial progress into a level is not visible to the app.`}>
+                        {needSp === 0 && bestSp === 0
+                          ? <span className="pos">✓ maxed</span>
+                          : <>
+                            <span className={needSp > 0 ? 'neg' : 'pos'}>{needSp > 0 ? spShort(needSp) : '✓'}</span>
+                            <span className="dim"> / </span>
+                            <span>{spShort(bestSp)}</span>
+                          </>}
+                      </td>
+                    );
+                  })}
+                  <td className="dim" style={{ fontSize: 11, paddingTop: 12 }}>need / best — full plan incl. fit-wide</td>
+                </tr>
               </tbody>
             </table>
           )}

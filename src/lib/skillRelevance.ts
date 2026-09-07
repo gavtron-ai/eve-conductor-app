@@ -36,6 +36,23 @@ export interface Skill {
   desc: string;
 }
 
+/** CUMULATIVE skill points at a level: 250 · rank · √32^(level−1) —
+ * verified against EVE's published rank-1 table (250 / 1,414 / 8,000 /
+ * 45,255 / 256,000) at every level. rank = the skill's training-time
+ * multiplier, already in the bundled skilldb. */
+export const spAtLevel = (rank: number, level: number): number =>
+  level <= 0 ? 0 : Math.round(250 * rank * Math.pow(Math.sqrt(32), level - 1));
+
+/** SP still to train from a CURRENT level to a target. The skills map only
+ * stores whole levels, so partial progress into the next level is unknown
+ * and counted as zero — the figure is the honest ceiling. */
+export const spMissing = (rank: number, current: number, target: number): number =>
+  Math.max(0, spAtLevel(rank, target) - spAtLevel(rank, current));
+
+/** "45.3k" / "1.28M" — SP totals get big fast */
+export const spShort = (n: number): string =>
+  n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n);
+
 export const allSkills: Skill[] = db.skills.map(([id, name, group, rank, prereqs, desc]) => ({
   id, name, group, rank, prereqs, desc,
 }));

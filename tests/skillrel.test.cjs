@@ -42,5 +42,20 @@ const find = (rel, name) => rel.find((r) => r.skill.name === name);
   check('B3 Drone Interfacing not listed for a lone module', find(rel, 'Drone Interfacing') === undefined);
 }
 
+// ---- SP math (v0.192) — hand-computed against EVE's published table ----
+{
+  const { spAtLevel, spMissing, spShort } = require('./sim/lib/skillRelevance.js');
+  // canonical rank-1 cumulative totals: 250 / 1,414 / 8,000 / 45,255 / 256,000
+  const canon = [250, 1414, 8000, 45255, 256000];
+  for (let l = 1; l <= 5; l++) check('SP rank-1 L' + l, spAtLevel(1, l) === canon[l - 1]);
+  check('SP rank scales linearly: rank 5 at V = 1,280,000', spAtLevel(5, 5) === 1_280_000);
+  check('SP level 0 costs nothing', spAtLevel(3, 0) === 0);
+  check('SP missing III->V (rank 2) = 496,000', spMissing(2, 3, 5) === 496_000);
+  check('SP already past target -> 0', spMissing(1, 5, 3) === 0);
+  check('SP untrained to IV (rank 1) = 45,255', spMissing(1, 0, 4) === 45_255);
+  check('spShort 45,255 -> 45.3k', spShort(45_255) === '45.3k');
+  check('spShort 1,280,000 -> 1.28M', spShort(1_280_000) === '1.28M');
+}
+
 console.log(`skillrel.test: ${pass} passed, ${fail} failed`);
-if (fail > 0) process.exit(1);
+process.exit(fail > 0 ? 1 : 0);

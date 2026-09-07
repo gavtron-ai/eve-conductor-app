@@ -164,8 +164,11 @@ export const MODULE_HELP: Record<ModuleId, ModuleHelp> = {
           <p>
             Pick or paste a ship fit and see <b>every skill that the hull and modules require
             or that boosts them</b> — tiered by impact, with each character's actual fitting
-            stats computed by the dogma engine, and a copyable training plan. The question it
-            answers: "what do I train to fly THIS better?"
+            stats computed by the dogma engine, and a copyable training plan. Skill point
+            numbers ride along: the Need and Best columns show each level's total SP cost,
+            every character gap shows the SP left to train, and the bottom row totals each
+            character's SP to meet requirements and to the full Best plan. The question it
+            answers: "what do I train to fly THIS better — and how big is that ask?"
           </p>
         ),
       },
