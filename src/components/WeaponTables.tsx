@@ -122,9 +122,25 @@ function AmmoRows({ fit, weaponTypeId, count, loaded, skills, implants, propRunn
   const [rows, setRows] = useState<AmmoRow[] | null>(null);
   const [progress, setProgress] = useState<[number, number]>([0, 0]);
   const run = useRef(0);
+  // RESTART ONLY WHEN THE INPUTS ACTUALLY CHANGE. The first version keyed
+  // this effect on object identity (fit, implants, skills) — the parent
+  // re-renders while the engine runs (stats landing, hover state, the pod
+  // override producing a fresh array every render), each re-render was a
+  // "new" input, the compute restarted, the table regrew, the scrollbar
+  // thrashed: the loop the owner saw. Fingerprint the inputs instead and
+  // read the live objects through refs when the loop runs.
+  const inputKey = [
+    fit.shipId, weaponTypeId, count, propRunning ? 1 : 0,
+    fit.items.map((i) => `${i.typeId}:${i.qty}:${i.offlineQty}:${i.charges.join('/')}`).join(','),
+    (implants ?? []).join('.'),
+    Object.keys(skills).length, // a resync replaces the object; levels moving is rare mid-view
+  ].join('|');
+  const live = useRef({ fit, skills, implants, propRunning });
+  live.current = { fit, skills, implants, propRunning };
   useEffect(() => {
     const mine = ++run.current;
     setRows(null);
+    const { fit: f, skills: sk, implants: imp, propRunning: prop } = live.current;
     void (async () => {
       const data = await getEsfData();
       const lookup = data as unknown as DogmaLookup;
@@ -136,7 +152,7 @@ function AmmoRows({ fit, weaponTypeId, count, loaded, skills, implants, propRunn
       for (const chargeId of ids) {
         if (run.current !== mine) return;
         try {
-          const st = await calculateFitStats(withAmmoMap(fit, { [weaponTypeId]: chargeId }), skills, implants, { propRunning });
+          const st = await calculateFitStats(withAmmoMap(f, { [weaponTypeId]: chargeId }), sk, imp, { propRunning: prop });
           const w = st.simWeapons.find((x) => x.typeId === weaponTypeId) ?? null;
           out.push({
             chargeId,
@@ -153,7 +169,8 @@ function AmmoRows({ fit, weaponTypeId, count, loaded, skills, implants, propRunn
       }
     })();
     return () => { run.current++; };
-  }, [fit, weaponTypeId, count, skills, implants, propRunning]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inputKey, weaponTypeId, count]);
 
   if (rows === null) return <div className="hint">computing {progress[1] || '…'} charges…</div>;
   return (
