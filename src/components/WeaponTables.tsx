@@ -17,6 +17,9 @@ import { calculateFitStats, getEsfData, type FitStats } from '../lib/dogmaStats'
 import { totalDamage, DAMAGE_TYPES, type SimWeapon, type Damage } from '../lib/fitSim';
 import { compatibleCharges, takesCharges, chargeDealsDamage, withAmmoMap, type DogmaLookup } from '../lib/fitCharges';
 import type { ParsedFit } from '../lib/skillRelevance';
+import { attrDef } from '../lib/skillRelevance';
+import type { ProjectedModule } from '../lib/projectedCycle';
+import type React from 'react';
 import Tip from './Tip';
 
 const km = (m: number | undefined) =>
@@ -235,6 +238,98 @@ export function AmmoTables({ stats, fit, skills, implants, propRunning }: {
         overheat is not folded in, so the loaded row can differ slightly from overheated figures
         above.
       </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// PROJECTED MODULES (v0.195.2) — everything this fit does TO another ship:
+// painters, webs, points, scrams, neuts, nos, remote reps, cap transfer,
+// ECM, damps. The engine computed their ranges and strengths all along
+// (stats.projected); nothing rendered them — "I can't see my painter's
+// optimal anywhere". One row per module type: strength, optimal + falloff,
+// cycle, cap.
+// ---------------------------------------------------------------------------
+
+const PROJ_LABEL: Record<ProjectedModule['kind'], string> = {
+  web: 'web', painter: 'painter', trackingDisruptor: 'tracking disruptor', guidanceDisruptor: 'guidance disruptor',
+  neut: 'neutralizer', nos: 'nosferatu', scram: 'scrambler', point: 'disruptor',
+  remoteShield: 'remote shield', remoteArmor: 'remote armor', remoteHull: 'remote hull', capTransfer: 'cap transfer',
+  damp: 'damp', remoteSensorBooster: 'remote sensor booster', ecm: 'ECM', burstJam: 'burst jammer',
+};
+
+/** a modified attribute's short display name (sig, speed, optimal…) */
+const attrName = (id: number): string => {
+  const d = attrDef(id) as { displayName?: string; name?: string } | undefined;
+  const n = d?.displayName || d?.name || `attr ${id}`;
+  return n.replace(/^Signature Radius$/i, 'sig radius').replace(/^Maximum Velocity$/i, 'speed');
+};
+
+function strengthCell(p: ProjectedModule): React.ReactNode {
+  const pct = (v: number) => `${v > 0 ? '+' : ''}${v.toLocaleString(undefined, { maximumFractionDigits: 1 })}%`;
+  if (p.rows && p.rows.length > 0) {
+    return p.rows.map((r) => `${pct(r.value)} ${attrName(r.modifies)}`).join(' · ');
+  }
+  switch (p.kind) {
+    case 'neut': return `−${n0(p.drainGj ?? 0)} GJ / cycle`;
+    case 'nos': return `${n0(p.drainGj ?? 0)} GJ / cycle drained`;
+    case 'scram': return `${p.warpPoints ?? 0} pt scram${(p.blockStrength ?? 0) > 0 ? ' · blocks MWD / MJD' : ''}`;
+    case 'point': return `${p.warpPoints ?? 0} pt disrupt`;
+    case 'capTransfer': return `+${n0(p.transferGj ?? 0)} GJ / cycle`;
+    case 'remoteShield': case 'remoteArmor': case 'remoteHull':
+      return p.rep ? `${n0(p.rep.amount)} ${p.rep.layer} / cycle (${p.rep.timing})` : '—';
+    case 'ecm': return p.jamStrength
+      ? `jam ${p.jamStrength.grav}/${p.jamStrength.ladar}/${p.jamStrength.mag}/${p.jamStrength.radar} (grav/ladar/mag/radar)`
+      : '—';
+    default: return '—';
+  }
+}
+
+export function ProjectedTable({ stats }: { stats: FitStats }) {
+  const groups = useMemo(() => {
+    const m = new Map<number, { p: ProjectedModule; count: number }>();
+    for (const p of stats.projected) {
+      const g = m.get(p.typeId);
+      if (g) g.count++; else m.set(p.typeId, { p, count: 1 });
+    }
+    return [...m.values()];
+  }, [stats]);
+  const refused = stats.projRefused ?? [];
+  if (groups.length === 0 && refused.length === 0) return null;
+  return (
+    <>
+    {groups.length > 0 && <table className="data" style={{ marginTop: 6 }}>
+      <thead>
+        <tr>
+          <th>Projected</th>
+          <th><Tip tip="Engine-final strength with this character's skills and the hull's bonuses folded in — what lands on the target before its own resistances.">Strength</Tip></th>
+          <th><Tip tip="Optimal, then falloff. Falloff 0 means a hard cutoff at optimal (a plain web); a Heavy Grappler carries real falloff.">Range</Tip></th>
+          <th>Cycle</th>
+          <th>Cap</th>
+        </tr>
+      </thead>
+      <tbody>
+        {groups.map(({ p, count }) => (
+          <tr key={p.typeId}>
+            <td className="hub-name">
+              {count}× {getType(p.typeId)?.name ?? p.typeId}
+              <div className="dim" style={{ fontSize: 11 }}>{PROJ_LABEL[p.kind]}</div>
+            </td>
+            <td style={{ fontSize: 12 }}>{strengthCell(p)}</td>
+            <td style={{ whiteSpace: 'nowrap' }}>
+              {km(p.optimal)}{p.falloff > 0 ? <span className="dim"> + {km(p.falloff)}</span> : <span className="dim" style={{ fontSize: 10 }}> hard cutoff</span>}
+            </td>
+            <td style={{ fontVariantNumeric: 'tabular-nums' }}>{p.cycleSeconds.toFixed(1)} s</td>
+            <td style={{ fontVariantNumeric: 'tabular-nums' }}>{p.capPerCycle > 0 ? `${n0(p.capPerCycle)} GJ` : <span className="dim">—</span>}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>}
+    {refused.length > 0 && (
+      <div className="dim" style={{ fontSize: 11, marginTop: 4 }}>
+        not modelled as projected: {refused.map((r) => `${getType(r.typeId)?.name ?? r.typeId} (${r.why})`).join(' · ')}
+      </div>
+    )}
     </>
   );
 }

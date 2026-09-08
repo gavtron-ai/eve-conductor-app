@@ -22,7 +22,7 @@ import { fittingProblems } from '../lib/fitFix';
 import { DAMAGE_TYPES, type DamageType } from '../lib/fitSim';
 import { logUser } from '../lib/devlog';
 import SimPanel from './SimPanel';
-import { WeaponTable, AmmoTables } from './WeaponTables';
+import { WeaponTable, AmmoTables, ProjectedTable } from './WeaponTables';
 import { totalDamage } from '../lib/fitSim';
 
 type CharStats = FitStats | { error: string } | 'loading' | 'unsynced';
@@ -627,6 +627,7 @@ export default function FitStatsPanel({ fit, chars, onStats, esfFit, benchedDron
         return (
           <>
             <WeaponTable stats={usable} />
+            <ProjectedTable stats={usable} />
             {sc?.skills
               ? <AmmoTables stats={usable} fit={fit} skills={sc.skills} implants={podFor(sc)} propRunning={propRunning} />
               : null}

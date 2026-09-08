@@ -447,7 +447,9 @@ export const PANEL_HELP: Record<string, { title: string; body: ReactNode }> = {
         resistances like the in-game display. <b>DPS, Alpha and Range</b> are separate headline
         numbers; the weapons table under them shows every weapon group's dps, alpha, range
         (optimal + falloff, or missile flight ceiling), tracking or explosion figures and damage
-        split; and each weapon's <b>ammo table</b> computes every loadable charge with the real
+        split; a <b>projected</b> table lists everything the fit does to other ships — painters,
+        webs, points, neuts, remote reps — with engine-final strength, optimal and falloff; and each
+        weapon's <b>ammo table</b> computes every loadable charge with the real
         engine (open it to run) so range and damage trade-offs are a glance. The applied-damage
         section is a mini simulation against a chosen target, including your lock time on it. Under the stats, the
         <b> 🧠 Pod</b> section sits the fit in different clones: ten slots, every implant for
