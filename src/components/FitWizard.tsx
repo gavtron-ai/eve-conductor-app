@@ -28,6 +28,7 @@ import {
   hullHardpoints, usesLauncherHardpoint, usesTurretHardpoint,
 } from '../lib/fitFilters';
 import type { EsfDataShapes } from '../lib/dogmaFit';
+import { moduleStateOptions } from '../lib/dogmaFit';
 import { canLoad, takesCharges, type DogmaLookup } from '../lib/fitCharges';
 import { loadVariantParents, baseVariantOf } from '../lib/variantParents';
 import type { FitStats } from '../lib/dogmaFit';
@@ -768,9 +769,16 @@ export default function FitWizard({ chars }: { chars: CharAccount[] }) {
     const s = variation[t.rack]?.[t.index];
     if (!s || s.typeId === null) return null;
     const passiveRack = t.rack === 'rig' || t.rack === 'sub';
-    const state = s.state ?? 'active';
-    const canOh = overloadable(s.typeId, data);
-    const states: SlotState[] = canOh ? ['offline', 'online', 'active', 'overload'] : ['offline', 'online', 'active'];
+    // LEGAL STATES COME FROM THE MODULE'S OWN EFFECTS (v0.195): a plate or
+    // an extender has no active effect category, so it is offline or online
+    // and nothing else — the old fixed list offered 'active' on every module
+    const legal = moduleStateOptions(s.typeId, data, data.dogmaEffects ?? {});
+    const states: SlotState[] = [
+      'offline', 'online',
+      ...(legal.includes('Active') ? ['active' as const] : []),
+      ...(legal.includes('Overload') && overloadable(s.typeId, data) ? ['overload' as const] : []),
+    ];
+    const state: SlotState = s.state && states.includes(s.state) ? s.state : (states.includes('active') ? 'active' : 'online');
     const STATE_WORD: Record<SlotState, string> = { offline: 'offline', online: 'online', active: 'active', overload: 'overheat' };
     return (
       <>

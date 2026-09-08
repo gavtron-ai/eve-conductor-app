@@ -444,8 +444,12 @@ export const PANEL_HELP: Record<string, { title: string; body: ReactNode }> = {
         Simulated live by the dogma engine for the selected character — the same math as the
         in-game fitting window, including stacking penalties. Meters go amber near a limit
         and red with an OVER chip past it. Defense shows each layer's HP and per-damage-type
-        resistances like the in-game display. The applied-damage section is a mini simulation
-        against a chosen target, including your lock time on it. Under the stats, the
+        resistances like the in-game display. <b>DPS, Alpha and Range</b> are separate headline
+        numbers; the weapons table under them shows every weapon group's dps, alpha, range
+        (optimal + falloff, or missile flight ceiling), tracking or explosion figures and damage
+        split; and each weapon's <b>ammo table</b> computes every loadable charge with the real
+        engine (open it to run) so range and damage trade-offs are a glance. The applied-damage
+        section is a mini simulation against a chosen target, including your lock time on it. Under the stats, the
         <b> 🧠 Pod</b> section sits the fit in different clones: ten slots, every implant for
         each slot with its Jita price, one click to load a character's current pod, and a
         <b> pod library</b> — save a pod by name and sit any fit in it later. By default every

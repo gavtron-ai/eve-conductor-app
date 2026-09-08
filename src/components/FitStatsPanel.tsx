@@ -12,7 +12,6 @@ import type { ParsedFit } from '../lib/skillRelevance';
 import { attrDef, attrCategory, formatAttrValue } from '../lib/skillRelevance';
 import { calculateFitStats, calculateFromEsfFit, ESF_DATA_TAG, type FitStats } from '../lib/dogmaStats';
 import type { EsfFitShape } from '../lib/dogmaFit';
-import { getType } from '../lib/typedb';
 import Tip from './Tip';
 import {
   fittingGapSkills, headroom, RESOURCE_LABEL,
@@ -23,6 +22,8 @@ import { fittingProblems } from '../lib/fitFix';
 import { DAMAGE_TYPES, type DamageType } from '../lib/fitSim';
 import { logUser } from '../lib/devlog';
 import SimPanel from './SimPanel';
+import { WeaponTable, AmmoTables } from './WeaponTables';
+import { totalDamage } from '../lib/fitSim';
 
 type CharStats = FitStats | { error: string } | 'loading' | 'unsynced';
 
@@ -410,6 +411,10 @@ export default function FitStatsPanel({ fit, chars, onStats, esfFit, benchedDron
   const anyNonFit = ready.find(([, s]) => s.nonFit.length > 0)?.[1];
   const anyBenched = ready.find(([, s]) => s.benchedDrones.length > 0)?.[1];
   const fmtNum = (n: number, d = 0) => n.toLocaleString(undefined, { maximumFractionDigits: d });
+  /** the weapon whose reach the Range tile shows: highest-dps non-drone */
+  const primaryWeapon = (st: FitStats) => [...st.simWeapons]
+    .filter((w) => w.kind !== 'drone')
+    .sort((a, b) => totalDamage(b.volley) / b.cycleSeconds - totalDamage(a.volley) / a.cycleSeconds)[0];
   /** the four numbers a fit is judged by (v0.165 layout: ONE prominent
    * number per metric, the breakdown as a quiet second line — the jammed
    * compound strings were the readability complaint) */
@@ -422,8 +427,37 @@ export default function FitStatsPanel({ fit, chars, onStats, esfFit, benchedDron
       // hiding either number misleads on exactly the burst weapons.
       big: (s) => fmtNum(s.summary.dps, 1),
       sub: (s) => (s.summary.dpsSustained < s.summary.dps - 0.05
-        ? `${fmtNum(s.summary.dpsSustained, 1)} sustained · volley ${fmtNum(s.summary.volley)}`
-        : `volley ${fmtNum(s.summary.volley)}`),
+        ? `${fmtNum(s.summary.dpsSustained, 1)} sustained (reload)`
+        : null),
+    },
+    {
+      // ALPHA IS ITS OWN NUMBER (v0.195): as important as DPS and it used to
+      // ride a tiny sub-line — the owner's complaint. One full volley from
+      // every weapon.
+      label: 'Alpha',
+      tip: 'One full volley from every fitted weapon and drone at once — the number that decides whether a target survives the first cycle. Same engine pass as DPS.',
+      big: (s) => fmtNum(s.summary.volley),
+      sub: (s) => `${s.summary.weapons.length} weapon group${s.summary.weapons.length === 1 ? '' : 's'}`,
+    },
+    {
+      // RANGE (v0.195): the highest-dps non-drone weapon's reach. Turrets:
+      // optimal + falloff; missiles: the flight ceiling. The weapons table
+      // below lists every group.
+      label: 'Range',
+      tip: "The main weapon's reach — turrets: optimal, then falloff (half damage at optimal+falloff); missiles: the flight ceiling, a missile past it never arrives. Taken from the highest-dps non-drone weapon; the weapons table lists them all.",
+      big: (s) => {
+        const w = primaryWeapon(s);
+        if (!w) return '—';
+        const m = w.kind === 'missile' ? w.maxRange : w.optimal;
+        return m === undefined ? '—' : `${fmtNum(m / 1000, m < 10_000 ? 2 : 1)} km`;
+      },
+      sub: (s) => {
+        const w = primaryWeapon(s);
+        if (!w) return null;
+        if (w.kind === 'missile') return `explosion ${fmtNum(w.expRadius ?? 0)} m · ${fmtNum(w.expVelocity ?? 0)} m/s`;
+        const fo = w.falloff ?? 0;
+        return `+ ${fmtNum(fo / 1000, fo < 10_000 ? 2 : 1)} km falloff · tracking ${(w.tracking ?? 0).toLocaleString(undefined, { maximumFractionDigits: 1 })}`;
+      },
     },
     {
       label: 'EHP',
@@ -530,24 +564,6 @@ export default function FitStatsPanel({ fit, chars, onStats, esfFit, benchedDron
             })}
           </React.Fragment>
         ))}
-        {ready.length > 0 && ready[0][1].summary.weapons.length > 0 && (
-          <React.Fragment>
-            <div className="fsp-label dim">weapons</div>
-            {chars.map((c) => {
-              const s = stats[c.characterId];
-              if (typeof s !== 'object' || 'error' in s) return <div key={c.characterId} className="fsp-cell" />;
-              return (
-                <div key={c.characterId} className="fsp-cell fsp-sub" style={{ paddingTop: 6 }}
-                  title={s.summary.weapons.map((w) => `${getType(w.typeId)?.name ?? w.typeId}: ${w.dps.toFixed(1)} dps`
-                    + (w.dpsSustained !== undefined
-                      ? ` — ${w.dpsSustained.toFixed(1)} with reload (${Math.round(w.clipSize ?? 0)} rounds, ${(w.reloadSeconds ?? 0).toFixed(1)}s)`
-                      : '')).join('\n')}>
-                  {s.summary.weapons.length} firing (hover)
-                </div>
-              );
-            })}
-          </React.Fragment>
-        )}
         <div className="fsp-sec"><Tip tip="Fitting resources, REMAINING / total — the in-game layout. The bar shows utilization: amber when nearly full, red once over budget.">Fitting</Tip></div>
         {ROWS.map((r) => (
           <React.Fragment key={r.label}>
@@ -598,6 +614,25 @@ export default function FitStatsPanel({ fit, chars, onStats, esfFit, benchedDron
           </React.Fragment>
         ))}
       </div>
+      {/* WEAPONS + AMMO (v0.195) — right under the headline tiles and NEVER
+          inside a fold: these are the numbers a fitter swaps modules and
+          charges to move. (First draft mounted them beside SimPanel, inside
+          the collapsed "applied damage" section — invisible by default,
+          the same mistake as the pod placement in v0.193.) */}
+      {simChar !== null && (() => {
+        const s = stats[simChar];
+        const usable = s !== undefined && s !== 'loading' && s !== 'unsynced' && !('error' in s) ? s : null;
+        const sc = chars.find((c) => c.characterId === simChar);
+        if (!usable) return null;
+        return (
+          <>
+            <WeaponTable stats={usable} />
+            {sc?.skills
+              ? <AmmoTables stats={usable} fit={fit} skills={sc.skills} implants={podFor(sc)} propRunning={propRunning} />
+              : null}
+          </>
+        );
+      })()}
       {anyNonFit && (
         <div className="hint" style={{ marginTop: -4 }}>
           Not counted (cargo, not fitted): {anyNonFit.nonFit.join(', ')}
