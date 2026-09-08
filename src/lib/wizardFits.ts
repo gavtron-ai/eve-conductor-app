@@ -9,6 +9,7 @@
 //   (the optimizer may swap variants); unset = free slot, fully ideated.
 import { toEft, typeNameOf, type RawFitItem } from './fitSerial';
 import { allocateDrones, type EsfDataShapes, type EsfFitShape } from './dogmaFit';
+import { implantSlot } from './implants';
 
 /** module run state, cycled in the UI like the game: offline → online →
  * active → overloaded (shift-click walks it backwards). Undefined = the
@@ -46,9 +47,27 @@ export interface WizardFit {
   variations: WizardVariation[];
   /** the POD this fit is evaluated in (v0.193): ten entries, slot 1–10,
    * null = empty slot. undefined = no custom pod — stats use each selected
-   * character's own implants, exactly as before the pod picker existed. */
+   * character's own implants, exactly as before the pod picker existed.
+   * A pod attached to a fit TRAVELS WITH IT: its implants ride in cargo on
+   * every copy (EFT, buy list) and every save to a character (v0.194). */
   implants?: (number | null)[];
+  /** the saved pod these implants came from (pod library, v0.194) — a
+   * bookkeeping link so the UI can offer "update saved pod"; the implants
+   * array above is always the truth the engine and exports use */
+  podId?: string;
 }
+
+/** a named pod in the app's pod library (v0.194) — saved SEPARATELY from
+ * fits so one pod can be sat in by many fits */
+export interface SavedPod {
+  id: string;
+  name: string;
+  slots: (number | null)[];
+}
+
+/** the implants a fit carries, as cargo-ready type ids (nulls dropped) */
+export const fitImplants = (fit: WizardFit): number[] =>
+  (fit.implants ?? []).filter((x): x is number => x !== null);
 
 export const RACKS = ['high', 'med', 'low', 'rig', 'sub'] as const;
 export type Rack = (typeof RACKS)[number];
@@ -163,6 +182,8 @@ export function variationEft(fit: WizardFit, v: WizardVariation): string {
   }
   for (const d of v.drones) items.push({ type_id: d.typeId, quantity: d.qty, flag: 'DroneBay' });
   for (const c of v.cargo) items.push({ type_id: c.typeId, quantity: c.qty, flag: 'Cargo' });
+  // the fit's pod rides along in cargo — importing this EFT back rebuilds it
+  for (const imp of fitImplants(fit)) items.push({ type_id: imp, quantity: 1, flag: 'Cargo' });
   return toEft(typeNameOf(fit.hullId), fitVariationName(fit, v), items);
 }
 
@@ -244,6 +265,14 @@ export function wizardFitFromEft(
     if (typeId === undefined) { unresolved.push(name); continue; }
 
     if (qtyM || rackForModule(typeId, data) === null) {
+      // an implant in cargo IS the pod travelling with the fit (v0.194) —
+      // put it back in its slot so export→import rebuilds the pod
+      const slot = catOf(typeId) === 20 ? implantSlot(data, typeId) : undefined;
+      if (slot !== undefined && slot >= 1 && slot <= 10) {
+        fit.implants ??= Array(10).fill(null) as (number | null)[];
+        fit.implants[slot - 1] = typeId;
+        continue;
+      }
       // quantities are bays: drones fly, everything else is cargo
       const bay = catOf(typeId) === 18 ? v.drones : v.cargo;
       const cur = bay.find((x) => x.typeId === typeId);
@@ -272,6 +301,7 @@ export function buyList(fit: WizardFit, v: WizardVariation): string {
   }
   for (const d of v.drones) add(d.typeId, d.qty);
   for (const c of v.cargo) add(c.typeId, c.qty);
+  for (const imp of fitImplants(fit)) add(imp, 1); // the pod is part of the shopping
   return [...counts.entries()]
     .map(([t, q]) => (q > 1 ? `${typeNameOf(t)}\t${q}` : typeNameOf(t)))
     .join('\n');
@@ -320,6 +350,8 @@ export function toEsiFitting(
   for (const [typeId, qty] of charges) items.push({ type_id: typeId, flag: 'Cargo', quantity: qty });
   for (const d of v.drones) items.push({ type_id: d.typeId, flag: 'DroneBay', quantity: d.qty });
   for (const c of v.cargo) items.push({ type_id: c.typeId, flag: 'Cargo', quantity: c.qty });
+  // the attached pod travels to the character in cargo (v0.194)
+  for (const imp of fitImplants(fit)) items.push({ type_id: imp, flag: 'Cargo', quantity: 1 });
   if (items.length > 512) {
     for (const extra of items.splice(512)) skipped.push(`${typeNameOf(extra.type_id)} ×${extra.quantity} (over EVE's 512-item limit)`);
   }

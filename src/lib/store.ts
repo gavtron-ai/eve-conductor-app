@@ -301,6 +301,9 @@ interface AppState {
   /** Fit Wizard fits — app-side, so a fit can carry unlimited spare/variant
    * modules (the in-game fitting service can't) */
   wizardFits: import('./wizardFits').WizardFit[];
+  /** the pod library (v0.194) — named implant sets saved SEPARATELY from
+   * fits, so one pod can be sat in by many fits */
+  pods: import('./wizardFits').SavedPod[];
   alerts: AlertSettings;
   alloc: AllocSettings;
 
@@ -322,6 +325,7 @@ interface AppState {
   setCharCompare: (patch: Partial<AppState['charCompare']>) => void;
   setBattleSim: (patch: Partial<BattleSimState>) => void;
   setWizardFits: (fits: import('./wizardFits').WizardFit[]) => void;
+  setPods: (pods: import('./wizardFits').SavedPod[]) => void;
   addToGroup: (name: string, typeIds: number[]) => string;
   removeFromGroup: (groupId: string, typeId: number) => void;
   deleteGroup: (groupId: string) => void;
@@ -357,6 +361,7 @@ export const useApp = create<AppState>()(
       charCompare: { mode: 'match' as const, topicId: 'mining', custom: '', fitText: '' },
       battleSim: DEFAULT_BATTLE_SIM,
       wizardFits: [],
+      pods: [],
       alerts: DEFAULT_ALERTS,
       alloc: DEFAULT_ALLOC,
 
@@ -393,6 +398,7 @@ export const useApp = create<AppState>()(
       setCharCompare: (patch) => set((s) => ({ charCompare: { ...s.charCompare, ...patch } })),
       setBattleSim: (patch) => set((s) => ({ battleSim: { ...s.battleSim, ...patch } })),
       setWizardFits: (wizardFits) => set({ wizardFits }),
+      setPods: (pods) => set({ pods }),
       addToGroup: (name, typeIds) => {
         const trimmed = name.trim();
         let id = '';
@@ -461,6 +467,7 @@ export const useApp = create<AppState>()(
         theftMapImportedAt: s.theftMapImportedAt,
         charCompare: s.charCompare,
         wizardFits: s.wizardFits,
+        pods: s.pods,
         alerts: s.alerts,
         alloc: s.alloc,
         // partialize is an ALLOWLIST — a slice missing from it is silently

@@ -445,11 +445,14 @@ export const PANEL_HELP: Record<string, { title: string; body: ReactNode }> = {
         in-game fitting window, including stacking penalties. Meters go amber near a limit
         and red with an OVER chip past it. Defense shows each layer's HP and per-damage-type
         resistances like the in-game display. The applied-damage section is a mini simulation
-        against a chosen target, including your lock time on it. The <b>🧠 Pod</b> section
-        sits the fit in different clones: ten slots, every implant for each slot with its
-        Jita price, and one click to load a character's current pod — by default every
-        character wears their own implants, a custom pod overrides for all of them so the
-        comparison is about the pod.
+        against a chosen target, including your lock time on it. Under the stats, the
+        <b> 🧠 Pod</b> section sits the fit in different clones: ten slots, every implant for
+        each slot with its Jita price, one click to load a character's current pod, and a
+        <b> pod library</b> — save a pod by name and sit any fit in it later. By default every
+        character wears their own implants; a saved or custom pod overrides for all of them so
+        the comparison is about the pod. A pod attached to a fit travels with it: its implants
+        ride in cargo on every copy, buy list and save-to-character, and importing that EFT
+        puts them back in their slots.
       </p>
     ),
   },

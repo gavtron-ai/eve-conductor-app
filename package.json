@@ -1,7 +1,7 @@
 {
   "name": "eve-trade-conductor",
   "productName": "EVE Conductor",
-  "version": "0.193.0",
+  "version": "0.194.0",
   "description": "Cross-hub market price comparison and trading tool for EVE Online",
   "main": "electron/main.cjs",
   "private": true,

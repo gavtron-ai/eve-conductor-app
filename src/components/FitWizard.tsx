@@ -22,12 +22,7 @@ import {
   type Rack, type WizardFit, type WizardVariation, type WizardSlot, type SlotState,
 } from '../lib/wizardFits';
 import { findByName } from '../lib/typedb';
-import { implantSlot } from '../lib/implants';
-import { activePodImplants } from '../lib/cloneNames';
 import { loadTeamFits, type TeamFitCatalog } from '../lib/teamFits';
-import { fetchAggregates } from '../lib/market';
-import { BUILTIN_HUBS } from '../lib/constants';
-import { iskShort } from '../lib/format';
 import {
   missingSkillsFor, moduleFitsHull, moduleFitsRemaining, overloadable,
   hullHardpoints, usesLauncherHardpoint, usesTurretHardpoint,
@@ -37,6 +32,7 @@ import { canLoad, takesCharges, type DogmaLookup } from '../lib/fitCharges';
 import { loadVariantParents, baseVariantOf } from '../lib/variantParents';
 import type { FitStats } from '../lib/dogmaFit';
 import FitStatsPanel from './FitStatsPanel';
+import PodPicker from './PodPicker';
 import ShipTree from './ShipTree';
 
 const typeIcon = (id: number) => `https://images.evetech.net/types/${id}/icon?size=64`;
@@ -214,40 +210,6 @@ export default function FitWizard({ chars }: { chars: CharAccount[] }) {
       ...(res.unresolved.length > 0 ? [`could not resolve: ${res.unresolved.join(', ')}`] : []),
     ];
     setImportNote(notes.length > 0 ? notes.join(' · ') : null);
-  };
-  // pod picker (v0.193)
-  const [implantPrices, setImplantPrices] = useState<Map<number, number> | null>(null);
-  /** every implant in the bundle, by pod slot 1–10, natural-sorted so
-   * families group alphabetically and grades order numerically
-   * (ZMA10 < ZMA100 < ZMA1000). Boosters are category 20 too but carry no
-   * implantness, so the slot filter drops them for free. */
-  const implantCatalog = useMemo(() => {
-    if (!data) return null;
-    const bySlot = new Map<number, { typeId: number; name: string }[]>();
-    for (const [idStr, t] of Object.entries(data.types)) {
-      if (t.categoryID !== 20) continue;
-      const id = Number(idStr);
-      const slot = implantSlot(data, id);
-      if (slot === undefined || slot < 1 || slot > 10) continue;
-      (bySlot.get(slot) ?? bySlot.set(slot, []).get(slot)!).push({ typeId: id, name: t.name });
-    }
-    for (const arr of bySlot.values()) {
-      arr.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
-    }
-    return bySlot;
-  }, [data]);
-  /** Jita asks for every implant, fetched once when the pod section is
-   * first opened (aggregates are chunked+cached by the market lib) */
-  const loadImplantPrices = () => {
-    if (implantPrices !== null || !implantCatalog) return;
-    setImplantPrices(new Map()); // guard against double-fire while loading
-    const ids = [...implantCatalog.values()].flat().map((x) => x.typeId);
-    const jita = BUILTIN_HUBS.find((h) => h.id === 'jita') ?? BUILTIN_HUBS[0];
-    void fetchAggregates(jita, ids).then((agg) => {
-      const m = new Map<number, number>();
-      for (const [id, a] of agg) if (a.sell?.min) m.set(id, a.sell.min);
-      setImplantPrices(m);
-    }).catch(() => { /* prices are a nicety; names still work */ });
   };
   /** picking a REPLACEMENT hull for the current fit (kept modules that no
    * longer fit the new layout move to cargo, visibly) */
@@ -1258,73 +1220,6 @@ export default function FitWizard({ chars }: { chars: CharAccount[] }) {
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 2 }}>
           <InfoDot id="wizard.stats" />
         </div>
-        {/* THE POD (v0.193): sit this fit in different clones and watch the
-            numbers move. Default = each character's own implants (the old
-            behavior); a custom pod overrides for EVERYONE so the comparison
-            is about the POD, not about who wears what. */}
-        {fit && (
-          <details onToggle={(e) => { if ((e.target as HTMLDetailsElement).open) loadImplantPrices(); }}
-            style={{ marginBottom: 8 }}>
-            <summary style={{ cursor: 'pointer', fontSize: 12.5 }}>
-              🧠 Pod{fit.implants === undefined
-                ? <span className="dim"> — characters’ own implants</span>
-                : <span> — custom ({fit.implants.filter((x) => x !== null).length} implant{fit.implants.filter((x) => x !== null).length === 1 ? '' : 's'})</span>}
-            </summary>
-            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '6px 0' }}>
-              {fit.implants === undefined ? (
-                <button className="btn mini" onClick={() => updateFit({ ...fit, implants: Array(10).fill(null) })}>
-                  customize pod
-                </button>
-              ) : (
-                <button className="btn mini"
-                  title="Back to the default: every selected character wears their own synced implants."
-                  onClick={() => updateFit({ ...fit, implants: undefined })}>
-                  use characters’ own pods
-                </button>
-              )}
-              {chars[0] && data && (
-                <button className="btn mini"
-                  title={`Fill the slots with ${chars[0].characterName}'s current pod (live from the multibox registry; falls back to the last character sync).`}
-                  onClick={() => {
-                    const pod = activePodImplants(chars[0].characterId) ?? chars[0].implants ?? [];
-                    const slots: (number | null)[] = Array(10).fill(null);
-                    for (const id of pod) {
-                      const s = implantSlot(data, id);
-                      if (s !== undefined && s >= 1 && s <= 10) slots[s - 1] = id;
-                    }
-                    updateFit({ ...fit, implants: slots });
-                  }}>
-                  ⤓ load {chars[0].characterName}'s pod
-                </button>
-              )}
-            </div>
-            {fit.implants !== undefined && implantCatalog && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 6px', alignItems: 'center', fontSize: 12 }}>
-                {Array.from({ length: 10 }, (_, i) => (
-                  <div key={i} style={{ display: 'contents' }}>
-                    <span className="dim">{i + 1}</span>
-                    <select value={fit.implants![i] ?? ''} style={{ width: '100%', fontSize: 11.5 }}
-                      onChange={(e) => {
-                        const next = [...fit.implants!];
-                        next[i] = e.target.value === '' ? null : Number(e.target.value);
-                        updateFit({ ...fit, implants: next });
-                      }}>
-                      <option value="">— empty —</option>
-                      {(implantCatalog.get(i + 1) ?? []).map((imp) => {
-                        const p = implantPrices?.get(imp.typeId);
-                        return (
-                          <option key={imp.typeId} value={imp.typeId}>
-                            {imp.name}{p !== undefined ? ` — ${iskShort(p)}` : implantPrices && implantPrices.size > 0 ? ' — no Jita sell' : ''}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </div>
-                ))}
-              </div>
-            )}
-          </details>
-        )}
         {parsed && parsed.shipId !== null ? (
           chars.length > 0 ? (
             <FitStatsPanel benchedDrones={benchedDrones} fit={parsed} chars={chars} podOverride={fit?.implants}
@@ -1344,6 +1239,9 @@ export default function FitWizard({ chars }: { chars: CharAccount[] }) {
         {parsed && parsed.unresolved.length > 0 && (
           <div className="flag warn" title={parsed.unresolved.join('\n')}>⚠ {parsed.unresolved.length} item(s) failed round-trip — stats exclude them</div>
         )}
+        {/* the pod lives UNDER the stats — an open pod list must never bury
+            the numbers a fitter watches constantly (v0.193 had it above) */}
+        {fit && <PodPicker fit={fit} onFit={updateFit} chars={chars} data={data} />}
       </div>
     </div>
   );
