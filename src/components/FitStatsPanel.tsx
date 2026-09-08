@@ -277,7 +277,7 @@ function GapPopover({ me, other, resource, fit, esfFit, anchor, onEnter, onLeave
   );
 }
 
-export default function FitStatsPanel({ fit, chars, onStats, esfFit, benchedDrones = [] }: {
+export default function FitStatsPanel({ fit, chars, onStats, esfFit, benchedDrones = [], podOverride }: {
   fit: ParsedFit;
   chars: CharAccount[];
   /** the Fit Wizard uses these numbers for its "fits in what's left" filter */
@@ -287,6 +287,9 @@ export default function FitStatsPanel({ fit, chars, onStats, esfFit, benchedDron
   esfFit?: EsfFitShape;
   /** drones the caller could not put in space (bandwidth / 5-drone cap) */
   benchedDrones?: string[];
+  /** the wizard's pod picker (v0.193): slot array (nulls = empty) worn by
+   * EVERY character instead of their own implants; undefined = old behavior */
+  podOverride?: (number | null)[];
 }) {
   const [stats, setStats] = useState<Record<number, CharStats>>({});
   const [showAttrs, setShowAttrs] = useState(false);
@@ -320,7 +323,14 @@ export default function FitStatsPanel({ fit, chars, onStats, esfFit, benchedDron
   // lastSync moves on every skill sync — a level-up of an already-known
   // skill changes NO key count, so counting keys showed stale numbers.
   // Implants are part of the fingerprint too: a new hardwiring moves outputs.
-  const charKey = chars.map((c) => `${c.characterId}:${c.lastSync ?? 'never'}:${c.skills ? 1 : 0}:${c.implants?.join('|') ?? 'null'}`).join(',');
+  // the wizard's POD (v0.193): an array overrides EVERY character's own
+  // implants — "what do these numbers become in THIS pod"; undefined keeps
+  // the old behavior (each character wears their own synced clone)
+  const podFor = (c: { implants?: number[] | null }): number[] | null =>
+    podOverride !== undefined
+      ? podOverride.filter((x): x is number => x !== null)
+      : c.implants ?? null;
+  const charKey = chars.map((c) => `${c.characterId}:${c.lastSync ?? 'never'}:${c.skills ? 1 : 0}:${podFor(c)?.join('|') ?? 'null'}`).join(',');
   const esfKey = esfFit ? JSON.stringify(esfFit) : '';
   useEffect(() => {
     let cancelled = false;
@@ -336,8 +346,8 @@ export default function FitStatsPanel({ fit, chars, onStats, esfFit, benchedDron
       for (const c of chars) {
         if (!c.skills) continue; // numbers from assumed skills would be lies
         (esfFit
-          ? calculateFromEsfFit(esfFit, c.skills, c.implants, benchedDrones, { propRunning })
-          : calculateFitStats(fit, c.skills, c.implants, { propRunning }))
+          ? calculateFromEsfFit(esfFit, c.skills, podFor(c), benchedDrones, { propRunning })
+          : calculateFitStats(fit, c.skills, podFor(c), { propRunning }))
           .then((s) => {
             if (cancelled) return;
             setStats((cur) => {

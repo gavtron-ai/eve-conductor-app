@@ -177,11 +177,13 @@ export const MODULE_HELP: Record<ModuleId, ModuleHelp> = {
         body: (
           <>
             <p>
-              A graphical fit builder. Browse modules in the market-style tree on the left
-              (drag one onto the wheel, or double-click), drag between sockets to move,
-              shift-drag to copy, and use <b>+ charges</b> — or drop a charge on the ship —
-              to load ammo everywhere it fits. The selected module shows its whole variation
-              family for one-click swaps.
+              A graphical fit builder. Start from scratch, <b>from the clipboard</b> (copy
+              any EFT fit in game and import it), or <b>from any character's saved fits</b> —
+              most fits are alterations of a starting point, not blank slates. Browse modules
+              in the market-style tree on the left (drag one onto the wheel, or double-click),
+              drag between sockets to move, shift-drag to copy, and use <b>+ charges</b> — or
+              drop a charge on the ship — to load ammo everywhere it fits. The selected module
+              shows its whole variation family for one-click swaps.
             </p>
             <p>
               Stats on the right are simulated live for the selected character, including
@@ -443,7 +445,11 @@ export const PANEL_HELP: Record<string, { title: string; body: ReactNode }> = {
         in-game fitting window, including stacking penalties. Meters go amber near a limit
         and red with an OVER chip past it. Defense shows each layer's HP and per-damage-type
         resistances like the in-game display. The applied-damage section is a mini simulation
-        against a chosen target, including your lock time on it.
+        against a chosen target, including your lock time on it. The <b>🧠 Pod</b> section
+        sits the fit in different clones: ten slots, every implant for each slot with its
+        Jita price, and one click to load a character's current pod — by default every
+        character wears their own implants, a custom pod overrides for all of them so the
+        comparison is about the pod.
       </p>
     ),
   },

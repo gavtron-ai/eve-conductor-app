@@ -44,6 +44,10 @@ export interface WizardFit {
   name: string;
   hullId: number;
   variations: WizardVariation[];
+  /** the POD this fit is evaluated in (v0.193): ten entries, slot 1–10,
+   * null = empty slot. undefined = no custom pod — stats use each selected
+   * character's own implants, exactly as before the pod picker existed. */
+  implants?: (number | null)[];
 }
 
 export const RACKS = ['high', 'med', 'low', 'rig', 'sub'] as const;
@@ -160,6 +164,95 @@ export function variationEft(fit: WizardFit, v: WizardVariation): string {
   for (const d of v.drones) items.push({ type_id: d.typeId, quantity: d.qty, flag: 'DroneBay' });
   for (const c of v.cargo) items.push({ type_id: c.typeId, quantity: c.qty, flag: 'Cargo' });
   return toEft(typeNameOf(fit.hullId), fitVariationName(fit, v), items);
+}
+
+/**
+ * EFT → WizardFit (v0.193): "look at a fit and alter from a starting
+ * point". The inverse of variationEft, built to ROUND-TRIP: importing what
+ * variationEft printed reproduces the same racks, charges, states, drones
+ * and cargo. Robust to real-world EFT too — sections are ignored and every
+ * module is placed by its OWN rack (rackForModule), so mis-ordered pastes
+ * still land right. Anything that cannot fit its rack spills to cargo and
+ * is REPORTED, never dropped; unresolvable lines are reported the same way.
+ */
+export function wizardFitFromEft(
+  eft: string,
+  data: EsfDataShapes,
+  findByName: (name: string) => { id: number } | undefined,
+): { fit: WizardFit; spilled: string[]; unresolved: string[] } | { error: string } {
+  const lines = eft.split(/\r?\n/);
+  const head = lines.findIndex((l) => l.trim().startsWith('['));
+  const m = head >= 0 ? lines[head].trim().match(/^\[\s*([^,\]]+?)\s*(?:,\s*(.+?)\s*)?\]$/) : null;
+  if (!m) return { error: 'no [Hull, Name] header line found' };
+  const hull = findByName(m[1]);
+  if (!hull) return { error: `unknown hull "${m[1]}"` };
+  const sizes = rackSizes(hull.id, data);
+  const fit = newWizardFit((m[2] ?? m[1]).trim() || m[1], hull.id, sizes);
+  const v = fit.variations[0];
+  const spilled: string[] = [];
+  const unresolved: string[] = [];
+  const catOf = (id: number) => data.types[String(id)]?.categoryID;
+
+  const place = (typeId: number, chargeTypeId: number | undefined, offline: boolean) => {
+    const rack = rackForModule(typeId, data);
+    if (rack !== null) {
+      const free = v[rack].findIndex((s) => s.typeId === null);
+      if (free >= 0) {
+        v[rack][free] = {
+          typeId,
+          ...(chargeTypeId !== undefined ? { chargeTypeId } : {}),
+          ...(offline ? { state: 'offline' as const } : {}),
+        };
+        return;
+      }
+      spilled.push(typeNameOf(typeId));
+    }
+    // no rack on this hull (or none free): keep the item, honestly, in cargo
+    const cur = v.cargo.find((c) => c.typeId === typeId);
+    if (cur) cur.qty += 1; else v.cargo.push({ typeId, qty: 1 });
+    if (chargeTypeId !== undefined) {
+      const ch = v.cargo.find((c) => c.typeId === chargeTypeId);
+      if (ch) ch.qty += 1; else v.cargo.push({ typeId: chargeTypeId, qty: 1 });
+    }
+  };
+
+  for (let i = head + 1; i < lines.length; i++) {
+    let line = lines[i].trim();
+    if (line === '' || /^\[.*\]$/.test(line)) continue; // blank / [Empty ... slot]
+    // the wizard's own serializer emits "Module/OFFLINE" with NO space
+    // (caught by the round-trip check); in-game EFT uses " /OFFLINE" —
+    // accept both or importing our own exports would lose the flag
+    const offline = /\s*\/OFFLINE\s*$/i.test(line);
+    line = line.replace(/\s*\/OFFLINE\s*$/i, '').trim();
+    const qtyM = line.match(/^(.*?)\s+x(\d+)$/i);
+    const qty = qtyM ? Number(qtyM[2]) : 1;
+    const name = (qtyM ? qtyM[1] : line).trim();
+
+    let typeId: number | undefined = findByName(name)?.id;
+    let chargeTypeId: number | undefined;
+    if (typeId === undefined && name.includes(',')) {
+      // "Module Name, Charge Name" — split at each comma until both resolve
+      const parts = name.split(',');
+      for (let cut = parts.length - 1; cut >= 1 && typeId === undefined; cut--) {
+        const modName = parts.slice(0, cut).join(',').trim();
+        const chName = parts.slice(cut).join(',').trim();
+        const mod = findByName(modName);
+        const ch = findByName(chName);
+        if (mod && ch) { typeId = mod.id; chargeTypeId = ch.id; }
+      }
+    }
+    if (typeId === undefined) { unresolved.push(name); continue; }
+
+    if (qtyM || rackForModule(typeId, data) === null) {
+      // quantities are bays: drones fly, everything else is cargo
+      const bay = catOf(typeId) === 18 ? v.drones : v.cargo;
+      const cur = bay.find((x) => x.typeId === typeId);
+      if (cur) cur.qty += qty; else bay.push({ typeId, qty });
+    } else {
+      place(typeId, chargeTypeId, offline);
+    }
+  }
+  return { fit, spilled, unresolved };
 }
 
 /** EVE MULTIBUY lines ("Item Name<TAB>qty", qty omitted when 1 — the

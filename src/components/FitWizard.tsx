@@ -18,8 +18,16 @@ import { buildMarketTree, filterTree, type TreeNode, type CatalogShapes } from '
 import {
   RACK_LABEL, rackSizes, rackForModule, cloneVariation, normalizeFitLayout,
   newWizardFit, variationEft, variationEsfFitFull, buyList, fitVariationName, toEsiFitting, ESI_FIT_NAME_MAX,
+  wizardFitFromEft,
   type Rack, type WizardFit, type WizardVariation, type WizardSlot, type SlotState,
 } from '../lib/wizardFits';
+import { findByName } from '../lib/typedb';
+import { implantSlot } from '../lib/implants';
+import { activePodImplants } from '../lib/cloneNames';
+import { loadTeamFits, type TeamFitCatalog } from '../lib/teamFits';
+import { fetchAggregates } from '../lib/market';
+import { BUILTIN_HUBS } from '../lib/constants';
+import { iskShort } from '../lib/format';
 import {
   missingSkillsFor, moduleFitsHull, moduleFitsRemaining, overloadable,
   hullHardpoints, usesLauncherHardpoint, usesTurretHardpoint,
@@ -179,6 +187,68 @@ export default function FitWizard({ chars }: { chars: CharAccount[] }) {
   const [hullQuery, setHullQuery] = useState('');
   const [newVarName, setNewVarName] = useState('');
   const [creating, setCreating] = useState(fits.length === 0);
+  // import starting points (v0.193): "look at a fit and alter from it"
+  const [teamCatalog, setTeamCatalog] = useState<TeamFitCatalog | null>(null);
+  const [importNote, setImportNote] = useState<string | null>(null);
+  useEffect(() => {
+    if (!creating) return;
+    let alive = true;
+    void loadTeamFits().then((c) => { if (alive) setTeamCatalog(c); }).catch(() => {});
+    return () => { alive = false; };
+  }, [creating]);
+  /** shared landing for both import paths — reports spills/unresolved
+   * instead of silently dropping anything */
+  const importEft = (eft: string, nameOverride?: string) => {
+    if (!data) return;
+    const res = wizardFitFromEft(eft, data, findByName);
+    if ('error' in res) { setImportNote(`import failed: ${res.error}`); return; }
+    if (nameOverride) res.fit.name = nameOverride;
+    setFits([...fits, res.fit]);
+    setActiveFitId(res.fit.id);
+    setActiveVarId(res.fit.variations[0].id);
+    setCreating(false);
+    setNewFitName('');
+    setHullQuery('');
+    const notes = [
+      ...(res.spilled.length > 0 ? [`rack full — moved to cargo: ${res.spilled.join(', ')}`] : []),
+      ...(res.unresolved.length > 0 ? [`could not resolve: ${res.unresolved.join(', ')}`] : []),
+    ];
+    setImportNote(notes.length > 0 ? notes.join(' · ') : null);
+  };
+  // pod picker (v0.193)
+  const [implantPrices, setImplantPrices] = useState<Map<number, number> | null>(null);
+  /** every implant in the bundle, by pod slot 1–10, natural-sorted so
+   * families group alphabetically and grades order numerically
+   * (ZMA10 < ZMA100 < ZMA1000). Boosters are category 20 too but carry no
+   * implantness, so the slot filter drops them for free. */
+  const implantCatalog = useMemo(() => {
+    if (!data) return null;
+    const bySlot = new Map<number, { typeId: number; name: string }[]>();
+    for (const [idStr, t] of Object.entries(data.types)) {
+      if (t.categoryID !== 20) continue;
+      const id = Number(idStr);
+      const slot = implantSlot(data, id);
+      if (slot === undefined || slot < 1 || slot > 10) continue;
+      (bySlot.get(slot) ?? bySlot.set(slot, []).get(slot)!).push({ typeId: id, name: t.name });
+    }
+    for (const arr of bySlot.values()) {
+      arr.sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: 'base' }));
+    }
+    return bySlot;
+  }, [data]);
+  /** Jita asks for every implant, fetched once when the pod section is
+   * first opened (aggregates are chunked+cached by the market lib) */
+  const loadImplantPrices = () => {
+    if (implantPrices !== null || !implantCatalog) return;
+    setImplantPrices(new Map()); // guard against double-fire while loading
+    const ids = [...implantCatalog.values()].flat().map((x) => x.typeId);
+    const jita = BUILTIN_HUBS.find((h) => h.id === 'jita') ?? BUILTIN_HUBS[0];
+    void fetchAggregates(jita, ids).then((agg) => {
+      const m = new Map<number, number>();
+      for (const [id, a] of agg) if (a.sell?.min) m.set(id, a.sell.min);
+      setImplantPrices(m);
+    }).catch(() => { /* prices are a nicety; names still work */ });
+  };
   /** picking a REPLACEMENT hull for the current fit (kept modules that no
    * longer fit the new layout move to cargo, visibly) */
   const [rehulling, setRehulling] = useState(false);
@@ -537,6 +607,46 @@ export default function FitWizard({ chars }: { chars: CharAccount[] }) {
           {fits.length > 0 && (
             <button className="btn" onClick={() => { setCreating(false); setHullQuery(''); }}>cancel</button>
           )}
+        </div>
+        {/* STARTING POINTS (v0.193): most fits are alterations of an
+            existing one, not blank slates */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', margin: '6px 0' }}>
+          <button className="btn"
+            title="Read an EFT fit from the clipboard (copy one in game: fitting window → ≡ → Copy) and open it here as a new editable fit."
+            onClick={() => {
+              void navigator.clipboard.readText()
+                .then((t) => importEft(t))
+                .catch(() => setImportNote('could not read the clipboard'));
+            }}>
+            📋 new fit from clipboard
+          </button>
+          <span className="dim" style={{ fontSize: 12 }}>or start from a saved fit:</span>
+          <select value="" style={{ maxWidth: 340 }}
+            title="Every character's in-game saved fits — pick one to open a copy here as a starting point. The in-game original is never touched."
+            onChange={(e) => {
+              const f = teamCatalog?.fits.find((x) => x.key === e.target.value);
+              if (f) importEft(f.eft, f.fitName);
+            }}>
+            <option value="">
+              {teamCatalog === null ? 'loading saved fits…'
+                : teamCatalog.fits.length === 0 ? 'no saved fits found' : 'pick a saved fit…'}
+            </option>
+            {chars.concat(allCharacters.filter((a) => !chars.some((c) => c.characterId === a.characterId)))
+              .map((c) => {
+                const own = (teamCatalog?.fits ?? []).filter((f) => f.sources.some((s) => s.charId === c.characterId && s.kind === 'saved'));
+                if (own.length === 0) return null;
+                return (
+                  <optgroup key={c.characterId} label={c.characterName}>
+                    {own.map((f) => (
+                      <option key={`${c.characterId}:${f.key}`} value={f.key}>
+                        {f.fitName} ({f.hullName})
+                      </option>
+                    ))}
+                  </optgroup>
+                );
+              })}
+          </select>
+          {importNote && <span className="hint" style={{ margin: 0, color: '#e0a13a' }}>{importNote}</span>}
         </div>
         <div className="hint" style={{ margin: '0 0 6px' }}>
           Pick a hull below to start the fit — rename it any time with ✎. Variations are added inside
@@ -1148,9 +1258,76 @@ export default function FitWizard({ chars }: { chars: CharAccount[] }) {
         <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 2 }}>
           <InfoDot id="wizard.stats" />
         </div>
+        {/* THE POD (v0.193): sit this fit in different clones and watch the
+            numbers move. Default = each character's own implants (the old
+            behavior); a custom pod overrides for EVERYONE so the comparison
+            is about the POD, not about who wears what. */}
+        {fit && (
+          <details onToggle={(e) => { if ((e.target as HTMLDetailsElement).open) loadImplantPrices(); }}
+            style={{ marginBottom: 8 }}>
+            <summary style={{ cursor: 'pointer', fontSize: 12.5 }}>
+              🧠 Pod{fit.implants === undefined
+                ? <span className="dim"> — characters’ own implants</span>
+                : <span> — custom ({fit.implants.filter((x) => x !== null).length} implant{fit.implants.filter((x) => x !== null).length === 1 ? '' : 's'})</span>}
+            </summary>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', margin: '6px 0' }}>
+              {fit.implants === undefined ? (
+                <button className="btn mini" onClick={() => updateFit({ ...fit, implants: Array(10).fill(null) })}>
+                  customize pod
+                </button>
+              ) : (
+                <button className="btn mini"
+                  title="Back to the default: every selected character wears their own synced implants."
+                  onClick={() => updateFit({ ...fit, implants: undefined })}>
+                  use characters’ own pods
+                </button>
+              )}
+              {chars[0] && data && (
+                <button className="btn mini"
+                  title={`Fill the slots with ${chars[0].characterName}'s current pod (live from the multibox registry; falls back to the last character sync).`}
+                  onClick={() => {
+                    const pod = activePodImplants(chars[0].characterId) ?? chars[0].implants ?? [];
+                    const slots: (number | null)[] = Array(10).fill(null);
+                    for (const id of pod) {
+                      const s = implantSlot(data, id);
+                      if (s !== undefined && s >= 1 && s <= 10) slots[s - 1] = id;
+                    }
+                    updateFit({ ...fit, implants: slots });
+                  }}>
+                  ⤓ load {chars[0].characterName}'s pod
+                </button>
+              )}
+            </div>
+            {fit.implants !== undefined && implantCatalog && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '3px 6px', alignItems: 'center', fontSize: 12 }}>
+                {Array.from({ length: 10 }, (_, i) => (
+                  <div key={i} style={{ display: 'contents' }}>
+                    <span className="dim">{i + 1}</span>
+                    <select value={fit.implants![i] ?? ''} style={{ width: '100%', fontSize: 11.5 }}
+                      onChange={(e) => {
+                        const next = [...fit.implants!];
+                        next[i] = e.target.value === '' ? null : Number(e.target.value);
+                        updateFit({ ...fit, implants: next });
+                      }}>
+                      <option value="">— empty —</option>
+                      {(implantCatalog.get(i + 1) ?? []).map((imp) => {
+                        const p = implantPrices?.get(imp.typeId);
+                        return (
+                          <option key={imp.typeId} value={imp.typeId}>
+                            {imp.name}{p !== undefined ? ` — ${iskShort(p)}` : implantPrices && implantPrices.size > 0 ? ' — no Jita sell' : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </div>
+                ))}
+              </div>
+            )}
+          </details>
+        )}
         {parsed && parsed.shipId !== null ? (
           chars.length > 0 ? (
-            <FitStatsPanel benchedDrones={benchedDrones} fit={parsed} chars={chars}
+            <FitStatsPanel benchedDrones={benchedDrones} fit={parsed} chars={chars} podOverride={fit?.implants}
               onStats={(m) => setLiveStats((prev) =>
                 // the panel invalidates with {} while the engine recomputes;
                 // filtering against NOTHING for that window recommended
