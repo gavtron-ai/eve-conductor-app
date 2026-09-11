@@ -1044,7 +1044,7 @@ body.overlay-body #root { background: transparent; }
 .ovl-root.edit .ovl-box { border-color: var(--accent); cursor: move; background: rgba(10, 10, 10, 0.85); }
 .ovl-notice { align-items: stretch; background: rgba(14, 16, 20, 0.9);
   border-color: var(--alert, #ff5b5b); border-left: 3px solid var(--alert, #ff5b5b);
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.4); max-width: 360px; }
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.4); }
 .ovl-ship { border-radius: 4px; flex-shrink: 0; object-fit: contain; }
 .ovl-noship { display: flex; align-items: center; justify-content: center;
   border: 1px dashed rgba(255, 255, 255, 0.25); border-radius: 4px; color: #999; }

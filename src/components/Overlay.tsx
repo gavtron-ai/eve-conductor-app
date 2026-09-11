@@ -50,9 +50,12 @@ export interface OverlayChar {
 
 interface Pos { x: number; y: number }
 interface Size { w: number; h: number }
-/** ONE size for every box (user's rule: resizing any box resizes them all),
+/** ONE size for every POD box (user's rule: resizing any pod box resizes them all),
  * positions per character. The old per-box {x,y,w,h} shape is migrated. */
-interface Layout { size: Size; pos: Record<number, Pos> }
+/** notice-type boxes (notice / PI / raid) share ONE width of their OWN —
+ * they must not follow the pod boxes (beta report, v0.196.1: "only the pod
+ * boxes should resize together"); height is content-driven */
+interface Layout { size: Size; pos: Record<number, Pos>; noticeW?: number }
 
 const LAYOUT_KEY = 'eve-conductor-overlay-layout-v2';
 const LEGACY_KEY = 'eve-conductor-overlay-layout-v1';
@@ -66,6 +69,9 @@ const RAID_ID = -2;
 const PI_ID = -3;
 const MIN_W = 120;
 const MIN_H = 48;
+const DEFAULT_NOTICE_W = 300;
+const MIN_NOTICE_W = 200;
+const MAX_NOTICE_W = 640;
 
 const loadLayout = (): Layout => {
   try {
@@ -135,6 +141,7 @@ export default function Overlay() {
   const [pi, setPi] = useState<{ charName: string; planetName: string; text: string; sev: number }[]>([]);
   const [edit, setEdit] = useState(false);
   const [layout, setLayout] = useState<Layout>(loadLayout);
+  const noticeW = layout.noticeW ?? DEFAULT_NOTICE_W;
   const drag = useRef<{
     id: number; mode: 'move' | 'nw' | 'ne' | 'sw' | 'se';
     startX: number; startY: number; pos: Pos; size: Size;
@@ -175,7 +182,16 @@ export default function Overlay() {
         setLayout((cur) => ({ ...cur, pos: { ...cur.pos, [d.id]: { x: d.pos.x + dx, y: d.pos.y + dy } } }));
         return;
       }
-      // RESIZING ANY BOX RESIZES THEM ALL — one shared size. Dragging a
+      if (d.id < 0) {
+        // NOTICE-TYPE BOXES resize on their OWN shared width, never the pod
+        // boxes' (v0.196.1). Height follows the content, so only width moves.
+        const w = Math.min(MAX_NOTICE_W, Math.max(MIN_NOTICE_W, d.mode === 'ne' || d.mode === 'se' ? d.size.w + dx : d.size.w - dx));
+        const pos = { ...d.pos };
+        if (d.mode === 'nw' || d.mode === 'sw') pos.x = d.pos.x + (d.size.w - w);
+        setLayout((cur) => ({ ...cur, noticeW: w, pos: { ...cur.pos, [d.id]: pos } }));
+        return;
+      }
+      // RESIZING ANY POD BOX RESIZES THEM ALL — one shared size. Dragging a
       // north/west handle also moves the box being dragged, so the corner
       // under the cursor stays put.
       const w = Math.max(MIN_W, d.mode === 'ne' || d.mode === 'se' ? d.size.w + dx : d.size.w - dx);
@@ -208,9 +224,15 @@ export default function Overlay() {
     e.stopPropagation();
     drag.current = {
       id, mode, startX: e.clientX, startY: e.clientY,
-      pos: layout.pos[id] ?? DEFAULT_POS, size: layout.size,
+      pos: layout.pos[id] ?? DEFAULT_POS,
+      size: id < 0 ? { w: layout.noticeW ?? DEFAULT_NOTICE_W, h: 0 } : layout.size,
     };
   };
+
+  /** corner handles for a notice-type box — same look as the pod boxes' */
+  const handles = (id: number) => edit && (['nw', 'ne', 'sw', 'se'] as const).map((corner) => (
+    <span key={corner} className={`ovl-handle ovl-${corner}`} onMouseDown={start(id, corner)} />
+  ));
 
   return (
     <div className={`ovl-root ${edit ? 'edit' : ''}`}>
@@ -305,7 +327,7 @@ export default function Overlay() {
       })}
       {notice && (() => {
         const npos = layout.pos[NOTICE_ID] ?? { x: DEFAULT_POS.x, y: 8 };
-        const nw = Math.max(240, layout.size.w * 1.15);
+        const nw = noticeW;
         const color = notice.kind === 'api-down' ? '#ff5b5b' : notice.kind === 'ratelimit' ? '#ffb347' : '#4da3ff';
         return (
           <div className="ovl-box ovl-notice"
@@ -320,12 +342,13 @@ export default function Overlay() {
               </div>
               <div style={{ fontSize: 12, lineHeight: 1.45, color: '#e6e9ef' }}>{notice.text}</div>
             </div>
+            {handles(NOTICE_ID)}
           </div>
         );
       })()}
       {pi.length > 0 && (() => {
         const ppos = layout.pos[PI_ID] ?? { x: DEFAULT_POS.x, y: 120 };
-        const pw = Math.max(240, layout.size.w * 1.15);
+        const pw = noticeW;
         return (
           <div className="ovl-box ovl-notice"
             style={{ left: ppos.x, top: ppos.y, width: pw, minHeight: 40,
@@ -343,12 +366,13 @@ export default function Overlay() {
                 </div>
               ))}
             </div>
+            {handles(PI_ID)}
           </div>
         );
       })()}
       {raids.length > 0 && (() => {
         const rpos = layout.pos[RAID_ID] ?? { x: DEFAULT_POS.x, y: 64 };
-        const rw = Math.max(240, layout.size.w * 1.15);
+        const rw = noticeW;
         return (
           <div className="ovl-box ovl-notice"
             style={{ left: rpos.x, top: rpos.y, width: rw, minHeight: 44,
@@ -377,6 +401,7 @@ export default function Overlay() {
               ))}
               {raids.length > 6 && <div style={{ fontSize: 11, color: '#9aa0aa' }}>+{raids.length - 6} more…</div>}
             </div>
+            {handles(RAID_ID)}
           </div>
         );
       })()}
@@ -386,7 +411,7 @@ export default function Overlay() {
           dragging a template places the real box. */}
       {edit && !notice && (() => {
         const npos = layout.pos[NOTICE_ID] ?? { x: DEFAULT_POS.x, y: 8 };
-        const nw = Math.max(240, layout.size.w * 1.15);
+        const nw = noticeW;
         return (
           <div className="ovl-box ovl-notice" style={{ left: npos.x, top: npos.y, width: nw, minHeight: 44, opacity: 0.65, ['--alert' as string]: '#8b949e' } as React.CSSProperties}
             onMouseDown={start(NOTICE_ID, 'move')}>
@@ -394,12 +419,13 @@ export default function Overlay() {
               <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#8b949e' }}>⚠ notification box — template</div>
               <div style={{ fontSize: 12, lineHeight: 1.45, color: '#c9d1d9' }}>Drag me where API-problem notices should appear. Only shown in setup mode.</div>
             </div>
+            {handles(NOTICE_ID)}
           </div>
         );
       })()}
       {edit && raids.length === 0 && (() => {
         const rpos = layout.pos[RAID_ID] ?? { x: DEFAULT_POS.x, y: 64 };
-        const rw = Math.max(240, layout.size.w * 1.15);
+        const rw = noticeW;
         return (
           <div className="ovl-box ovl-notice" style={{ left: rpos.x, top: rpos.y, width: rw, minHeight: 44, opacity: 0.65, ['--alert' as string]: '#8b949e' } as React.CSSProperties}
             onMouseDown={start(RAID_ID, 'move')}>
@@ -407,6 +433,7 @@ export default function Overlay() {
               <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#8b949e' }}>🎯 raid alert — template</div>
               <div style={{ fontSize: 12, lineHeight: 1.45, color: '#c9d1d9' }}>Drag me where nearby-raidable-skyhook alerts should appear. Only shown in setup mode.</div>
             </div>
+            {handles(RAID_ID)}
           </div>
         );
       })()}

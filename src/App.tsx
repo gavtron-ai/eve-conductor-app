@@ -148,11 +148,23 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
     const onStorage = (e: StorageEvent) => {
       if (e.key !== 'eve-trade-conductor' || !e.newValue) return;
       try {
-        const s = (JSON.parse(e.newValue) as { state?: { settings?: { raidAlert?: boolean; raidAlertJumps?: number } } }).state?.settings;
-        if (!s) return;
-        const cur = useApp.getState().settings;
-        if (s.raidAlert !== cur.raidAlert || s.raidAlertJumps !== cur.raidAlertJumps) {
-          useApp.getState().setSettings({ raidAlert: s.raidAlert, raidAlertJumps: s.raidAlertJumps });
+        const parsed = JSON.parse(e.newValue) as {
+          state?: { settings?: { raidAlert?: boolean; raidAlertJumps?: number }; alerts?: { piOverlay?: boolean } };
+        };
+        const s = parsed.state?.settings;
+        if (s) {
+          const cur = useApp.getState().settings;
+          if (s.raidAlert !== cur.raidAlert || s.raidAlertJumps !== cur.raidAlertJumps) {
+            useApp.getState().setSettings({ raidAlert: s.raidAlert, raidAlertJumps: s.raidAlertJumps });
+          }
+        }
+        // the PI-overlay toggle (v0.179) is patched the same way — and was
+        // NOT adopted here, so this window's next persist wrote its stale
+        // in-memory `alerts` back over the patch and the 🪐 box never went
+        // away (beta report, v0.196.1). Measured: false → one set() → gone.
+        const a = parsed.state?.alerts;
+        if (a && a.piOverlay !== useApp.getState().alerts.piOverlay) {
+          useApp.getState().setAlerts({ piOverlay: a.piOverlay });
         }
       } catch { /* not our payload */ }
     };

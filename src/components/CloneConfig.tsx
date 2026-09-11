@@ -315,7 +315,9 @@ export default function CloneConfig() {
         <h2 style={{ fontSize: 15, margin: '0 0 6px', borderBottom: '1px solid rgba(128,128,128,.25)', paddingBottom: 4 }}>⚠ Notification Box</h2>
         <p className="cfg-sub">
           Appears only when something needs saying — EVE API down, login (SSO) trouble, or rate limiting —
-          and explains it in plain language. Position its template with <b>Alt+\</b> in game.
+          and explains it in plain language. Position its template with <b>Alt+\</b> in game. Notice boxes
+          (this one, 🪐 planets, 🎯 raids) share a width of their own — drag a corner in setup mode to change
+          it; the pod boxes keep their separate shared size.
         </p>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, marginTop: 8 }}>
           <input type="checkbox" checked={piOverlay}
