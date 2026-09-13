@@ -52,10 +52,10 @@ interface Pos { x: number; y: number }
 interface Size { w: number; h: number }
 /** ONE size for every POD box (user's rule: resizing any pod box resizes them all),
  * positions per character. The old per-box {x,y,w,h} shape is migrated. */
-/** notice-type boxes (notice / PI / raid) share ONE width of their OWN —
- * they must not follow the pod boxes (beta report, v0.196.1: "only the pod
- * boxes should resize together"); height is content-driven */
-interface Layout { size: Size; pos: Record<number, Pos>; noticeW?: number }
+/** EACH notice-type box (notice / PI / raid) has a width of its OWN —
+ * none follows the pod boxes or each other (beta reports, v0.196.1 + v0.197:
+ * "only the pod boxes should resize together", "PI and alert individually"); height is content-driven */
+interface Layout { size: Size; pos: Record<number, Pos>; /** legacy shared notice width (v0.196.1) — seeds `widths` */ noticeW?: number; /** per-box widths for the notice-type boxes, keyed by reserved id */ widths?: Record<number, number> }
 
 const LAYOUT_KEY = 'eve-conductor-overlay-layout-v2';
 const LEGACY_KEY = 'eve-conductor-overlay-layout-v1';
@@ -67,6 +67,8 @@ const NOTICE_ID = -1;
 const RAID_ID = -2;
 /** reserved layout key for the PI-warnings box (v0.179) */
 const PI_ID = -3;
+// (−4 was the v0.198 "needs you" box, removed in v0.199 — EVE logs nothing
+// when a trade opens, so it could never do the one job it was for)
 const MIN_W = 120;
 const MIN_H = 48;
 const DEFAULT_NOTICE_W = 300;
@@ -141,7 +143,7 @@ export default function Overlay() {
   const [pi, setPi] = useState<{ charName: string; planetName: string; text: string; sev: number }[]>([]);
   const [edit, setEdit] = useState(false);
   const [layout, setLayout] = useState<Layout>(loadLayout);
-  const noticeW = layout.noticeW ?? DEFAULT_NOTICE_W;
+  const nwOf = (id: number): number => layout.widths?.[id] ?? layout.noticeW ?? DEFAULT_NOTICE_W;
   const drag = useRef<{
     id: number; mode: 'move' | 'nw' | 'ne' | 'sw' | 'se';
     startX: number; startY: number; pos: Pos; size: Size;
@@ -183,12 +185,12 @@ export default function Overlay() {
         return;
       }
       if (d.id < 0) {
-        // NOTICE-TYPE BOXES resize on their OWN shared width, never the pod
-        // boxes' (v0.196.1). Height follows the content, so only width moves.
+        // EACH NOTICE-TYPE BOX resizes on its OWN width — never the pod
+        // boxes, never each other (v0.197). Height follows the content.
         const w = Math.min(MAX_NOTICE_W, Math.max(MIN_NOTICE_W, d.mode === 'ne' || d.mode === 'se' ? d.size.w + dx : d.size.w - dx));
         const pos = { ...d.pos };
         if (d.mode === 'nw' || d.mode === 'sw') pos.x = d.pos.x + (d.size.w - w);
-        setLayout((cur) => ({ ...cur, noticeW: w, pos: { ...cur.pos, [d.id]: pos } }));
+        setLayout((cur) => ({ ...cur, widths: { ...(cur.widths ?? {}), [d.id]: w }, pos: { ...cur.pos, [d.id]: pos } }));
         return;
       }
       // RESIZING ANY POD BOX RESIZES THEM ALL — one shared size. Dragging a
@@ -199,7 +201,9 @@ export default function Overlay() {
       const pos = { ...d.pos };
       if (d.mode === 'nw' || d.mode === 'sw') pos.x = d.pos.x + (d.size.w - w);
       if (d.mode === 'nw' || d.mode === 'ne') pos.y = d.pos.y + (d.size.h - h);
-      setLayout((cur) => ({ size: { w, h }, pos: { ...cur.pos, [d.id]: pos } }));
+      // spread cur: the notice boxes' own widths live beside size/pos and a pod
+      // resize must not throw them away (caught by the v0.197 harness)
+      setLayout((cur) => ({ ...cur, size: { w, h }, pos: { ...cur.pos, [d.id]: pos } }));
     };
     const up = () => {
       if (drag.current) {
@@ -225,7 +229,7 @@ export default function Overlay() {
     drag.current = {
       id, mode, startX: e.clientX, startY: e.clientY,
       pos: layout.pos[id] ?? DEFAULT_POS,
-      size: id < 0 ? { w: layout.noticeW ?? DEFAULT_NOTICE_W, h: 0 } : layout.size,
+      size: id < 0 ? { w: nwOf(id), h: 0 } : layout.size,
     };
   };
 
@@ -327,7 +331,7 @@ export default function Overlay() {
       })}
       {notice && (() => {
         const npos = layout.pos[NOTICE_ID] ?? { x: DEFAULT_POS.x, y: 8 };
-        const nw = noticeW;
+        const nw = nwOf(NOTICE_ID);
         const color = notice.kind === 'api-down' ? '#ff5b5b' : notice.kind === 'ratelimit' ? '#ffb347' : '#4da3ff';
         return (
           <div className="ovl-box ovl-notice"
@@ -348,7 +352,7 @@ export default function Overlay() {
       })()}
       {pi.length > 0 && (() => {
         const ppos = layout.pos[PI_ID] ?? { x: DEFAULT_POS.x, y: 120 };
-        const pw = noticeW;
+        const pw = nwOf(PI_ID);
         return (
           <div className="ovl-box ovl-notice"
             style={{ left: ppos.x, top: ppos.y, width: pw, minHeight: 40,
@@ -372,7 +376,7 @@ export default function Overlay() {
       })()}
       {raids.length > 0 && (() => {
         const rpos = layout.pos[RAID_ID] ?? { x: DEFAULT_POS.x, y: 64 };
-        const rw = noticeW;
+        const rw = nwOf(RAID_ID);
         return (
           <div className="ovl-box ovl-notice"
             style={{ left: rpos.x, top: rpos.y, width: rw, minHeight: 44,
@@ -411,7 +415,7 @@ export default function Overlay() {
           dragging a template places the real box. */}
       {edit && !notice && (() => {
         const npos = layout.pos[NOTICE_ID] ?? { x: DEFAULT_POS.x, y: 8 };
-        const nw = noticeW;
+        const nw = nwOf(NOTICE_ID);
         return (
           <div className="ovl-box ovl-notice" style={{ left: npos.x, top: npos.y, width: nw, minHeight: 44, opacity: 0.65, ['--alert' as string]: '#8b949e' } as React.CSSProperties}
             onMouseDown={start(NOTICE_ID, 'move')}>
@@ -425,7 +429,7 @@ export default function Overlay() {
       })()}
       {edit && raids.length === 0 && (() => {
         const rpos = layout.pos[RAID_ID] ?? { x: DEFAULT_POS.x, y: 64 };
-        const rw = noticeW;
+        const rw = nwOf(RAID_ID);
         return (
           <div className="ovl-box ovl-notice" style={{ left: rpos.x, top: rpos.y, width: rw, minHeight: 44, opacity: 0.65, ['--alert' as string]: '#8b949e' } as React.CSSProperties}
             onMouseDown={start(RAID_ID, 'move')}>

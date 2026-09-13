@@ -367,25 +367,23 @@ const esiCorpKillmails = (corpId: number, src: LiveSource): Promise<ZkbEntry[]> 
 /** how many page-only killmails get individual lookups — the page and the
  * API overlap almost entirely, so this is normally 0-3 ids; the cap only
  * bounds a pathological gap */
-const PAGE_LOOKUP_CAP = 25;
 
 /**
- * The corp PAGE's killmail ids (extracted by the hidden window in
- * zkillPage.cjs) minus what the API feeds already delivered, each resolved
- * through /api/killID/{id}/ — measured to serve hash + price even for
- * mails the cached list endpoints are still missing.
+ * The corp's recent kills + losses from zKillboard's JSON API — through
+ * the main process, which identifies the app and spaces requests the way
+ * zKill's API rules ask (v0.199.1). zKill caches these lists for up to an
+ * hour (measured: max-age=3600), which is the honest price of not
+ * scraping their site. In the browser rig (no bridge) the renderer fetches
+ * the same two endpoints directly.
  */
-async function resolvePageOnlyIds(pageIds: number[], have: Set<number>): Promise<ZkbEntry[]> {
-  const missing = pageIds.filter((id) => !have.has(id)).slice(0, PAGE_LOOKUP_CAP);
-  const rows = await Promise.all(missing.map(async (id) => {
-    try {
-      const r = await getJson<ZkbEntry[]>(`https://zkillboard.com/api/killID/${id}/`, { noStore: true });
-      return r[0] ?? null;
-    } catch {
-      return null; // one unpriced mail must not kill the report
-    }
-  }));
-  return rows.filter((x): x is ZkbEntry => x !== null);
+async function corpLists(corpId: number): Promise<{ kills: ZkbEntry[]; losses: ZkbEntry[] }> {
+  const bridge = window.appInfo?.zkill;
+  if (bridge?.corpKills) return bridge.corpKills(corpId) as Promise<{ kills: ZkbEntry[]; losses: ZkbEntry[] }>;
+  const [kills, losses] = await Promise.all([
+    getJson<ZkbEntry[]>(`https://zkillboard.com/api/kills/corporationID/${corpId}/`, { noStore: true }),
+    getJson<ZkbEntry[]>(`https://zkillboard.com/api/losses/corporationID/${corpId}/`, { noStore: true }),
+  ]);
+  return { kills, losses };
 }
 
 /** one hydrated feed row — the clustering unit */
@@ -423,14 +421,13 @@ export interface BattleHistory {
 export const HISTORY_DAYS = 3;
 
 export async function makeBattleReports(
-  corpId: number, sources: LiveSource[] = [], pageIds: number[] = [],
+  corpId: number, sources: LiveSource[] = [],
 ): Promise<BattleHistory> {
   // kills AND losses — a fight the corp lost still deserves its report —
   // PLUS every logged-in character's own mails live from ESI, PLUS the
   // corp-wide feed through any source holding the Director role
-  const [kills, losses, corpFeed, ...own] = await Promise.all([
-    getJson<ZkbEntry[]>(`https://zkillboard.com/api/kills/corporationID/${corpId}/`, { noStore: true }),
-    getJson<ZkbEntry[]>(`https://zkillboard.com/api/losses/corporationID/${corpId}/`, { noStore: true }),
+  const [{ kills, losses }, corpFeed, ...own] = await Promise.all([
+    corpLists(corpId),
     (async () => {
       for (const src of sources) {
         const rows = await esiCorpKillmails(corpId, src);
@@ -442,12 +439,9 @@ export async function makeBattleReports(
   ]);
   const byId = new Map<number, ZkbEntry>();
   for (const e of [...kills, ...losses, ...corpFeed, ...own.flat()]) byId.set(e.killmail_id, e);
-  // the PAGE is the live source of truth — ids it has that no feed served
-  // are exactly the mails the cached APIs are still missing
-  const pageOnly = await resolvePageOnlyIds(pageIds, new Set(byId.keys()));
-  for (const e of pageOnly) byId.set(e.killmail_id, e);
+  // "live" = straight from ESI: own mails, or the corp feed via a Director
   const liveFeeds = own.filter((rows) => rows.length > 0).length
-    + (corpFeed.length > 0 ? 1 : 0) + (pageIds.length > 0 ? 1 : 0);
+    + (corpFeed.length > 0 ? 1 : 0);
   const entries = [...byId.values()]
     .sort((a, b) => b.killmail_id - a.killmail_id) // ids are chronological
     .slice(0, HYDRATE_LIMIT);

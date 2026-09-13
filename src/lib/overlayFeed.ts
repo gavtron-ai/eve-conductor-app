@@ -262,6 +262,37 @@ function recordDockState(charId: number, docked: boolean): void {
   } catch { /* journal only — never let bookkeeping break the feed */ }
 }
 
+/**
+ * ASK ONLY WHEN THE ANSWER CAN CHANGE (v0.199.2). ESI serves /online/ from
+ * a 60 s cache and /implants/ from a 120 s one — a 6 s poll got the SAME
+ * cached body ten or twenty times per answer. Each response's own
+ * `expiresIn` (from its Expires/Date headers) says when the next call can
+ * possibly differ; until then the last body is reused. Nothing the overlay
+ * shows gets one second staler than before — it was always ESI's cache —
+ * and the request count on these two routes drops ~10-20×. The same rule
+ * harvestCloneNames() has followed for /clones/ since v0.139.
+ */
+interface Cached<T> { data: T; until: number }
+const onlineCache = new Map<number, Cached<{ online: boolean }>>();
+const implantsCache = new Map<number, Cached<number[]>>();
+async function askWhenStale<T>(
+  cache: Map<number, Cached<T>>, charId: number, defaultTtlS: number,
+  fetcher: () => Promise<{ data: T; expiresIn: number | null }>,
+): Promise<{ data: T } | null> {
+  const hit = cache.get(charId);
+  if (hit && Date.now() < hit.until) return { data: hit.data };
+  try {
+    const r = await fetcher();
+    const ttl = Math.max(5, r.expiresIn ?? defaultTtlS);
+    cache.set(charId, { data: r.data, until: Date.now() + ttl * 1000 });
+    return { data: r.data };
+  } catch {
+    // a failed refresh keeps showing the last known answer for one more
+    // poll rather than blanking the box — the same thing the null path did
+    return hit ? { data: hit.data } : null;
+  }
+}
+
 async function readOne(charId: number, name: string, obs: CloneObservation[]): Promise<OverlayChar> {
   const row: OverlayChar = {
     characterId: charId,
@@ -276,9 +307,9 @@ async function readOne(charId: number, name: string, obs: CloneObservation[]): P
   try {
     const [ship, online, implants, cloneScope, location] = await Promise.all([
       esiAuth<{ ship_type_id: number; ship_name: string }>(`/characters/${charId}/ship/`, undefined, charId, OVERLAY),
-      esiAuth<{ online: boolean }>(`/characters/${charId}/online/`, undefined, charId, OVERLAY).catch(() => null),
+      askWhenStale(onlineCache, charId, 55, () => esiAuth<{ online: boolean }>(`/characters/${charId}/online/`, undefined, charId, OVERLAY)),
       // the CLONE the pilot is flying — what a pod name was ever describing
-      esiAuth<number[]>(`/characters/${charId}/implants/`, undefined, charId, OVERLAY).catch(() => null),
+      askWhenStale(implantsCache, charId, 110, () => esiAuth<number[]>(`/characters/${charId}/implants/`, undefined, charId, OVERLAY)),
       harvestCloneNames(charId, name, obs),
       // WHERE they are — the security band is the thing a multiboxer needs
       // at a glance (scope esi-location.read_location.v1, cached 5s).

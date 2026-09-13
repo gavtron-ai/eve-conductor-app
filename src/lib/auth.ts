@@ -136,9 +136,14 @@ declare global {
       };
       overlay?: OverlayBridge;
       clones?: ClonesBridge;
-      /** the corp killboard read as a real page — live killmail ids */
+      /** zKillboard's JSON API, called from the main process with an
+       * identifying user agent, one request at a time (v0.199.1) */
       zkill?: {
-        pageIds: (corpId: number) => Promise<number[]>;
+        /** the corp's recent kills + losses — cached by zKill for up to an hour */
+        corpKills: (corpId: number) => Promise<{
+          kills: { killmail_id: number; zkb: { hash: string; totalValue: number } }[];
+          losses: { killmail_id: number; zkb: { hash: string; totalValue: number } }[];
+        }>;
         charKills: (charId: number) => Promise<{ killmail_id: number; hash: string; value: number }[]>;
         systemKills: (systemId: number, pastSeconds?: number) => Promise<{ killmail_id: number; hash: string; value: number; locationId: number; npc: boolean }[]>;
       };

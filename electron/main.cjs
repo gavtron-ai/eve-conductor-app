@@ -9,7 +9,7 @@ const appConfig = require('./appConfig.cjs');
 const overlay = require('./overlay.cjs');
 const cloneStore = require('./cloneStore.cjs');
 const narrative = require('./narrative.cjs');
-const zkillPage = require('./zkillPage.cjs');
+const zkill = require('./zkill.cjs');
 const storms = require('./storms.cjs');
 const gamelog = require('./gamelog.cjs');
 const aperturePage = require('./aperturePage.cjs');
@@ -58,6 +58,12 @@ ipcMain.handle('stats-info', () => ({ dir: stats.statsDir(app.getPath('documents
 // ---- baseline seeding: new installs inherit the project's measurement
 // history (radar + skyhook raids) instead of starting cold. Existing
 // files are never touched — the user's own history always wins. ----
+// IDENTIFY THE APP ON EVERY REQUEST (v0.199.2): the session user agent is
+// what Chromium sends with each renderer fetch — ESI, Fuzzwork, br.evetools
+// — and Electron lets the app set it, unlike a browser. Contact = the public
+// repo URL, never an email (see ua.cjs). Set before any window exists.
+app.userAgentFallback = `${app.userAgentFallback.replace(/\s?EVEConductor\/[^\s]+/, '')} ${require('./ua.cjs').USER_AGENT}`;
+
 app.whenReady().then(() => {
   try {
     const baseline = require('./baseline.cjs');
@@ -103,7 +109,7 @@ app.whenReady().then(() => {
   // the MAIN process gets its own line: if the renderer never starts, this is
   // the only evidence the app was launched at all
   devlog.append(app.getPath('documents'), [{
-    level: 'info', area: 'main', msg: `main process ready — EVE Conductor ${app.getVersion()}`,
+    level: 'info', area: 'main', msg: `main process ready — EVE Conductor ${app.getVersion()} · UA ${app.userAgentFallback}`,
     data: { platform: process.platform, electron: process.versions.electron },
   }]);
 }).catch(() => {});
@@ -233,12 +239,12 @@ ipcMain.handle('narrative-write', (_e, digest) => narrative.narrate(app.getPath(
 ipcMain.handle('narrative-set-key', (_e, apiKey) => narrative.setKey(app.getPath('documents'), apiKey));
 
 // ---- the corp killboard read as a PAGE (live) rather than the cached API ----
-ipcMain.handle('zkill-page-ids', (_e, corpId) => zkillPage.corpPageKillIds(Number(corpId) || 0));
-ipcMain.handle('zkill-char-kills', (_e, charId) => zkillPage.charKillmails(Number(charId) || 0));
+ipcMain.handle('zkill-corp-kills', (_e, corpId) => zkill.corpKillmails(Number(corpId) || 0));
+ipcMain.handle('zkill-char-kills', (_e, charId) => zkill.charKillmails(Number(charId) || 0));
 ipcMain.handle('zkill-system-kills', (_e, arg) => {
   const systemId = Number(arg && arg.systemId) || 0;
   const pastSeconds = arg && arg.pastSeconds;
-  return zkillPage.systemKills(systemId, pastSeconds);
+  return zkill.systemKills(systemId, pastSeconds);
 });
 
 // ---- the storm tracker page (no CORS header — main must fetch it) ----

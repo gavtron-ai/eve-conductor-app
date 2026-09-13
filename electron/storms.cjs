@@ -5,12 +5,8 @@
 // exposed — the renderer cannot ask main to fetch arbitrary URLs.
 const STORM_TRACK_URL = 'https://evescoutrescue.com/home/stormtrack.php';
 
-// polite-crawler identification WITHOUT the owner's email compiled into
-// shared builds (the shareability guard caught it in v0.186's asar) —
-// the app name + version identifies us; per-user contact would belong in
-// config.json, never in code
-const { app } = require('electron');
-const USER_AGENT = `EVE-Conductor/${app?.getVersion?.() ?? 'dev'}`;
+// identified like every other request the app makes (ua.cjs, v0.199.2)
+const { USER_AGENT } = require('./ua.cjs');
 
 /** raw page HTML, or '' on any failure (the renderer treats '' as
  * tracker-unreachable and says so rather than inventing storm data) */

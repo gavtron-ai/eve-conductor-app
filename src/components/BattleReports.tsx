@@ -127,22 +127,19 @@ export default function BattleReports() {
       }
       const corp = await corporationOf(chars[0].characterId);
       // every logged-in character with a live token feeds its OWN killmails
-      // straight from ESI — zkill's API runs ~30 min behind its own site
+      // straight from ESI (live); the corp-wide list comes from zKill's
+      // API, which zKill caches for up to an hour (v0.199.1 — the hidden
+      // page reader that beat that cache was scraping and is gone)
       const sources = chars
         .filter((c) => c.accessToken && c.expiresAt > Date.now())
         .map((c) => ({ characterId: c.characterId, token: c.accessToken! }));
-      // ...and the corp PAGE itself, loaded like a real browser tab in a
-      // hidden window: the live list, no scopes, works for any corp member
-      const pageIds = await (window.appInfo?.zkill?.pageIds(corp).catch(() => [])
-        ?? Promise.resolve([]));
-      if (runRef.current !== run) return;
-      let h = await makeBattleReports(corp, sources, pageIds);
+      let h = await makeBattleReports(corp, sources);
       if (runRef.current !== run) return;
       // feed went backwards? one fresh retry usually lands on a caught-up
       // zkill node; if not, say so rather than presenting an old fight
       let staleNow = false;
       if (h.newestKillmailId < highWater()) {
-        const retry = await makeBattleReports(corp, sources, pageIds);
+        const retry = await makeBattleReports(corp, sources);
         if (runRef.current !== run) return;
         if (retry.newestKillmailId >= h.newestKillmailId) h = retry;
         staleNow = h.newestKillmailId < highWater();
@@ -158,7 +155,7 @@ export default function BattleReports() {
       select(0);
       logUser('battle reports made', {
         fights: h.fights.length, newest: h.fights[0]?.systemName,
-        pageIds: pageIds.length, liveFeeds: h.liveFeeds,
+        liveFeeds: h.liveFeeds,
         ms: Math.round(performance.now() - t0),
       });
       // learn EAGERLY whether br.evetools has the newest fight, so the card
@@ -298,7 +295,7 @@ export default function BattleReports() {
         )}
         {noLiveFeed && !busy && battles && (
           <div className="dim" style={{ fontSize: 12, marginTop: 4 }}>
-            ⚠ no live source answered — the list may lag the killboard by ~30 min
+            ⚠ no live source answered — this list is zKill's, cached by them for up to an hour; your own characters' kills arrive live from CCP once they are logged in
           </div>
         )}
         <div style={{ maxHeight: 'calc(100vh - 190px)', overflowY: 'auto' }}>

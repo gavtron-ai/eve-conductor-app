@@ -18,6 +18,12 @@ const EDIT_HOTKEY = 'Alt+\\';
 let win = null;
 let cfgWin = null;
 let editMode = false;
+// NOTE (v0.199): there is deliberately NO "clickable while hovered" state
+// any more. v0.198 flipped click-through off while the cursor was over a
+// box; when that box vanished under the cursor no mouse-leave ever fired,
+// the flag stuck, and the invisible full-screen window swallowed every
+// click until the overlay was toggled. The overlay is click-through
+// except in edit mode, full stop.
 
 function isOpen() {
   return win !== null && !win.isDestroyed();

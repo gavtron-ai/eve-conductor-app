@@ -581,6 +581,22 @@ function DiagnosticsPanel() {
   return (
     <div className="sso-section">
       <DiagnosticsPanel />
+      <h3 className="section-title">About</h3>
+      <p className="hint" style={{ marginBottom: 10 }}>
+        EVE Conductor is free, open-source and unaffiliated. EVE Online and the EVE logo are the
+        registered trademarks of CCP hf. All rights are reserved worldwide. All other trademarks are
+        the property of their respective owners. EVE Online, the EVE logo, EVE and all associated
+        logos and designs are the intellectual property of CCP hf. All artwork, screenshots,
+        characters, vehicles, storylines, world facts or other recognizable features of the
+        intellectual property relating to these trademarks are likewise the intellectual property of
+        CCP hf. CCP hf. has granted permission to EVE Conductor to use EVE Online and all associated
+        logos and designs for promotional and information purposes but does not endorse, and is not
+        in any way affiliated with, EVE Conductor. CCP is in no way responsible for the content on or
+        functioning of this application, nor can it be liable for any damage arising from its use.
+        Ship and character images are served by CCP's image service; market and dogma data come from
+        CCP's Static Data Export.
+      </p>
+
       <h3 className="section-title">Backup &amp; transfer</h3>
       <div style={{ display: 'flex', gap: 8 }}>
         <button className="btn" onClick={doExport} disabled={busy}

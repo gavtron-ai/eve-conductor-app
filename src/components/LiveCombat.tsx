@@ -36,6 +36,7 @@ import { logInfo } from '../lib/devlog';
 import { fetchAggregates } from '../lib/market';
 import { BUILTIN_HUBS } from '../lib/constants';
 import { iskShort } from '../lib/format';
+import FeedPanel from './FeedPanel';
 import { parseJournal, lastUndocks, computeUndockCuts, UNDOCK_KEY } from '../lib/undockJournal';
 import { getType } from '../lib/typedb';
 
@@ -314,10 +315,12 @@ function Stat({ label, value, color, title }: {
  * bands shade the background; peaks are marked; cumulative mode swaps in
  * running totals ("who was winning").
  */
-function FlowChart({ events, logins, reships, kills, ships, fights, domain, width, cumulative }: {
+export function FlowChart({ events, logins, reships, kills, ships, fights, domain, width, cumulative, onPickTime, picking }: {
   events: GameLogEvent[]; logins: number[]; reships: { t: number; text: string }[];
   kills: KillMark[]; ships: ShipSegment[];
   fights: Engagement[]; domain: [number, number]; width: number; cumulative: boolean;
+  /** click-to-scope: every timeline sets the custom start/end (v0.199.4) */
+  onPickTime?: (t: number) => void; picking?: boolean;
 }) {
   // the ship BAND sits in its own strip above the plot; the plot drops to
   // make room only when there is history to show
@@ -368,7 +371,9 @@ function FlowChart({ events, logins, reships, kills, ships, fights, domain, widt
   const pO = argmax(A); const pI = argmax(B);
   const yLabel = (v: number) => (cumulative ? fmtN(v) : `${fmtN(v)}/s`);
   return (
-    <svg width={W} height={H} role="img" aria-label={cumulative ? 'cumulative damage over time' : 'damage per second over time'}>
+    <svg width={W} height={H} role="img" aria-label={cumulative ? 'cumulative damage over time' : 'damage per second over time'}
+      style={picking ? { cursor: 'crosshair' } : undefined}
+      onClick={(e) => onPickTime?.(svgClickTime(e, domain[0], domain[1], PAD_L, PAD_R, W))}>
       {ships.map((seg, i) => {
         const x0 = Math.max(PAD_L, xOfT(seg.t0));
         const x1 = Math.min(W - PAD_R, xOfT(Math.min(seg.t1, d1)));
@@ -575,8 +580,9 @@ function VolleyHistogram({ volleys }: { volleys: number[] }) {
  * pressure is exactly what those are. GJ drained per rolling window,
  * yours-out above the baseline and enemy-in below it.
  */
-function CapChart({ events, domain, width }: {
+export function CapChart({ events, domain, width, onPickTime, picking }: {
   events: GameLogEvent[]; domain: [number, number]; width: number;
+  onPickTime?: (t: number) => void; picking?: boolean;
 }) {
   const W = width; const H = 200; const PAD_L = 56; const PAD_R = 10; const MID = H / 2 - 6; const AMP = MID - 20;
   const [d0, d1] = domain;
@@ -604,7 +610,9 @@ function CapChart({ events, domain, width }: {
   const fillDn = `M${PAD_L},${MID} ${inc.map((v, i) => `L${xOf(i).toFixed(1)},${dnOf(v).toFixed(1)}`).join(' ')} L${xOf(nS).toFixed(1)},${MID} Z`;
   const hasAny = yMax > 1;
   return (
-    <svg width={W} height={H} role="img" aria-label="cap pressure over time">
+    <svg width={W} height={H} role="img" aria-label="cap pressure over time"
+      style={picking ? { cursor: 'crosshair' } : undefined}
+      onClick={(e) => onPickTime?.(svgClickTime(e, domain[0], domain[1], PAD_L, PAD_R, W))}>
       <line x1={PAD_L} x2={W - PAD_R} y1={MID} y2={MID} stroke="var(--grid)" strokeWidth="1.2" />
       <text x={PAD_L - 7} y={upOf(yMax) + 4} textAnchor="end" className="sim-tick" style={{ fontSize: 11 }}>{fmtN(yMax)}/s</text>
       <text x={PAD_L - 7} y={dnOf(yMax) + 4} textAnchor="end" className="sim-tick" style={{ fontSize: 11 }}>{fmtN(yMax)}/s</text>
@@ -827,16 +835,6 @@ function RateChart({ events, logins, domain, width, valueOf, color, fmtY, ariaLa
   );
 }
 
-const FEED_TAG: Record<GameLogEvent['kind'], { tag: string; cls: string }> = {
-  dmgOut: { tag: '→', cls: 'pos' }, dmgIn: { tag: '←', cls: 'neg' },
-  missOut: { tag: '∅', cls: 'dim' }, missIn: { tag: '∅', cls: 'dim' },
-  neutOut: { tag: '▽', cls: 'pos' }, neutIn: { tag: '▽', cls: 'neg' },
-  repIn: { tag: '+', cls: 'pos' }, repOut: { tag: '+', cls: 'dim' },
-  ewar: { tag: 'EW', cls: 'flag warn' }, jammed: { tag: 'J', cls: 'flag warn' },
-  mine: { tag: 'M', cls: 'pos' }, mineCrit: { tag: 'M✦', cls: 'flag good' },
-  residue: { tag: 'R', cls: 'neg' }, bounty: { tag: 'ISK', cls: 'pos' },
-  reship: { tag: 'SHIP', cls: 'flag info' }, other: { tag: '·', cls: 'dim' },
-};
 
 // ---------------------------------------------------------------------------
 // ENTITY PANEL — click any pilot/ship to open. Pulls together the log
@@ -1458,6 +1456,31 @@ export default function LiveCombat() {
             {selFiles.length} session{selFiles.length === 1 ? '' : 's'} · {rangeEvents.length.toLocaleString()} events
             {(selFight !== null || customRange !== null) && <> · <b style={{ color: OUT_COLOR }}>scoped to {scopeLabel}</b></>}
           </span>
+          {/* CUSTOM WINDOW — for EVERY topic (v0.199.4; it lived inside the
+              mining section only, though the scoping was always global):
+              arm start, click any timeline; optionally arm end, click again */}
+          <span className="lc-custom-range" style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+            {pickingTime !== null && (
+              <span className="flag info" style={{ fontSize: 12 }}>click any timeline to set the {pickingTime}</span>
+            )}
+            <button className={`btn mini${pickingTime === 'start' ? ' on' : ''}`}
+              title="arm, then click a spot on any timeline in any section — everything re-scopes from that moment (running to now until you also set an end)"
+              onClick={() => setPickingTime(pickingTime === 'start' ? null : 'start')}>
+              ⟟ set custom start
+            </button>
+            <button className={`btn mini${pickingTime === 'end' ? ' on' : ''}`}
+              disabled={customRange === null}
+              title={customRange === null ? 'set a custom start first' : 'optional second step: arm, then click a timeline to close the window there'}
+              onClick={() => setPickingTime(pickingTime === 'end' ? null : 'end')}>
+              set custom end
+            </button>
+            {customRange !== null && (
+              <button className="btn mini on" title="clear the custom window"
+                onClick={() => { setCustomRange(null); setPickingTime(null); }}>
+                ✕ {scopeLabel}
+              </button>
+            )}
+          </span>
           <span style={{ marginLeft: 'auto', display: 'flex', gap: 6 }}>
             {(['overview', 'damage', 'ewar', 'mining', 'feed'] as Topic[]).map((tp) => (
               <button key={tp} className={`btn${topic === tp ? ' primary' : ''}`} style={{ fontSize: 13 }}
@@ -1557,7 +1580,8 @@ export default function LiveCombat() {
                   } />
                   <div ref={chartRef}>
                     <FlowChart events={rangeEvents} logins={logins} reships={reships} kills={scopedKills} ships={shipSegs} fights={fights}
-                      domain={domain} width={chartW} cumulative={cumulative} />
+                      domain={domain} width={chartW} cumulative={cumulative}
+                      onPickTime={pickTime} picking={pickingTime !== null} />
                   </div>
                 </div>
                 {fightRows.length > 0 && (
@@ -1667,7 +1691,8 @@ export default function LiveCombat() {
                   } />
                   <div ref={chartRef}>
                     <FlowChart events={rangeEvents} logins={logins} reships={reships} kills={scopedKills} ships={shipSegs} fights={fights}
-                      domain={domain} width={chartW} cumulative={cumulative} />
+                      domain={domain} width={chartW} cumulative={cumulative}
+                      onPickTime={pickTime} picking={pickingTime !== null} />
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 10, marginBottom: 10 }}>
@@ -1756,7 +1781,7 @@ export default function LiveCombat() {
                     </span>
                   } />
                   <div ref={chartRef}>
-                    <CapChart events={scopedEvents} domain={domain} width={chartW} />
+                    <CapChart events={scopedEvents} domain={domain} width={chartW} onPickTime={pickTime} picking={pickingTime !== null} />
                   </div>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(360px, 1fr))', gap: 10 }}>
@@ -1893,30 +1918,6 @@ export default function LiveCombat() {
                             <span style={{ fontSize: 12.5, color: CRIT_COLOR }}>▬ crit share · ▲ critical</span>
                             <span style={{ fontSize: 12.5, color: RESIDUE_COLOR }}>▼ residue/min</span>
                             <span className="dim" style={{ fontSize: 12.5 }}>dashed = login · hover for numbers</span>
-                            <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, flexWrap: 'wrap', alignItems: 'center' }}>
-                              {pickingTime !== null && (
-                                <span className="flag info" style={{ fontSize: 12 }}>
-                                  click any timeline below to set the {pickingTime}
-                                </span>
-                              )}
-                              <button className={`btn mini${pickingTime === 'start' ? ' on' : ''}`}
-                                title="arm, then click a spot on any of the timelines below — everything re-scopes from that moment (running to now until you also set an end)"
-                                onClick={() => setPickingTime(pickingTime === 'start' ? null : 'start')}>
-                                ⟟ set custom start
-                              </button>
-                              <button className={`btn mini${pickingTime === 'end' ? ' on' : ''}`}
-                                disabled={customRange === null}
-                                title={customRange === null ? 'set a custom start first' : 'optional second step: arm, then click a timeline to close the window — leave unset for a running total to now'}
-                                onClick={() => setPickingTime(pickingTime === 'end' ? null : 'end')}>
-                                set custom end
-                              </button>
-                              {customRange !== null && (
-                                <button className="btn mini on" title="clear the custom window"
-                                  onClick={() => { setCustomRange(null); setPickingTime(null); }}>
-                                  ✕ {scopeLabel}
-                                </button>
-                              )}
-                            </span>
                           </>
                         } />
                         <div ref={chartRef}>
@@ -2050,37 +2051,9 @@ export default function LiveCombat() {
 
             {topic === 'feed' && (
               <div style={CARD}>
-                <SectionHead accent="var(--muted)" text={`raw combat feed — ${scopeLabel} (${scopedEvents.length.toLocaleString()} events, newest first)`} />
-                <div style={{ maxHeight: 560, overflowY: 'auto', fontSize: 13.5, lineHeight: 1.7 }}>
-                  {scopedEvents.slice(-400).reverse().map((e, i) => {
-                    const k = FEED_TAG[e.kind];
-                    return (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '4px 8px', borderRadius: 6,
-                        background: i % 2 === 0 ? 'rgba(128,128,128,.05)' : 'transparent' }}>
-                        <span className="dim" style={{ flex: 'none', fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>{hhmmss(e.t)}</span>
-                        <span className={k.cls} style={{ flex: 'none', minWidth: 34, textAlign: 'center', fontWeight: 700,
-                          fontSize: 11.5, padding: '2px 6px', borderRadius: 5, background: 'rgba(128,128,128,.14)' }}>{k.tag}</span>
-                        <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {e.kind === 'dmgOut' && <><b>{fmtN(e.amount ?? 0)}</b> to {e.entity}{e.quality ? <span className="dim"> ({e.quality})</span> : ''}</>}
-                          {e.kind === 'dmgIn' && <><b>{fmtN(e.amount ?? 0)}</b> from {e.entity}{e.quality ? <span className="dim"> ({e.quality})</span> : ''}</>}
-                          {e.kind === 'missOut' && <>missed {e.entity}</>}
-                          {e.kind === 'missIn' && <>{e.entity} missed you</>}
-                          {e.kind === 'neutOut' && <>drained {e.entity} for <b>{fmtN(e.amount ?? 0)}</b> GJ</>}
-                          {e.kind === 'neutIn' && <>drained by {e.entity} for <b>{fmtN(e.amount ?? 0)}</b> GJ</>}
-                          {e.kind === 'repIn' && <><b>{fmtN(e.amount ?? 0)}</b> hp rep from {e.entity}</>}
-                          {e.kind === 'repOut' && <><b>{fmtN(e.amount ?? 0)}</b> hp rep to {e.entity}</>}
-                          {e.kind === 'jammed' && <>ECM jammed by {e.entity}{e.weapon ? <span className="dim"> ({e.weapon})</span> : ''}</>}
-                          {e.kind === 'mine' && <>mined <b>{fmtN(e.amount ?? 0)}</b> {e.ore}</>}
-                          {e.kind === 'mineCrit' && <b style={{ color: CRIT_COLOR }}>critical! +{fmtN(e.amount ?? 0)} {e.ore}</b>}
-                          {e.kind === 'residue' && <span style={{ color: RESIDUE_COLOR }}><b>{fmtN(e.amount ?? 0)}</b> units lost as residue</span>}
-                          {e.kind === 'bounty' && <><b>{fmtN(e.isk ?? 0)}</b> ISK bounty</>}
-                          {e.kind === 'reship' && <>{e.text}</>}
-                          {(e.kind === 'ewar' || e.kind === 'other') && <>{e.text}</>}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
+                <SectionHead accent="var(--muted)" text={`raw combat feed — ${scopeLabel} (${scopedEvents.length.toLocaleString()} events)`} />
+                {/* search, what-I-was-doing filters, opponent filter, scrubbable timeline (v0.199.5) */}
+                <FeedPanel events={scopedEvents} domain={domain} fights={fights} />
               </div>
             )}
           </>

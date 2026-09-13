@@ -1,15 +1,20 @@
-// HELP SYSTEM (v0.184) — three pieces, one content source (helpContent.tsx):
-//   · HelpButton  — the ⓘ in the header; opens the current module's guide,
-//     scrolled to the tab the user is actually looking at
+// HELP SYSTEM (v0.184, rebuilt v0.197) — three pieces, one content source
+// (helpContent.tsx, assembled from src/help/*):
+//   · HelpButton  — the ⓘ in the header; opens the module's GUIDE: a paged
+//     book with a table of contents down the left, one group per tab plus
+//     the shared "everywhere" groups, opened on the tab you are looking at
 //   · InfoDot     — a small ⓘ beside a panel title for panels whose
 //     mechanics are not obvious from the module guide
 //   · IntroTour   — the first-run walkthrough (sign in, per-character
-//     ticks, where help lives); replayable from any module guide's footer
+//     ticks, where help lives); replayable from any guide's footer
 //
-// RULE 20: new features ship WITH their help — add the module section /
-// panel entry in helpContent.tsx as part of the feature, not after.
-import { useEffect, useRef, useState } from 'react';
-import { MODULE_HELP, PANEL_HELP } from '../helpContent';
+// RULE 20: new features ship WITH their help — pages in src/help/<module>.tsx
+// as part of the feature, not after.
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { MODULE_HELP, PANEL_HELP, SHARED_GROUPS } from '../helpContent';
+import type { HelpGroup, HelpPage } from '../help/types';
+import { RELEASE_NOTES } from '../help/releaseNotes';
+import { POLICY_INTRO, POLICY_ROWS, POLICY_THIRD_PARTY, POLICY_QA, POLICY_SOURCES } from '../help/policy';
 import type { ModuleId } from '../lib/store';
 import { useAuth } from '../lib/auth';
 import { logUser } from '../lib/devlog';
@@ -24,8 +29,8 @@ export function replayIntro(): void {
 
 // ---------------------------------------------------------------------------
 
-function ModalShell({ wide, onClose, children }: {
-  wide?: boolean; onClose: () => void; children: React.ReactNode;
+function ModalShell({ wide, onClose, children, style }: {
+  wide?: boolean; onClose: () => void; children: React.ReactNode; style?: React.CSSProperties;
 }) {
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -42,6 +47,7 @@ function ModalShell({ wide, onClose, children }: {
           textTransform: 'none', letterSpacing: 'normal', fontWeight: 'normal',
           fontSize: 13, lineHeight: 1.55,
           ...(wide ? { maxWidth: 760 } : null),
+          ...style,
         }}
         onClick={(e) => e.stopPropagation()}>
         {children}
@@ -50,44 +56,296 @@ function ModalShell({ wide, onClose, children }: {
   );
 }
 
-/** the header ⓘ — the current module's full guide, scrolled to its tab */
+// ---------------------------------------------------------------------------
+// THE GUIDE — a book. Flat page list for prev/next; grouped list for the TOC.
+// ---------------------------------------------------------------------------
+
+interface FlatPage { group: string; groupTitle: string; page: HelpPage; index: number }
+
+function flatten(groups: HelpGroup[]): FlatPage[] {
+  const out: FlatPage[] = [];
+  for (const g of groups) for (const p of g.pages) out.push({ group: g.id, groupTitle: g.title, page: p, index: out.length });
+  return out;
+}
+
+/** the header ⓘ — the module's guide, opened on the tab in front of you */
 export function HelpButton({ module, section }: { module: ModuleId; section?: string }) {
   const [open, setOpen] = useState(false);
-  const bodyRef = useRef<HTMLDivElement | null>(null);
   const help = MODULE_HELP[module];
-  useEffect(() => {
-    if (!open || !section) return;
-    const el = bodyRef.current?.querySelector(`#help-${section}`);
-    if (el) el.scrollIntoView({ block: 'start' });
-  }, [open, section]);
   if (!help) return null;
   return (
     <>
-      <button className="btn icon" title={`How to use ${help.title}`}
+      <button className="btn icon" title={`How to use ${help.title} — a paged guide for every tab`}
         onClick={() => { logUser('help: module guide', { module, section }); setOpen(true); }}>
         ⓘ
       </button>
-      {open && (
-        <ModalShell wide onClose={() => setOpen(false)}>
-          <div ref={bodyRef}>
-            <h2>{help.title} — how to use it</h2>
-            {help.intro}
-            {help.sections.map((s) => (
-              <section key={s.id} id={`help-${s.id}`} style={{ scrollMarginTop: 8 }}>
-                <h3 className="section-title" style={{ marginTop: 16 }}>{s.title}</h3>
-                {s.body}
-              </section>
-            ))}
-            <div className="hint" style={{ marginTop: 16, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-              <span>Panels with a small ⓘ beside their title have their own notes.</span>
-              <button className="btn mini" onClick={() => { setOpen(false); replayIntro(); }}>
-                ↻ Replay the welcome tour
-              </button>
+      {open && <Guide module={module} section={section} onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+function Guide({ module, section, onClose }: { module: ModuleId; section?: string; onClose: () => void }) {
+  const help = MODULE_HELP[module];
+  const groups = useMemo<HelpGroup[]>(() => [
+    { id: 'intro', title: help.title, pages: help.intro },
+    ...help.groups,
+    ...SHARED_GROUPS,
+  ], [help]);
+  const flat = useMemo(() => flatten(groups), [groups]);
+  const [cur, setCur] = useState<number>(() => {
+    const hit = section ? flat.find((f) => f.group === section) : undefined;
+    return hit?.index ?? 0;
+  });
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const tocRef = useRef<HTMLDivElement | null>(null);
+  const page = flat[cur];
+
+  // ← / → turn pages; the reader's hands stay where they are
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowRight') setCur((c) => Math.min(flat.length - 1, c + 1));
+      if (e.key === 'ArrowLeft') setCur((c) => Math.max(0, c - 1));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [flat.length]);
+
+  // a new page starts at its top, and its TOC entry stays in view
+  useEffect(() => {
+    bodyRef.current?.scrollTo({ top: 0 });
+    const el = tocRef.current?.querySelector(`[data-page="${cur}"]`);
+    if (el) (el as HTMLElement).scrollIntoView({ block: 'nearest' });
+    logUser('help: page', { module, page: page?.page.id });
+  }, [cur, module, page?.page.id]);
+
+  if (!page) return null;
+  return (
+    <ModalShell wide onClose={onClose} style={{ maxWidth: 1040, width: 'min(1040px, 96vw)', padding: 0, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', height: 'min(78vh, 760px)', minHeight: 420 }}>
+        {/* ---- table of contents ---- */}
+        <nav ref={tocRef} style={{
+          width: 250, flex: 'none', overflowY: 'auto', borderRight: '1px solid var(--border)',
+          padding: '12px 8px', background: 'var(--surface-2)', fontSize: 12,
+        }}>
+          <div style={{ fontWeight: 800, fontSize: 13, padding: '0 6px 8px' }}>{help.title}</div>
+          {groups.map((g) => (
+            <div key={g.id} style={{ marginBottom: 8 }}>
+              <div style={{
+                fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase',
+                color: 'var(--ink-2)', padding: '4px 6px 2px',
+              }}>{g.title}</div>
+              {g.pages.map((p) => {
+                const idx = flat.findIndex((f) => f.group === g.id && f.page.id === p.id);
+                const on = idx === cur;
+                return (
+                  <button key={p.id} data-page={idx}
+                    onClick={() => setCur(idx)}
+                    style={{
+                      display: 'block', width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer',
+                      padding: '4px 8px', borderRadius: 4, fontSize: 12,
+                      background: on ? 'var(--accent-dim)' : 'transparent',
+                      color: on ? 'var(--ink)' : 'var(--ink-2)', fontWeight: on ? 700 : 500,
+                    }}>
+                    {p.title}
+                  </button>
+                );
+              })}
             </div>
-            <div className="actions" style={{ marginTop: 10 }}>
-              <button className="btn" onClick={() => setOpen(false)}>Close</button>
+          ))}
+        </nav>
+
+        {/* ---- the page ---- */}
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          <div ref={bodyRef} style={{ flex: 1, overflowY: 'auto', padding: '14px 20px 10px' }}>
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-2)' }}>
+              {page.groupTitle}
             </div>
+            <h2 style={{ margin: '2px 0 10px' }}>{page.page.title}</h2>
+            {page.page.figure}
+            <div className="help-body">{page.page.body}</div>
           </div>
+          <div style={{
+            display: 'flex', gap: 8, alignItems: 'center', padding: '8px 14px',
+            borderTop: '1px solid var(--border)', background: 'var(--surface-2)', flexWrap: 'wrap',
+          }}>
+            <button className="btn mini" disabled={cur === 0} onClick={() => setCur((c) => c - 1)}>◀ Prev</button>
+            <button className="btn mini" disabled={cur >= flat.length - 1} onClick={() => setCur((c) => c + 1)}>Next ▶</button>
+            <span className="dim" style={{ fontSize: 11 }}>
+              page {cur + 1} of {flat.length} · ← → keys turn pages · panels with a small ⓘ have their own notes
+            </span>
+            <span style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+              <button className="btn mini" onClick={() => { onClose(); replayIntro(); }}>↻ Replay the welcome tour</button>
+              <button className="btn" onClick={onClose}>Close</button>
+            </span>
+          </div>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// RELEASE NOTES (v0.199.3) — the 📋 in the header: every version since the
+// beta, newest first, with the why. Same two-column shape as the guide.
+// ---------------------------------------------------------------------------
+
+export function ReleaseNotesButton() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button className="btn icon" title="Release notes — what changed in each version, and why"
+        onClick={() => { logUser('help: release notes'); setOpen(true); }}>
+        📋
+      </button>
+      {open && <ReleaseNotes onClose={() => setOpen(false)} />}
+    </>
+  );
+}
+
+function ReleaseNotes({ onClose }: { onClose: () => void }) {
+  const [cur, setCur] = useState(0);
+  const bodyRef = useRef<HTMLDivElement | null>(null);
+  const n = RELEASE_NOTES[cur];
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowRight') setCur((c) => Math.min(RELEASE_NOTES.length - 1, c + 1));
+      if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') setCur((c) => Math.max(0, c - 1));
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  useEffect(() => { bodyRef.current?.scrollTo({ top: 0 }); }, [cur]);
+  if (!n) return null;
+  return (
+    <ModalShell wide onClose={onClose} style={{ maxWidth: 1040, width: 'min(1040px, 96vw)', padding: 0, overflow: 'hidden' }}>
+      <div style={{ display: 'flex', height: 'min(78vh, 760px)', minHeight: 420 }}>
+        <nav style={{
+          width: 230, flex: 'none', overflowY: 'auto', borderRight: '1px solid var(--border)',
+          padding: '12px 8px', background: 'var(--surface-2)', fontSize: 12,
+        }}>
+          <div style={{ fontWeight: 800, fontSize: 13, padding: '0 6px 8px' }}>Release notes</div>
+          {RELEASE_NOTES.map((r, i) => (
+            <button key={r.version} onClick={() => setCur(i)} className="release-nav"
+              style={{
+                display: 'block', width: '100%', textAlign: 'left', border: 'none', cursor: 'pointer',
+                padding: '5px 8px', borderRadius: 4, fontSize: 12,
+                background: i === cur ? 'var(--accent-dim)' : 'transparent',
+                color: i === cur ? 'var(--ink)' : 'var(--ink-2)', fontWeight: i === cur ? 700 : 500,
+              }}>
+              <span style={{ fontVariantNumeric: 'tabular-nums' }}>{r.version}</span>
+              {r.published && <span title="reached the public release feed" style={{ marginLeft: 6, fontSize: 10, color: 'var(--good)' }}>●</span>}
+              {r.policy && <span title="a policy decision is recorded" style={{ marginLeft: 4, fontSize: 10 }}>⚖</span>}
+              <div style={{ fontSize: 10.5, color: 'var(--ink-2)', fontWeight: 400 }}>{r.date}</div>
+            </button>
+          ))}
+          <div className="hint" style={{ padding: '8px 6px 0', fontSize: 10.5 }}>● reached the public release feed · ⚖ a policy decision is recorded. Versions before 0.186 predate the beta.</div>
+        </nav>
+        <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
+          <div ref={bodyRef} style={{ flex: 1, overflowY: 'auto', padding: '14px 20px 10px' }}>
+            <div style={{ fontSize: 10.5, fontWeight: 800, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-2)' }}>
+              version {n.version} · {n.date}{n.published ? ' · on the public release feed' : ''}
+            </div>
+            <h2 style={{ margin: '2px 0 10px' }}>{n.headline}</h2>
+            <div className="section-title" style={{ marginTop: 8 }}>What changed</div>
+            <ul style={{ paddingLeft: 18 }}>{n.changes.map((c, i) => <li key={i} style={{ margin: '3px 0' }}>{c}</li>)}</ul>
+            <div className="section-title" style={{ marginTop: 12 }}>Why</div>
+            <p style={{ margin: '4px 0 0' }}>{n.why}</p>
+            {n.policy && (
+              <div style={{ margin: '12px 0 4px', padding: '8px 10px', borderLeft: '3px solid var(--accent)', background: 'var(--surface-2)', borderRadius: 4 }}>
+                <div style={{ fontSize: 11, fontWeight: 800, letterSpacing: '0.04em', textTransform: 'uppercase', color: 'var(--accent)' }}>⚖ Policy reasoning</div>
+                <div style={{ fontSize: 12.5 }}>{n.policy}</div>
+              </div>
+            )}
+          </div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '8px 14px', borderTop: '1px solid var(--border)', background: 'var(--surface-2)' }}>
+            <button className="btn mini" disabled={cur === 0} onClick={() => setCur((c) => c - 1)}>▲ Newer</button>
+            <button className="btn mini" disabled={cur >= RELEASE_NOTES.length - 1} onClick={() => setCur((c) => c + 1)}>Older ▼</button>
+            <span className="dim" style={{ fontSize: 11 }}>{cur + 1} of {RELEASE_NOTES.length} · arrow keys move</span>
+            <button className="btn" style={{ marginLeft: 'auto' }} onClick={onClose}>Close</button>
+          </div>
+        </div>
+      </div>
+    </ModalShell>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// POLICY (v0.199.3) — the ⚖ in the header: CCP's rules that touch a tool
+// like this, paraphrased (their text is copyrighted) beside how the app
+// keeps to each, plus the questions we asked ourselves.
+// ---------------------------------------------------------------------------
+
+export function PolicyButton() {
+  const [open, setOpen] = useState(false);
+  return (
+    <>
+      <button className="btn icon" title="EVE Online terms — the rules that apply to a tool like this, and how this app keeps to them"
+        onClick={() => { logUser('help: policy page'); setOpen(true); }}>
+        ⚖
+      </button>
+      {open && (
+        <ModalShell wide onClose={() => setOpen(false)} style={{ maxWidth: 1100, width: 'min(1100px, 96vw)' }}>
+          <div style={{ maxHeight: 'min(78vh, 760px)', overflowY: 'auto', paddingRight: 4 }}>
+            <h2>EVE Online's rules, and how this app keeps to them</h2>
+            {POLICY_INTRO}
+            <table className="data policy-table" style={{ fontSize: 12, marginTop: 8 }}>
+              <thead>
+                <tr>
+                  <th style={{ width: '40%' }}>The rule (paraphrased) · source</th>
+                  <th>How EVE Conductor keeps to it</th>
+                  <th style={{ width: 70 }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {POLICY_ROWS.map((r, i) => (
+                  <tr key={i}>
+                    <td style={{ verticalAlign: 'top' }}>
+                      <div>{r.rule}</div>
+                      <div className="dim" style={{ fontSize: 10.5, marginTop: 3 }}>{r.source}</div>
+                    </td>
+                    <td style={{ verticalAlign: 'top' }}>{r.how}</td>
+                    <td style={{ verticalAlign: 'top', color: r.status === 'clean' ? 'var(--good)' : '#e0a13a', fontWeight: 700 }}>{r.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <h3 className="section-title" style={{ marginTop: 16 }}>The other services the app talks to</h3>
+            <p className="hint" style={{ margin: '4px 0 6px' }}>Not CCP's rules, but each service has its own, and the app is a guest on all of them.</p>
+            <table className="data policy-table" style={{ fontSize: 12 }}>
+              <thead>
+                <tr>
+                  <th style={{ width: '24%' }}>Service</th>
+                  <th style={{ width: '28%' }}>Their rules (paraphrased)</th>
+                  <th>How EVE Conductor behaves</th>
+                  <th style={{ width: 70 }}>Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {POLICY_THIRD_PARTY.map((r, i) => (
+                  <tr key={i}>
+                    <td style={{ verticalAlign: 'top' }}>{r.service}</td>
+                    <td style={{ verticalAlign: 'top' }}>{r.rules}</td>
+                    <td style={{ verticalAlign: 'top' }}>{r.how}</td>
+                    <td style={{ verticalAlign: 'top', color: r.status === 'clean' ? 'var(--good)' : '#e0a13a', fontWeight: 700 }}>{r.status}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <h3 className="section-title" style={{ marginTop: 16 }}>Questions we asked ourselves</h3>
+            {POLICY_QA.map((q, i) => (
+              <div key={i} style={{ margin: '6px 0 10px' }}>
+                <div style={{ fontWeight: 700 }}>{q.q}</div>
+                <div style={{ fontSize: 12.5 }}>{q.a}</div>
+              </div>
+            ))}
+            <h3 className="section-title" style={{ marginTop: 16 }}>The originals</h3>
+            <ul style={{ paddingLeft: 18, fontSize: 12 }}>
+              {POLICY_SOURCES.map((s) => (
+                <li key={s.url}><b>{s.name}</b> — <a href={s.url} target="_blank" rel="noreferrer">{s.url}</a></li>
+              ))}
+            </ul>
+          </div>
+          <div className="actions"><button className="btn" onClick={() => setOpen(false)}>Close</button></div>
         </ModalShell>
       )}
     </>
@@ -112,8 +370,9 @@ export function InfoDot({ id }: { id: string }) {
         i
       </button>
       {open && (
-        <ModalShell onClose={() => setOpen(false)}>
+        <ModalShell wide onClose={() => setOpen(false)}>
           <h2>{entry.title}</h2>
+          {entry.figure}
           {entry.body}
           <div className="actions"><button className="btn" onClick={() => setOpen(false)}>Close</button></div>
         </ModalShell>
@@ -244,9 +503,11 @@ export function IntroTour({ onOpenSettings }: { onOpenSettings: () => void }) {
       {step === 4 && (
         <>
           <p>
-            Every module has an <b>ⓘ button in the top bar</b> — a full how-to for the tab you
-            are on. Panels with a small <b>ⓘ</b> beside their title have their own notes. This
-            tour can be replayed from any module guide's footer.
+            Every module has an <b>ⓘ button in the top bar</b> — a paged guide with a table of
+            contents: one group per tab, every control explained with a picture and an example,
+            plus shared pages on the header, Settings and the multibox overlay. Panels with a
+            small <b>ⓘ</b> beside their title have their own notes. This tour can be replayed
+            from any guide's footer.
           </p>
           <p className="hint">
             One habit worth keeping: when a number surprises you, hover it — most numbers

@@ -316,7 +316,7 @@ export default function CloneConfig() {
         <p className="cfg-sub">
           Appears only when something needs saying — EVE API down, login (SSO) trouble, or rate limiting —
           and explains it in plain language. Position its template with <b>Alt+\</b> in game. Notice boxes
-          (this one, 🪐 planets, 🎯 raids) share a width of their own — drag a corner in setup mode to change
+          (this one, 🪐 planets, 🎯 raids) each have a width of their own — drag a corner in setup mode to change
           it; the pod boxes keep their separate shared size.
         </p>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, marginTop: 8 }}>

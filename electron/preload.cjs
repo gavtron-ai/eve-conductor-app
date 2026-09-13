@@ -48,10 +48,11 @@ contextBridge.exposeInMainWorld('appInfo', {
     write: (patch) => ipcRenderer.invoke('config-write', patch),
     path: () => ipcRenderer.invoke('config-path'),
   },
-  /** the corp killboard read as a real PAGE in a hidden window — the live
-   * list that zkill's cached APIs run ~30 min behind */
+  /** zKillboard's JSON API, called from main with an identifying user agent,
+   * one request at a time (v0.199.1 — the page reader is gone) */
   zkill: {
-    pageIds: (corpId) => ipcRenderer.invoke('zkill-page-ids', corpId),
+    /** the corp's recent kills + losses from zKill's API (cached by zKill for up to an hour) */
+    corpKills: (corpId) => ipcRenderer.invoke('zkill-corp-kills', corpId),
     charKills: (charId) => ipcRenderer.invoke('zkill-char-kills', charId),
     /** a system's recent killmails (window in seconds) for the gatecamp check */
     systemKills: (systemId, pastSeconds) => ipcRenderer.invoke('zkill-system-kills', { systemId, pastSeconds }),

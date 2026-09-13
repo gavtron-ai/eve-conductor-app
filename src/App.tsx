@@ -5,7 +5,7 @@ import HubTable from './components/HubTable';
 import ArbitragePanel from './components/ArbitragePanel';
 import HistoryChart from './components/HistoryChart';
 import SettingsModal from './components/SettingsModal';
-import { HelpButton, IntroTour } from './components/Help';
+import { HelpButton, IntroTour, ReleaseNotesButton, PolicyButton } from './components/Help';
 import TradeFinder from './components/TradeFinder';
 import MistakeFinder from './components/MistakeFinder';
 import AutoHaul from './components/AutoHaul';
@@ -641,6 +641,8 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
               : module === 'theft' ? theftView
                 : module === 'character' ? (charMode === 'fit' || charMode === 'wizard' || charMode === 'propagator' ? charMode : 'match')
                   : module === 'pi' ? 'planets' : undefined} />
+        <ReleaseNotesButton />
+        <PolicyButton />
         <button className="btn icon" onClick={() => setShowSettings(true)} title="Trading settings">
           ⚙
         </button>
