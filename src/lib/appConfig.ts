@@ -14,6 +14,7 @@
 import { useAuth } from './auth';
 import { useApp } from './store';
 import { logInfo, logWarn } from './devlog';
+import { DEFAULT_CHAIN_HOME } from './chain';
 
 export interface AppSetup {
   /** the EVE application logins go through — a public id, not a secret */
@@ -23,7 +24,9 @@ export interface AppSetup {
   /** corporation web map embedded as the Aperture module ('' = off) */
   apertureUrl: string;
   /** the map's label for the corp's home system — the chain summary's
-   * default origin (v0.200.2; '' = type it in the window) */
+   * origin. The main process answers DEFAULT_CHAIN_HOME ("Florida") when the
+   * file has no such key (v0.201.11); '' = the player cleared it, so the
+   * summary uses the map's own home instead */
   chainHome: string;
 }
 
@@ -72,7 +75,7 @@ export async function loadSetup(): Promise<AppSetup> {
     eveApplication: loaded.eveClientId !== '' ? 'configured' : 'not set',
     transitShip: loaded.transitShipName !== '' ? 'configured' : 'not set',
     apertureMap: loaded.apertureUrl !== '' ? 'configured' : 'not set',
-    chainHome: loaded.chainHome !== '' ? 'configured' : 'not set',
+    chainHome: loaded.chainHome === DEFAULT_CHAIN_HOME ? 'default' : loaded.chainHome !== '' ? 'configured' : 'cleared',
   });
   return loaded;
 }

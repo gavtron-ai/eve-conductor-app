@@ -23,21 +23,21 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'evecfg-'));
 
 // ---- 1. A FRESH INSTALL IS EMPTY, NOT BROKEN ---------------------------
 eq('no file yet reads as an unconfigured setup', cfg.read(tmp),
-  { eveClientId: '', transitShipName: '', apertureUrl: '', chainHome: '' });
+  { eveClientId: '', transitShipName: '', apertureUrl: '', chainHome: cfg.DEFAULT_CHAIN_HOME });
 ok('...and reading did not create a config file',
   !fs.existsSync(path.join(tmp, cfg.FOLDER_NAME, cfg.FILE_NAME)));
 
 // ---- 2. WRITING, AND THE FILE THAT RESULTS ------------------------------
 let out = cfg.write(tmp, { eveClientId: 'abc123', transitShipName: 'MY HAULER' });
 eq('a write returns the full new setup', out,
-  { eveClientId: 'abc123', transitShipName: 'MY HAULER', apertureUrl: '', chainHome: '' });
+  { eveClientId: 'abc123', transitShipName: 'MY HAULER', apertureUrl: '', chainHome: cfg.DEFAULT_CHAIN_HOME });
 eq('...and reading it back agrees', cfg.read(tmp), out);
 ok('a README explains the folder', fs.existsSync(path.join(tmp, cfg.FOLDER_NAME, 'README.txt')));
 
 // a PARTIAL write must not blank the fields it did not mention
 out = cfg.write(tmp, { apertureUrl: 'https://map.example/1' });
 eq('a partial write leaves other fields alone', out,
-  { eveClientId: 'abc123', transitShipName: 'MY HAULER', apertureUrl: 'https://map.example/1', chainHome: '' });
+  { eveClientId: 'abc123', transitShipName: 'MY HAULER', apertureUrl: 'https://map.example/1', chainHome: cfg.DEFAULT_CHAIN_HOME });
 
 // deliberately clearing a field must stick
 out = cfg.write(tmp, { transitShipName: '' });
@@ -48,6 +48,22 @@ eq('...and it stays cleared on the next read', cfg.read(tmp).transitShipName, ''
 // whitespace is trimmed — a trailing space in a ship name would silently
 // stop the exact-name match from ever succeeding
 eq('values are trimmed', cfg.write(tmp, { transitShipName: '  SPACED  ' }).transitShipName, 'SPACED');
+
+// ---- 2b. THE HOME LABEL HAS A DEFAULT (v0.201.11) -------------------------
+eq('the default home label is the corp home', cfg.DEFAULT_CHAIN_HOME, 'Florida');
+// a config.json written before the key existed (every corp install up to
+// v0.199.5) reads as the default, not as empty
+fs.writeFileSync(path.join(tmp, cfg.FOLDER_NAME, cfg.FILE_NAME),
+  JSON.stringify({ eveClientId: 'abc123', transitShipName: 'SPACED', apertureUrl: 'https://map.example/1' }));
+eq('a file WITHOUT the key reads as the default', cfg.read(tmp).chainHome, cfg.DEFAULT_CHAIN_HOME);
+eq('...and the other fields are untouched by that', cfg.read(tmp).eveClientId, 'abc123');
+// a player who clears it on purpose (to follow the map's own home) must not
+// be re-defaulted on the next read
+eq('a deliberately cleared home label stays cleared', cfg.write(tmp, { chainHome: '' }).chainHome, '');
+eq('...on the next read too', cfg.read(tmp).chainHome, '');
+eq('a typed label is stored as typed', cfg.write(tmp, { chainHome: ' J100001 ' }).chainHome, 'J100001');
+// the renderer names the same default (src/lib/chain.ts) — one value, two sides
+eq('the renderer carries the same default', require('./sim/lib/chain.js').DEFAULT_CHAIN_HOME, cfg.DEFAULT_CHAIN_HOME);
 
 // ---- 3. NO TOKENS, EVER (RULE 7) ---------------------------------------
 const JWT = 'eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJDSEFSQUNURVI6RVZFOjk1NDY0OTUifQ.sig123456';
@@ -76,7 +92,7 @@ const good = cfg.read(tmp);
 // a corrupt file reads as empty rather than throwing...
 fs.writeFileSync(path.join(tmp, cfg.FOLDER_NAME, cfg.FILE_NAME), '{ this is not json');
 eq('a corrupt file reads as unconfigured instead of crashing', cfg.read(tmp),
-  { eveClientId: '', transitShipName: '', apertureUrl: '', chainHome: '' });
+  { eveClientId: '', transitShipName: '', apertureUrl: '', chainHome: cfg.DEFAULT_CHAIN_HOME });
 // ...and writing over it restores a valid file
 eq('writing over a corrupt file works', cfg.write(tmp, { eveClientId: good.eveClientId }).eveClientId,
   good.eveClientId);
@@ -91,7 +107,7 @@ eq('...while the valid field beside it survives', cfg.read(tmp).transitShipName,
 eq('an unwritable path reports failure rather than throwing',
   cfg.write('Z:/definitely/not/real', { eveClientId: 'x' }), null);
 eq('...and reading one is empty, not an exception', cfg.read('Z:/nope'),
-  { eveClientId: '', transitShipName: '', apertureUrl: '', chainHome: '' });
+  { eveClientId: '', transitShipName: '', apertureUrl: '', chainHome: cfg.DEFAULT_CHAIN_HOME });
 
 // the write is atomic: no .tmp file is left behind
 const dirFiles = fs.readdirSync(path.join(tmp, cfg.FOLDER_NAME));

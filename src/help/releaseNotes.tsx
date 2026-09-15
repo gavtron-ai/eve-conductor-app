@@ -28,6 +28,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.201.11', date: '2026-09-15', headline: 'Florida is the chain summary\'s home out of the box', published: true,
+    changes: [
+      <>The chain summary's <b>home</b> is <b>Florida</b> by default — prefilled in ⚙ Settings → Your setup and in the tab's own field — so a fresh install counts jumps from the corp's home without typing anything. An install set up before this version, whose file never had the key, gets the same default.</>,
+      <>Change it if your map labels home differently. Clear it, and the summary follows whatever the map itself marks as home; a cleared field stays cleared across restarts.</>,
+    ],
+    why: <>"I want Florida entered in app as a default, that is not super secret info."</>,
+    policy: <>The label was on the personal-data guard list until now and is removed from it on the owner's decision. Character names and ids, the map's address, the ship name and the home J-code stay guarded.</>,
+  },
+  {
     version: '0.201.10', date: '2026-09-15', headline: 'Baked dataset refreshed: measurements through 15 September', published: true,
     changes: [
       <>A <b>new install</b> now starts with the project's collected history to date: the market radar summary (108,269 item rates, up from 102,632 in the previous bake), its region coverage, and the skyhook raid history (48,055 observations, the last on 15 September). Same three files, same format, same allowlist — only impersonal measurements derived from public data; never wallets, orders, fits or trend events.</>,

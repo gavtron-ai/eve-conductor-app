@@ -47,7 +47,7 @@ export const APERTURE_HELP: ModuleHelp = {
           figure: (
             <Fig caption="The Σ Summary tab: ISK on field per activity, every site with its distance in jumps from home or from you.">
               <div style={{ fontSize: 11.5 }}>
-                <div>distance counted from <Btn mini primary>🏠 home</Btn> <Btn mini>Home Sweet Home</Btn> <Btn mini>🧍 me · Pilot</Btn></div>
+                <div>distance counted from <Btn mini primary>🏠 home</Btn> <Btn mini>Florida</Btn> <Btn mini>🧍 me · Pilot</Btn></div>
                 <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
                   {[['Combat', '312m · 4 sites'], ['Ore', '95m · 5 sites'], ['Gas', '41m · 2 sites'], ['Relic', '— · 1 site'], ['Data', '— · 2 sites']].map(([g, v]) => (
                     <span key={g} style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 6 }}><b>{g}</b> {v}</span>
@@ -61,7 +61,7 @@ export const APERTURE_HELP: ModuleHelp = {
             <>
               <Steps items={[
                 <>Log in on the <b>Corp Map</b> tab once, then open the <b>Σ Summary</b> tab. The app reads the map's own data feed for every system drawn on the chain — the complete signature list, all types and classes, no panel needed — through your own login; the map stays loaded underneath. Nothing leaves your machine and nothing on the map is clicked or changed. The <i>Signature Search</i> table is only a fallback if the feed cannot be read.</>,
-                <>Pick the origin: <b>🏠 home</b> (the map's own home system, read from its feed; type a label in ⚙ Settings → Your setup or in the window only to override it) or <b>🧍 me</b>, your active character's current system from CCP's location route. Every site shows its distance in jumps from there.</>,
+                <>Pick the origin: <b>🏠 home</b> — <b>Florida</b> out of the box, prefilled in ⚙ Settings → Your setup and in the tab's own field; change it if your map labels home differently, or clear it to follow the home system the map itself marks — or <b>🧍 me</b>, your active character's current system from CCP's location route. Every site shows its distance in jumps from there.</>,
                 <>Read the dashboard: the <b>chain drawn by distance</b> (a column per jump; each card shows the system, its class, ISK on field and site count — click one to focus the tiles and table on it), <b>ISK by jumps</b> (stacked by activity — click a bar to set the distance filter), the <b>activity mix</b> and <b>freshness</b> (how long since the map last looked at each signature).</>,
                 <>Filter by <b>jumps</b>, <b>class</b> (C1 easiest to C6 hardest, plus HS/LS/NS), <b>activity</b> and <b>max age</b>. The tiles and the table follow; when a filter hides rows only because their class or distance is unknown, the window says so.</>,
                 <><b>⟳ refresh</b> asks the map for a fresh reading; the tab re-reads every five minutes on its own while it is open.</>,

@@ -54,9 +54,10 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
   // the "keep the last good list" adopter, reachable from the in-tab effect
   const adoptRef = useRef<(d: Extract) => void>(() => {});
   const [origin, setOrigin] = useState<'home' | 'me'>('home');
-  // the home label is per-player setup (the map's own custom name for the
-  // corp's home): prefilled from config.json (Settings → Your setup, or
-  // typed here — either way it lands in the file, never in code)
+  // the home label: "Florida" out of the box (the main process's default
+  // when config.json has no such key — v0.201.11, the owner's call), or
+  // whatever was typed in Settings → Your setup or here; either way it
+  // lands in the file. Cleared on purpose = use the map's own home.
   const [home, setHome] = useState<string>(() => { try { return localStorage.getItem(HOME_KEY) ?? ''; } catch { return ''; } });
   const [homeFromFile, setHomeFromFile] = useState<string | null>(null);
   useEffect(() => {
@@ -331,7 +332,7 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
           <span className="dim">distance counted from</span>
           <button className={`btn mini${origin === 'home' ? ' primary' : ''}`} onClick={() => setOrigin('home')}>🏠 home</button>
           <input type="text" value={home} onChange={(e) => setHome(e.target.value)} style={{ width: 120, fontSize: 12 }}
-            placeholder={feedHome ? `${feedHome} (from the map)` : 'home, as the map labels it'} title={feedHome ? `the map names ${feedHome} as home — type a label only to override it` : "the map's home system, as the map labels it — typed once, remembered"} />
+            placeholder={feedHome ? `${feedHome} (from the map)` : 'home, as the map labels it'} title={feedHome ? `the map names ${feedHome} as home — clear this field to follow the map, or type a label to override it` : "the map's home system, as the map labels it — Florida unless you change it"} />
           <button className={`btn mini${origin === 'me' ? ' primary' : ''}`} onClick={() => setOrigin('me')} disabled={!activeId}
             title={activeId ? `${activeName}'s current system, from CCP` : 'log a character in first'}>🧍 me{activeName ? ` · ${activeName}` : ''}</button>
           {origin === 'me' && <span className="dim" style={{ fontSize: 12 }}>{me.system ? `in ${me.system}` : me.note || 'locating…'}</span>}

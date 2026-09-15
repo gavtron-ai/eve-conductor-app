@@ -320,8 +320,9 @@ function YourSetupSection() {
         />
       </div>
       <p className="hint">
-        The chain summary (Aperture → <b>Σ Summary</b>) counts holes from here by default. Type it
-        as the map labels it — a custom name if the map uses one, else the J-code.
+        The chain summary (Aperture → <b>Σ Summary</b>) counts jumps from here. <b>Florida</b> is the
+        default; change it only if your map labels home differently (a custom name if the map uses
+        one, else the J-code). Clear it to follow whatever the map itself marks as home.
       </p>
     </div>
   );

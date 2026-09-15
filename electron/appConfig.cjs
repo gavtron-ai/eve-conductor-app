@@ -32,8 +32,8 @@ config.json holds the settings that are YOURS rather than the app's:
   apertureUrl       your corporation's web map, embedded as the Aperture
                     module (leave empty to turn the module off)
   chainHome         the map's label for your home system — where the
-                    chain summary counts holes from (leave empty to type
-                    it in the summary window)
+                    chain summary counts jumps from. "Florida" unless you
+                    change it; leave it empty to use the map's own home
 
 The app writes this file for you when you fill in Settings -> Your setup.
 You can also edit it by hand; the app reads it at startup.
@@ -62,6 +62,12 @@ writes a plain summary from the same computed facts.
 /** the only keys this file is allowed to carry */
 const KEYS = ['eveClientId', 'transitShipName', 'apertureUrl', 'chainHome'];
 
+/** the corp's home label on the map — the chain summary's origin out of the
+ * box (v0.201.11, the owner's call: "not super secret info"). A config.json
+ * WITHOUT the key reads as this; a file that carries '' (the player cleared
+ * it on purpose) stays '', and the summary then uses the map's own home. */
+const DEFAULT_CHAIN_HOME = 'Florida';
+
 /** anything token-shaped must never be written, whatever the caller passed */
 const looksSecret = (v) =>
   typeof v === 'string' &&
@@ -77,9 +83,9 @@ function configDir(documentsPath) {
 
 const configPath = (documentsPath) => path.join(configDir(documentsPath), FILE_NAME);
 
-/** the stored setup, or empty values when there is no file yet */
+/** the stored setup, or empty values (and the default home) when there is no file yet */
 function read(documentsPath) {
-  const empty = { eveClientId: '', transitShipName: '', apertureUrl: '', chainHome: '' };
+  const empty = { eveClientId: '', transitShipName: '', apertureUrl: '', chainHome: DEFAULT_CHAIN_HOME };
   try {
     const p = path.join(documentsPath, FOLDER_NAME, FILE_NAME);
     if (!fs.existsSync(p)) return empty;
@@ -215,6 +221,7 @@ function writeHauls(documentsPath, file) {
 }
 
 module.exports = {
+  DEFAULT_CHAIN_HOME,
   FOLDER_NAME, FILE_NAME, CLONES_FILE, HAULS_FILE, configDir, configPath, read, write, KEYS, readHauls, writeHauls,
   readClones, writeClones,
 };

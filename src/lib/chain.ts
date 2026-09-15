@@ -13,6 +13,11 @@
 // already been run — every figure is "if untouched", and the window says so.
 // Relic, data and k-space combat sites carry no estimate (count only).
 
+/** the corp's home label on the map — the chain summary's origin out of the
+ * box (v0.201.11). The main process holds the same value in
+ * electron/appConfig.cjs; the config fixture asserts the two agree. */
+export const DEFAULT_CHAIN_HOME = 'Florida';
+
 export type SigGroup = 'Combat' | 'Ore' | 'Gas' | 'Relic' | 'Data' | 'Wormhole' | 'Other';
 
 export interface ChainSig {
