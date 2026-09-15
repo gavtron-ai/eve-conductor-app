@@ -7,7 +7,7 @@
 // parseSystemList does with the copied text, is verifiable here against the
 // EXACT string he pasted from his map (Ctrl-A/Ctrl-C of the Systems tab).
 //
-// Ground truth from his screenshots + paste (map "FLORIDA", 7 systems):
+// Ground truth from his screenshots + paste (map "HOMEBASE", 7 systems):
 //   Airkio  H   k-space  (import)
 //   J141848 C3  wormhole (skip)
 //   J100001 C2  wormhole (skip, alias "Home")
@@ -70,7 +70,7 @@ const tableText = [
 const pageText = [
   'ApertureAperture',
   'EVE 03:55',
-  'FLORIDA',
+  'HOMEBASE',
   'corp · wh · 7 systems',
   '2121667732',
   'Map',
@@ -88,7 +88,7 @@ const pageText = [
   'Aperture — collaborative wormhole mapping for EVE Online',
   'Credits',
   'EVE Online and all related trademarks are property of Fenris Creations.',
-  'FLORIDA',
+  'HOMEBASE',
   'corp · wh',
   '',
   row(['System', 'Region / Constellation', 'Sec', 'Status', 'Statics']),
@@ -107,7 +107,7 @@ const pageText = [
   eq('page: matched names', r.matched.slice().sort(), ['Airkio', 'Jita', 'Kuhri', 'Neda']);
   eq('page: 3 wormholes skipped', r.wormholes.slice().sort(), ['J100001', 'J141848', 'J220654']);
   // page chrome that happens to be an EVE thing must not sneak in:
-  // "Intel", "Routes", "Map", "Credits", "FLORIDA" (the map name, not a system)
+  // "Intel", "Routes", "Map", "Credits", "HOMEBASE" (the map name, not a system)
   // — none are EVE systems, so the set stays exactly the four above.
   has('page: has Airkio', r.matched, 'Airkio');
   has('page: has Neda', r.matched, 'Neda');

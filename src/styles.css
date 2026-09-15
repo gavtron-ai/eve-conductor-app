@@ -1805,3 +1805,17 @@ svg text.dim { fill: var(--muted); }
 .wiz-variant.meta-3 img { outline: 1px solid rgba(90, 200, 130, 0.75); }   /* faction */
 .wiz-variant.meta-5 img { outline: 1px solid rgba(120, 180, 235, 0.75); }  /* deadspace */
 .wiz-variant.meta-6 img { outline: 1px solid rgba(230, 150, 90, 0.75); }   /* officer */
+
+/* PER-SCREEN ZOOM (v0.200.8): the "− 100% +" control in every window's
+   header. The percentage is a button (reset); it lights up when the
+   screen is off 100 % so a zoomed screen is never a mystery. */
+.zoom-ctl { display: inline-flex; align-items: center; gap: 2px; margin-left: 4px; }
+.zoom-ctl .btn.icon { padding: 4px 7px; font-size: 14px; min-width: 26px; }
+.zoom-ctl .zoom-pct {
+  min-width: 46px; padding: 4px 6px; font-size: 11.5px; font-variant-numeric: tabular-nums;
+  background: transparent; border: 1px solid transparent; border-radius: 6px; color: var(--muted, #9aa0aa); cursor: pointer;
+}
+.zoom-ctl .zoom-pct.on { color: var(--accent, #7fc8ff); border-color: var(--accent, #7fc8ff); }
+.zoom-ctl .zoom-pct:disabled { cursor: default; }
+.zoom-ctl.compact .btn.icon { padding: 2px 6px; font-size: 13px; min-width: 22px; }
+.zoom-ctl.compact .zoom-pct { min-width: 40px; padding: 2px 4px; font-size: 11px; }

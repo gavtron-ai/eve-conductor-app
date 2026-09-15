@@ -28,6 +28,201 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.201.9', date: '2026-09-15', headline: 'Jumps, not holes; the selected system glows apart from its route', published: true,
+    changes: [
+      <>Distance reads as <b>jumps</b> everywhere — the column heads, the filter, the table column, the bar chart, the card labels and tooltips.</>,
+      <>The system you click now <b>glows white</b>, while the systems and links merely on its route keep their coloured stroke, so the selection and the path read apart.</>,
+    ],
+    why: <>"Nobody says a hole is x holes away, it is x jumps away." and "make the selection glow a bit so it is clear what part is highlighted due to being part of the path and what is highlighted due to selection."</>,
+    policy: <>Nothing new.</>,
+  },
+  {
+    version: '0.201.8', date: '2026-09-15', headline: 'Systems on the map with no link to the origin are shown as such, not hidden',
+    changes: [
+      <>The chain is walked outward from the origin along the wormholes the map has drawn. A system that is on the map but has no drawn link back to the origin used to be left off the drawing silently. It now sits in a last, dashed column headed "on the map, not linked", its card says "no link to origin", and the header line names them. Their sites still show "?" for holes and drop out under a distance filter; draw the link on the map and they join the chain on the next read.</>,
+    ],
+    why: <>"I don't see the systems I added to the map on the dashboard — is that purposeful because we cannot get to them? If so that makes a lot of sense, but we need to be clear about how it works."</>,
+    policy: <>Nothing new.</>,
+  },
+  {
+    version: '0.201.7', date: '2026-09-15', headline: 'Shattered systems carry the map\'s dotted circle',
+    changes: [
+      <>A shattered wormhole shows a dotted circle after its name on the card and on the route strip, with a tooltip. The 108 shattered systems come from CCP's static data (every planet in them is the shattered kind): the 75 regular shattered holes, the 25 small-ship C13 ones, Thera and its neighbours. C13 has its own class colour.</>,
+    ],
+    why: <>"I added some systems with a shattered symbol, that is important to show as well (the dotted circle)."</>,
+    policy: <>CCP's public static data; nothing new.</>,
+  },
+  {
+    version: '0.201.6', date: '2026-09-15', headline: 'All six effect colours are now the map\'s own',
+    changes: [
+      <>The hunt paid off: the map page's own script chunk carries its effect palette, and the six colours are baked in — Magnetar <b>#e06fdf</b>, Red Giant <b>#d9534f</b>, Pulsar <b>#428bca</b>, Wolf-Rayet <b>#e28a0d</b>, Cataclysmic Variable <b>#ffffbb</b>, Black Hole <b>#000000</b>. The four the map had drawn matched the measured badges exactly. A live reading still overrides them, so if the map is ever recoloured the summary follows.</>,
+      <>The reader's palette scan now takes the colour that follows an effect's name rather than the nearest one, which had picked up a neighbouring status palette.</>,
+    ],
+    why: <>"Can you find what the other colour codes are somehow?" — the map's own front-end code, reached through your login, the same palette Aperture uses for its little squares.</>,
+    policy: <>The map's own script, read through your login; colours only.</>,
+  },
+  {
+    version: '0.201.5', date: '2026-09-15', headline: 'Effect box without the inner square; a wider hunt for the two effect colours the map has not shown',
+    changes: [
+      <>The effect box is just the box: the effect's colour as border and text, no swatch inside. Same for the route strip.</>,
+      <>Pulsar and Wolf-Rayet have not been drawn on the map since the reader started measuring, and the map's public files carry no palette, so the reader now searches every script and stylesheet the logged-in map page has loaded — the lazily loaded route chunks included — for each effect's name beside a colour, on every read. The two colours get baked in as soon as a read finds them or the map draws them.</>,
+    ],
+    why: <>"Can you find what the other colour codes are somehow? Hunt through the F12 stuff. Also the square in the effect box is not necessary."</>,
+    policy: <>The map's own page and scripts, through your login, structure and colours only.</>,
+  },
+  {
+    version: '0.201.4', date: '2026-09-15', headline: 'Effect colours taken from your map; calmer class tags; low-sec and tags fixed',
+    changes: [
+      <>The effect box now shows the same little coloured square your map draws, in the map's own colours: the reader measured the map's badges (Magnetar magenta, Cataclysmic Variable pale yellow, Black Hole black, Red Giant red) and adopts the colours of whatever is on the map at each read; Pulsar and Wolf-Rayet keep placeholders until they appear, and the reader also looks for the full palette in the map's own code.</>,
+      <>Class tags are outlined instead of solid: a dark translucent pill with the class colour as border and text, still large, without the glare.</>,
+      <>A hole's letter tag was missing when the map's card began with an age badge ("7h"); the reader now skips age and count badges. A k-space hole with no signatures showed no class colour; every system's class now comes from the map, not only from its signatures. Low-sec yellow leans orange.</>,
+    ],
+    why: <>"The colours for the effects should be colour-coded to match the little squares on the map … too much contrast on the C#X boxes … J131304 is a C3A but shows no letter … Shalne is low-sec but wasn't colour-coded … make the low-sec yellow a bit more orange."</>,
+    policy: <>Colours are read from the map's own page and its scripts through your login, structure only. Nothing new leaves the machine.</>,
+  },
+  {
+    version: '0.201.3', date: '2026-09-15', headline: 'The whole way home lights up; a smaller, colour-coded effect box on the card\'s bottom edge',
+    changes: [
+      <>Click a hole and the <b>whole route from home</b> to it is highlighted, every link and every card, with a strip listing the systems. When your active character is somewhere else on the chain, their own way there is drawn too, in green, as a second line.</>,
+      <>The effect box is now small, the same width as the class tag, anchored to the card's bottom edge, and abbreviated: WR, PULS, MAG, BH, RG, CATA. Hover it for the full name and the modifiers. Each effect has its own colour, and the reader now records how your map colours its effect badges so the summary can adopt the map's palette on the next read.</>,
+    ],
+    why: <>"The whole path back to home hole should be highlighted, not just one line on the way back. The effects should be smaller and anchored to the bottom side, a truncated name, the same size as the C#X box, the full name on hover. See if you can steal colour coding from Aperture."</>,
+    policy: <>Nothing new. The palette probe reads only computed colours of the map's own badges, structure only.</>,
+  },
+  {
+    version: '0.201.2', date: '2026-09-15', headline: 'The effect sits in its own box under the class tag; hover it for the exact modifiers',
+    changes: [
+      <>Each card's effect is now an amber box directly under the class tag. Hover it and a panel lists what that effect does in that class — armor HP, signature radius, resistances, weapon damage, capacitor, velocity and the rest, with the exact percentages — for example Wolf-Rayet in a C6: armor HP +100%, signature radius −50%, shield resistances +50%, small weapon damage +200%. The route strip's effect chips carry the same list.</>,
+    ],
+    why: <>"The hole effect should be in a box below the C#X box and when you hover over that it should show the effects of that (sig radius +X etc.)." The percentages are read from CCP's static data export — each system's effect beacon carries the modifiers the game applies — not from a wiki table, so every class of every effect is exact.</>,
+    policy: <>CCP's public static data; nothing new is read from the game or sent anywhere.</>,
+  },
+  {
+    version: '0.201.1', date: '2026-09-15', headline: 'Chain cards: a route from you to the clicked hole, bigger class tags, and the wormhole effect',
+    changes: [
+      <>Click a hole and a <b>route strip</b> appears above the drawing: from your active character's current system to that hole, system by system with class tags and effects, and the jump count; the links and cards on the way light up and your card gets a 🧍. If you are not on the chain, it says where you are.</>,
+      <>The <b>class tag</b> is now a large filled pill — dark text on the class colour — at the top right of every card, on the route strip too. Cards grew to fit.</>,
+      <>Every system's <b>effect</b> shows on its card and in the route: Wolf-Rayet, Pulsar, Magnetar, Black Hole, Red Giant, Cataclysmic Variable. It comes from the map's own feed when the map records one, otherwise from CCP's static data export, which the app now carries for every wormhole system.</>,
+    ],
+    why: <>"When you select a hole I want a route from the selected character and the system you selected, and I want deeper contrast under the C#X tags, which are extremely important pieces of info, so they should also be a larger part of the cards. Make sure we are showing system effects like Wolf-Rayet."</>,
+    policy: <>Your character's location is the same CCP route already read for the "me" origin; the effect table is CCP's public static data. Nothing new is sent anywhere.</>,
+  },
+  {
+    version: '0.201.0', date: '2026-09-15', headline: 'Every kind of site priced: k-space anomalies by bounty, pirate cans by your own hauls, k-space gas and ore by contents',
+    changes: [
+      <><b>K-space combat anomalies</b> — every Angel, Blood Raider, Guristas, Sansha and Serpentis Hideaway through Sanctum (Hidden, Forsaken and Forlorn variants included) and the ten Rogue Drone sites — are priced by NPC bounties: every rat in the initial spawn and the listed waves at CCP's kill bounty from the static data export, before any ESS or dynamic-bounty modifier. Random, faction and escalation spawns are noted, not counted.</>,
+      <><b>Pirate relic and data sites</b> use your own history. A <b>＋ haul</b> button on the row opens a logger: paste the loot from your inventory (select all, Ctrl+C) and it is appraised at Jita sell, or type the ISK. The site's estimate is the average of your logged hauls and updates with every new one; a site you have never run borrows the average of its tier (Crumbling, Decayed, Ruined; Local, Regional, Central) across factions. The hauls live in a portable file beside your setup.</>,
+      <><b>K-space gas sites and ore anomalies</b> are priced from their published contents at Jita sell, ore by security band where the wiki gives it. Your logged hauls also stand in for any site the tables do not know.</>,
+    ],
+    why: <>"Do the k-space thing, I want it calculated. For relic and data sites it's okay to use the player's historical averages in game; track that and update numbers as that is updated. Add all the sites from all types of systems — the chain is almost always going to contain all types of systems." Bounties are deterministic from CCP's data; can loot is not, so it is measured from your own runs.</>,
+    policy: <>CCP's static data export is public data; the wiki pages are public; your hauls are typed or pasted by you and stay in your Documents folder. No new game-side reads.</>,
+  },
+  {
+    version: '0.200.12', date: '2026-09-15', headline: 'The chain summary is a tab of the Aperture module',
+    changes: [
+      <>Aperture now has two tabs: <b>Corp Map</b> and <b>Σ Summary</b>. The summary opens in place, reads the map the moment the tab opens, and re-reads every five minutes while it is showing. The map page stays loaded underneath, so its login persists and switching back is instant.</>,
+      <>The summary follows the Aperture screen's zoom level; the pop-out window and its own zoom are gone.</>,
+    ],
+    why: <>"I want the summary to be a separate tab now instead of a pop up. It is a very good module now."</>,
+    policy: <>Nothing new.</>,
+  },
+  {
+    version: '0.200.11', date: '2026-09-15', headline: 'Every filter drives the whole chain dashboard',
+    changes: [
+      <>The clicked system, holes out, class, activity and max age now shape everything at once: the tiles, the numbers on the chain cards, ISK by holes out, the activity mix, freshness and the table. The drawing keeps every system so the chain stays navigable; a system with nothing in view says so and stays clickable.</>,
+    ],
+    why: <>"Combat sites with one hole as the filter filtered the results below but not the panels at the top or the graphs to the right. All filters should change the dashboard." The charts had been reading a copy of the view without the clicked system.</>,
+    policy: <>Nothing new.</>,
+  },
+  {
+    version: '0.200.10', date: '2026-09-15', headline: 'Chain map colours by class',
+    changes: [
+      <>Cards, the class column and the class filter now share one scheme: <b>C1–C3 blue</b>, light to bright; <b>C4</b> yellowish orange; <b>C5–C6</b> red; <b>high-sec</b> green; <b>low-sec</b> traffic-sign yellow; <b>null-sec</b> purple-maroon. A legend sits above the chain drawing.</>,
+    ],
+    why: <>Asked for exactly this scheme; the old one graded only by difficulty and gave every k-space hole the same blue.</>,
+    policy: <>Nothing new.</>,
+  },
+  {
+    version: '0.200.8', date: '2026-09-15', headline: 'Zoom any screen; every screen remembers its own level',
+    changes: [
+      <>A <b>− 100% +</b> control in the header of every window. Each screen — every module, the chain summary, the overlay setup window — keeps its own level, remembered across restarts; a popped-out module follows its module. Click the percentage to go back to 100%. <b>Ctrl +</b>, <b>Ctrl −</b> and <b>Ctrl 0</b> do the same for the screen you are on.</>,
+      <>Zoom is real layout zoom, not a stretched picture: text, charts, tables and buttons grow together and the screen reflows to the window — lines wrap, grids collapse, scrollbars appear where needed — so a zoomed screen stays readable. Aperture zooms the map page itself.</>,
+    ],
+    why: <>"I want to be able to click zoom in and zoom out to modify any screen and I want them remembered individually … think about readability." Ten steps from 70% to 200%, 100% in the middle.</>,
+    policy: <>Nothing new: a display preference kept on your machine.</>,
+  },
+  {
+    version: '0.200.7', date: '2026-09-15', headline: 'A modified pod is the same pod: old fingerprints fold once EVE\'s clone list disowns them',
+    changes: [
+      <>After every poll that reads both your worn implants and your complete jump-clone list, any pod the app once saw you wearing that is neither worn now nor on EVE's list is folded into whichever real body it is a small edit from — the pod you are wearing or a listed jump clone — when the implants differ by plugging in, pulling out, or up to two swapped. Name, alert and history carry over. The pod you modified and then jumped out of keeps its name on the jump clone it became.</>,
+      <>A once-worn pod that EVE still lists as a jump clone stays separate. A once-worn pod whose implants differ a lot (you were podded, or refitted heavily) is left alone and ages out as before.</>,
+    ],
+    why: <>0.200.5's rule looked at timing (worn within a day, not listed since) and folded nothing on a real registry with 48 once-worn records. EVE's clone list is the proof that a fingerprint is a separate body; the rule now waits for it, which is at most two minutes.</>,
+    policy: <>Unchanged: your own characters' implant and clone lists from CCP, already read for the overlay.</>,
+  },
+  {
+    version: '0.200.5', date: '2026-09-15', headline: 'Chain cards name systems properly and show the class tag; a modified pod is no longer a second pod',
+    changes: [
+      <>Chain cards show the system's <b>custom name</b> when the map has one, else the <b>system name</b> — never the region. The first live read had picked "The Forge" for a k-space hole because the region also appears on the map's card.</>,
+      <>The class chip carries the map's tag: <b>C2A</b>, <b>C4F</b>, and so on, on the cards and in the table.</>,
+      <>Plugging an implant into the pod you are wearing no longer produces a second pod (finished in 0.200.6, below).</>,
+    ],
+    why: <>"I want the holes to say the system name when one is available, if it has a custom name that is most important. I also want to see C#X … it would be C2A." and "When I change my pod by adding a new implant … it seems to think I now have 2 pods." A worn pod is one body; only a jump-clone listing proves an old fingerprint is a separate one.</>,
+    policy: <>Unchanged. The pod rule uses only the implant and clone lists CCP already provides for your own characters.</>,
+  },
+  {
+    version: '0.200.4', date: '2026-09-14', headline: 'Chain summary: a graphical dashboard, and home taken from the map itself',
+    changes: [
+      <>A dashboard above the table: the <b>chain drawn by distance</b> (one column per hole out, every system a card with its class, ISK on field and site count, links drawn between them), <b>ISK on field by holes out</b> (stacked by activity; click a bar to set the filter), the <b>activity mix</b>, and <b>freshness</b> (signatures by age of the map's last look).</>,
+      <>Click a system on the drawing and the tiles and table focus on it; the drawing keeps showing the whole chain.</>,
+      <>The map's feed names its own home system, so the origin is prefilled from the map when nothing is typed; a typed label still overrides it.</>,
+      <>Signatures that name their system by CCP's id (rather than the map's) are matched too; the diagnostics log now records each list's field names flat, so a first real read can be checked line by line.</>,
+    ],
+    why: <>"I like what you have so far but I want a graphical dashboard as well." The first real read also showed the map's document carries a home-system id and all signatures inline, so the reader was tightened to that shape.</>,
+    policy: <>Unchanged — the same feed, the same cadence; the drawing is computed locally from it.</>,
+  },
+  {
+    version: '0.200.3', date: '2026-09-14', headline: 'Chain summary reads the complete signature list from the map itself — no panel needed',
+    changes: [
+      <>The app now reads the map's own data feed — the same JSON the map page loads — for every system drawn on the chain: all signatures, all types, all classes, whatever the Signature Search panel shows or whether it is open at all. The panel table is only a fallback.</>,
+      <>The feed's field names are not assumed. Which list holds the systems, which field is the id, which two fields make a link, which field is the signature id, group, site name and timestamp — each is inferred from the values and checked against the drawn chain, the ABC-123 pattern, the activity words and the app's own site tables. When the feed carries a group code instead of a word, the activity comes from the site name.</>,
+      <>The window says which source it used ("map feed · N systems known" or "Signature Search panel") and the diagnostics log records what was matched and how well.</>,
+    ],
+    why: <>"Can you not just do this yourself in the background as a function of the app? I thought we would remove the complication of the sig search panel needing to be open and unfiltered." Yes — reading the page's own data instead of its screen is the way to do that. The schema is private, so the reader adapts to it rather than guessing it; verified against three plausible schemas plus decoys, and the first real read reports its matches.</>,
+    policy: <>Your own map, your own login, the same routes the page itself requests, once per press or every five minutes while the window is open (one request per drawn system, four at a time). Nothing is sent anywhere else.</>,
+  },
+  {
+    version: '0.200.2', date: '2026-09-14', headline: 'Chain summary: relic and data sites priced, home prefilled, the map is never touched',
+    changes: [
+      <>Sleeper relic ("Forgotten …") and data ("Unsecured …") sites are now priced at the blue loot their guards drop — all 24, C1 to C6, from EVE University's per-site pages. The hackable cans on top are random and stay uncounted; the basis column says so.</>,
+      <>The home system's label is a per-player setting (⚙ Settings → Your setup → Home system on the map) and prefills the summary window; typing it in the window saves it to the same file.</>,
+      <>The reader no longer clicks the map's tabs. If the Signature Search panel is not on screen it keeps the last list, still updates the chain drawing, and says what to do. A structure-only look at the map's own data feeds is recorded so the next version can read the complete list without the panel at all.</>,
+    ],
+    why: <>"These sites should be priced, why would you not?" — the guards' blue loot is a fixed NPC price, so that part is priceable; the cans are not. "Auto ensure everything is selected right in Aperture without disrupting what the user is doing on the map" — clicking the map's own controls was the wrong tool; the map's data feed is the right one, and this version measures its shape first. Pirate relic/data cans and k-space anomaly bounties have no published per-site figures yet.</>,
+    policy: <>Unchanged: your own map, your own login, read on demand. The feed probe requests the same paths the page itself just loaded, once per press, and stores only key names and value types.</>,
+  },
+  {
+    version: '0.200.1', date: '2026-09-14', headline: 'Chain summary: reads the real map — classes, distances and filters now work',
+    changes: [
+      <>The first read of a real map showed every class as "—" and every distance as "?", so any filter emptied the table. The map renders the class chip glued to the system name and identifies its chain links by bare numbers, which the first reader could not follow.</>,
+      <>The reader now takes the Signature Search table cell by cell, and the chain links from what the map's own drawing library puts in the page (its "Edge from A to B" labels, or the drawn line's endpoints against the system boxes).</>,
+      <>The origin line says how many links were read; when a filter hides rows only because their class or distance is unknown, the window says so instead of showing an empty table.</>,
+    ],
+    why: <>"Filters seem to completely clear the results no matter what you have selected, holes is always a question mark and class is always a dash." Verified with 48 hand-computed fixtures and a synthetic copy of the map's page structure, since the map itself is private.</>,
+    policy: <>Unchanged: the same page you are looking at, read in place through your own login. The structure probe records shapes only (letters and digits masked) in the local diagnostics log.</>,
+  },
+  {
+    version: '0.200.0', date: '2026-09-14', headline: 'Chain summary: what is out there to do in chain, in its own window',
+    changes: [
+      <>A <b>Σ Summary</b> button on the Aperture module opens a pop-out window: ISK on field per activity (combat, ore, gas, relic, data) and every site with its distance in wormhole hops.</>,
+      <>Two origins: <b>home</b> (the map's home system) or <b>me</b> (the active character's current system from CCP's location route).</>,
+      <>Filters: holes out, wormhole class C1 to C6 plus HS/LS/NS, activity, max age. Re-read on demand or every five minutes.</>,
+      <>Valuation tables: the 24 sleeper combat sites at their blue-loot totals, 10 gas sites and 10 ore anomalies at their published contents times live Jita sell.</>,
+    ],
+    why: <>"Scrape the aperture map to put together a dashboard for what is out there to do in chain, x ISK on field per activity … filter by distance from home and wormhole level … on a pop-out window … x jumps from me and x jumps from home." The map is the only source of what is in chain; it is read in place through your own login, exactly as the Theft import does, and every figure is labelled "if untouched".</>,
+    policy: <>The corp's own map, your own login, read on demand at a low cadence — not CCP data, and nothing leaves your machine. Site values come from public wiki pages (facts, cited in the code) and CCP's public market data.</>,
+  },
+  {
     version: '0.199.5', date: '2026-09-13', headline: 'Log Visualizer Feed: search, filters, an opponent filter, and a scrubbable timeline', published: true,
     changes: [
       <>A search box over the feed (pilot, ship, weapon, ore, amount — every word must match).</>,

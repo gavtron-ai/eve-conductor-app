@@ -232,6 +232,10 @@ app.on('child-process-gone', (_e, details) => {
 ipcMain.handle('config-read', () => appConfig.read(app.getPath('documents')));
 ipcMain.handle('config-write', (_e, patch) => appConfig.write(app.getPath('documents'), patch));
 ipcMain.handle('config-path', () => appConfig.configPath(app.getPath('documents')));
+// hauls (v0.201): the player's loot history for random-loot sites, a
+// portable file beside config.json; the renderer validates, main stores
+ipcMain.handle('hauls-read', () => appConfig.readHauls(app.getPath('documents')));
+ipcMain.handle('hauls-write', (_e, file) => appConfig.writeHauls(app.getPath('documents'), file));
 
 // ---- AI fight write-ups: the key stays in the main process (narrative.cjs) ----
 ipcMain.handle('narrative-status', () => narrative.status(app.getPath('documents')));
@@ -578,6 +582,48 @@ function createModuleWindow(moduleId, saved) {
   persistModuleWindows();
   return win;
 }
+// ---- CHAIN SUMMARY WINDOW (v0.200): "what is out there to do in chain".
+// The main window's Aperture module reads the user's own logged-in map in
+// place and POSTS the reading here; this window shows it. The latest
+// reading is kept so a reopened window has something at once; a refresh
+// request is relayed to every other window (the Aperture module answers).
+let chainWin = null;
+let chainLatest = null;
+function openChainSummary() {
+  if (chainWin && !chainWin.isDestroyed()) { chainWin.show(); chainWin.focus(); return chainWin; }
+  chainWin = new BrowserWindow({
+    width: 1120, height: 780, minWidth: 760, minHeight: 480,
+    title: 'EVE Conductor — Chain Summary',
+    backgroundColor: '#0d1117',
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.cjs'),
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+  chainWin.setMenuBarVisibility(false);
+  chainWin.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
+  if (process.env.VITE_DEV_SERVER_URL) {
+    chainWin.loadURL(`${process.env.VITE_DEV_SERVER_URL}#chain-summary`);
+  } else {
+    chainWin.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), { hash: 'chain-summary' });
+  }
+  chainWin.on('closed', () => { chainWin = null; });
+  return chainWin;
+}
+ipcMain.handle('chain-open', () => { openChainSummary(); return true; });
+ipcMain.on('chain-post', (_e, payload) => {
+  chainLatest = payload;
+  if (chainWin && !chainWin.isDestroyed()) { try { chainWin.webContents.send('chain-data', payload); } catch { /* closing */ } }
+});
+ipcMain.handle('chain-get', () => chainLatest);
+ipcMain.on('chain-refresh', () => {
+  for (const w of BrowserWindow.getAllWindows()) {
+    if (w === chainWin) continue;
+    try { w.webContents.send('chain-refresh-request'); } catch { /* closing */ }
+  }
+});
+
 ipcMain.handle('open-module-window', (_e, moduleId) => {
   createModuleWindow(moduleId);
   return true;

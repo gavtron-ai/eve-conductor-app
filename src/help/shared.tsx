@@ -35,7 +35,7 @@ export const SHARED: HelpGroup[] = [
               { n: 5, text: <><b>Tools ▾</b> opens the overlay tools: <i>Multibox overlay settings…</i> (the setup window — see the Multibox overlay pages). <Keys keys={['Alt', '\\']} /> in game does the same.</> },
               { n: 6, text: <><b>⧉ Open in a new window.</b> A second window with this module — put it on another monitor. Collectors keep running in the main window only.</> },
               { n: 7, text: <><b>⚙ Settings</b> — characters, duties, your EVE application, alerts, backup (next pages).</> },
-              { n: 8, text: <><b>ⓘ</b> — this guide. Beside it: <b>📋 Release notes</b> (every version since the beta, what changed and why) and <b>⚖ Policy</b> (CCP's rules that apply to a tool like this, paraphrased with links, beside how the app keeps to each one).</> },
+              { n: 8, text: <><b>ⓘ</b> — this guide. Beside it: <b>📋 Release notes</b> (every version since the beta, what changed and why), <b>⚖ Policy</b> (CCP's rules that apply to a tool like this, paraphrased with links, beside how the app keeps to each one) and <b>− 100% +</b>, the zoom for the screen you are on — every screen remembers its own level (click the percentage for 100%; Ctrl +, Ctrl −, Ctrl 0 work too).</> },
             ]} />
             <Try>Open the module menu now and switch to <b>EVE Planetary Industry</b>, then come back. Nothing stops in the background while you look around.</Try>
           </>

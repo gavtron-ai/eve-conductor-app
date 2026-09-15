@@ -59,10 +59,19 @@ eq('...and their own setting survived', s.accountingLevel, 4);
 useApp = launch();
 eq('launch 3: still blank', (useApp.getState().settings.transitShipName ?? ''), '');
 
-// nothing owner-shaped anywhere in what was written to disk
+// nothing owner-shaped anywhere in what was written to disk. The owner's
+// personal strings live ONLY in scripts/owner-patterns.local.json (gitignored,
+// same list the shareability guard uses); on a machine without that file
+// there is nothing personal to look for and the check passes trivially.
 const written = disk.get(KEY) ?? '';
+let ownerPatterns = [];
+try {
+  const raw = JSON.parse(require('fs').readFileSync(
+    require('path').join(__dirname, '..', 'scripts', 'owner-patterns.local.json'), 'utf8'));
+  ownerPatterns = raw.patterns.map((p) => new RegExp(p.pattern, p.flags ?? ''));
+} catch { /* no local list: a non-owner machine */ }
 eq('nothing owner-shaped was ever persisted',
-  /dkvc|TR--|256763e9|9260ac78/.test(written), false);
+  ownerPatterns.filter((re) => re.test(written)).length, 0);
 
 // ===== A USER WHO DELIBERATELY CLEARS A FIELD ============================
 useApp.getState().setSettings({ transitShipName: 'MY-HAULER' });

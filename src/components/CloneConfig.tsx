@@ -12,6 +12,8 @@
 // means it can never accept typed text.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { CloneRegistry, CloneRecord } from '../lib/cloneNames';
+import ZoomControl from './ZoomControl';
+import { useZoom } from '../lib/zoom';
 
 /** must track OVERLAY_POLL_MS in overlayFeed.ts. Deliberately NOT imported:
  * that module loads the whole dogma catalog on import, and this window has
@@ -58,6 +60,8 @@ const ago = (t: number): string => {
 
 export default function CloneConfig() {
   const [reg, setReg] = useState<CloneRegistry>({ v: 1, chars: {} });
+  // this window's own zoom level (keys handled by the header control)
+  const { zoom: zoomLevel } = useZoom('clone-config');
   const [filter, setFilter] = useState('');
   /** typed text lives here until it's committed, so the registry broadcast
    * can't yank the caret out from under the user mid-word */
@@ -155,7 +159,7 @@ export default function CloneConfig() {
   const total = [...groups.values()].reduce((n, l) => n + l.length, 0);
 
   return (
-    <div className="cfg-root">
+    <div className="cfg-root" style={{ zoom: zoomLevel }}>
       <header className="cfg-head">
         <div>
           <h1>Multibox Overlay Settings</h1>
@@ -178,6 +182,7 @@ export default function CloneConfig() {
             <input className="cfg-filter" placeholder="filter clones…" value={filter}
               onChange={(e) => setFilter(e.target.value)} />
           )}
+          <ZoomControl screen="clone-config" compact />
           <button onClick={() => void window.appInfo?.clones?.closeConfig()}>Done</button>
         </div>
       </header>

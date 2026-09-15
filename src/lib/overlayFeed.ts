@@ -147,10 +147,10 @@ function labelFor(implantIds: readonly number[], fallback: string) {
  * recognised by its implants — and so every pod they own shows up in the
  * setup window, named or not. Never throws: a character whose login predates
  * the scope simply contributes nothing. */
-async function harvestCloneNames(charId: number, charName: string, out: CloneObservation[]): Promise<boolean> {
-  if (!tokenHasScope(charId, CLONES_SCOPE)) return false;
+async function harvestCloneNames(charId: number, charName: string, out: CloneObservation[]): Promise<{ ok: boolean; fetched: boolean }> {
+  if (!tokenHasScope(charId, CLONES_SCOPE)) return { ok: false, fetched: false };
   const last = clonesAskedAt.get(charId) ?? 0;
-  if (Date.now() - last < CLONES_TTL_MS) return true;
+  if (Date.now() - last < CLONES_TTL_MS) return { ok: true, fetched: false };
   clonesAskedAt.set(charId, Date.now());
   try {
     const { data } = await esiAuth<{ jump_clones?: JumpCloneRow[] }>(
@@ -176,9 +176,10 @@ async function harvestCloneNames(charId: number, charName: string, out: CloneObs
         worn: false,
       });
     }
-    return true;
+    // fetched: the batch now carries this character's COMPLETE clone list
+    return { ok: true, fetched: true };
   } catch {
-    return false; // scope revoked or ESI hiccup — fall back to the summary
+    return { ok: false, fetched: false }; // scope revoked or ESI hiccup — fall back to the summary
   }
 }
 
@@ -318,7 +319,7 @@ async function readOne(charId: number, name: string, obs: CloneObservation[]): P
       // undocks, measured v0.168).
       esiAuth<{ solar_system_id: number; station_id?: number; structure_id?: number }>(`/characters/${charId}/location/`, undefined, charId, OVERLAY).catch(() => null),
     ]);
-    row.cloneNamesAvailable = cloneScope;
+    row.cloneNamesAvailable = cloneScope.ok;
     if (implants) {
       const { infos, summary } = labelFor(implants.data, name);
       row.cloneLabel = summary.label;
@@ -336,6 +337,9 @@ async function readOne(charId: number, name: string, obs: CloneObservation[]): P
           names: infos.map((i) => i.name),
           label: summary.label,
           worn: true,
+          // the registry may fold a modified pod only when this batch also
+          // holds the complete clone list (cloneMerge.cjs, v0.200.6)
+          listedNow: cloneScope.fetched,
         });
       }
       // the pilot's OWN name for this clone, matched by implant fingerprint

@@ -6,6 +6,8 @@ import ArbitragePanel from './components/ArbitragePanel';
 import HistoryChart from './components/HistoryChart';
 import SettingsModal from './components/SettingsModal';
 import { HelpButton, IntroTour, ReleaseNotesButton, PolicyButton } from './components/Help';
+import ZoomControl from './components/ZoomControl';
+import { useZoom } from './lib/zoom';
 import TradeFinder from './components/TradeFinder';
 import MistakeFinder from './components/MistakeFinder';
 import AutoHaul from './components/AutoHaul';
@@ -83,6 +85,8 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
       : 'trade',
   );
   const module: ModuleId = secondary ? localModule : storeModule;
+  // the active screen's zoom level (keys are handled by the header control)
+  const { zoom: screenZoom } = useZoom(module);
   const setModule = secondary ? setLocalModule : storeSetModule;
   const charMode = useApp((s) => s.charCompare.mode);
   const setCharCompare = useApp((s) => s.setCharCompare);
@@ -91,6 +95,9 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
   const [toolsMenu, setToolsMenu] = useState(false);
   /** Theft Conductor tabs: the skyhook raid table vs the (weaker) ESS list */
   const [theftView, setTheftView] = useState<'skyhooks' | 'ess'>('skyhooks');
+  // Aperture's tabs: the corp map, and the chain summary (a tab since
+  // v0.200.12 — it was a pop-out window)
+  const [apertureView, setApertureView] = useState<'map' | 'summary'>('map');
   /** Battle Conductor tabs: saved battle reports vs the live game-log feed */
   const [battleView, setBattleView] = useState<'reports' | 'live' | 'sim'>('reports');
   // MAKE BATTLE REPORT moved into the EVE Battle Conductor module
@@ -529,7 +536,17 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
             </button>
           </>)}
           {module === 'pi' && <button className="on">Planets</button>}
-          {module === 'aperture' && <button className="on">Corp Map</button>}
+          {module === 'aperture' && (<>
+            <button className={apertureView === 'map' ? 'on' : ''}
+              onClick={() => { setApertureView('map'); logUser('view: aperture map'); }}>
+              Corp Map
+            </button>
+            <button className={apertureView === 'summary' ? 'on' : ''}
+              title="What is out there to do in chain — ISK on field per activity, holes out from home or from you, read from the map itself"
+              onClick={() => { setApertureView('summary'); logUser('view: chain summary'); }}>
+              Σ Summary
+            </button>
+          </>)}
           {module === 'trade' && (<>
           <button className={view === 'finder' ? 'on' : ''} onClick={() => setView('finder')}>
             Trade Finder
@@ -640,14 +657,19 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
             : module === 'battle' ? battleView
               : module === 'theft' ? theftView
                 : module === 'character' ? (charMode === 'fit' || charMode === 'wizard' || charMode === 'propagator' ? charMode : 'match')
-                  : module === 'pi' ? 'planets' : undefined} />
+                  : module === 'pi' ? 'planets'
+                    : module === 'aperture' ? (apertureView === 'summary' ? 'summary' : 'toolbar') : undefined} />
         <ReleaseNotesButton />
         <PolicyButton />
+        <ZoomControl screen={module} />
         <button className="btn icon" onClick={() => setShowSettings(true)} title="Trading settings">
           ⚙
         </button>
       </header>
-      <div className={`main ${module === 'trade' && view === 'explorer' ? '' : 'no-side'}`}>
+      {/* PER-SCREEN ZOOM (v0.200.8): CSS zoom on the content root so the
+          screen reflows at its level; the header stays put. Aperture hosts
+          another page and zooms that page itself (ApertureModule). */}
+      <div className={`main ${module === 'trade' && view === 'explorer' ? '' : 'no-side'}`} style={module === 'aperture' ? undefined : { zoom: screenZoom }}>
         {module === 'character' && (
           <div className="content">
             <CharacterConductor />
@@ -667,7 +689,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
             overflowed the app shell, the PAGE itself scrolled, and the
             statusbar (fixed at the shell's bottom) appeared stranded mid-list */}
         {module === 'pi' && <div className="content"><PiModule /></div>}
-        {module === 'aperture' && <ApertureModule />}
+        {module === 'aperture' && <ApertureModule view={apertureView} />}
         {module === 'trade' && view === 'explorer' && <Sidebar />}
         <div className="content">
           {module === 'trade' && view === 'finder' && (

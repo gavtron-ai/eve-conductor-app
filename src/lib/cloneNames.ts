@@ -36,6 +36,10 @@ export interface CloneRecord {
   first: number;
   seen: number;
   lastWorn: number;
+  /** when ESI last listed this fingerprint as a jump clone (v0.200.5) */
+  lastListed?: number;
+  /** the fingerprint this record absorbed when the pod was modified */
+  supersedes?: string;
 }
 
 export interface CloneRegistry {
@@ -53,6 +57,10 @@ export interface CloneObservation {
   esiName?: string;
   /** true for the clone the character is wearing right now */
   worn?: boolean;
+  /** on a worn observation: this same batch carries the character's
+   * COMPLETE jump-clone list from ESI (fetched this tick, not the cached
+   * skip) — the registry may then fold fingerprints the list disowns */
+  listedNow?: boolean;
 }
 
 /**

@@ -48,6 +48,12 @@ contextBridge.exposeInMainWorld('appInfo', {
     write: (patch) => ipcRenderer.invoke('config-write', patch),
     path: () => ipcRenderer.invoke('config-path'),
   },
+  /** the player's own loot history for random-loot sites (v0.201),
+   * Documents/EVE Conductor/hauls.json — portable, never a token */
+  hauls: {
+    read: () => ipcRenderer.invoke('hauls-read'),
+    write: (file) => ipcRenderer.invoke('hauls-write', file),
+  },
   /** zKillboard's JSON API, called from main with an identifying user agent,
    * one request at a time (v0.199.1 — the page reader is gone) */
   zkill: {
@@ -66,6 +72,16 @@ contextBridge.exposeInMainWorld('appInfo', {
    * watches this; main reads it without the focus gate the renderer has */
   clipboard: {
     read: () => ipcRenderer.invoke('clipboard-read'),
+  },
+  /** the chain summary pop-out (v0.200): the Aperture module posts a map
+   * reading; the summary window shows it and can ask for a fresh one */
+  chain: {
+    open: () => ipcRenderer.invoke('chain-open'),
+    post: (payload) => ipcRenderer.send('chain-post', payload),
+    get: () => ipcRenderer.invoke('chain-get'),
+    onData: (cb) => ipcRenderer.on('chain-data', (_e, d) => cb(d)),
+    refresh: () => ipcRenderer.send('chain-refresh'),
+    onRefreshRequest: (cb) => ipcRenderer.on('chain-refresh-request', () => cb()),
   },
   /** the owner's Aperture map, read from his own logged-in session in a hidden
    * window — returns the Systems-table text (or '' if it couldn't be read) */

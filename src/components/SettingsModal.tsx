@@ -12,7 +12,7 @@ import { iskShort, pct } from '../lib/format';
 import HubManager from './HubManager';
 import { sendTestNotification } from '../lib/notify';
 import { exportBackup, importBackupText } from '../lib/backup';
-import { saveSetup, setupPath } from '../lib/appConfig';
+import { currentSetup, saveSetup, setupPath } from '../lib/appConfig';
 import { useFreshness } from '../lib/freshness';
 
 // NEVER a second copy of the port. The main process reports the callback the
@@ -263,6 +263,8 @@ function YourSetupSection() {
   useEffect(() => { void setupPath().then(setCfgPath); }, []);
   const ship = settings.transitShipName ?? '';
   const map = settings.apertureUrl ?? '';
+  // not mirrored in the store — only the chain window reads it, from the file
+  const [home, setHome] = useState<string>(() => currentSetup().chainHome);
   return (
     <div className="sso-section">
       <h3 className="section-title">Your setup</h3>
@@ -305,6 +307,21 @@ function YourSetupSection() {
         login. {map === ''
           ? <>Empty, so Aperture loads nothing at all — it will not open a page you did not choose.</>
           : <>Loaded in a real browser tab inside the app, so signing in sticks across restarts.</>}
+      </p>
+      <div className="field-grid" style={{ marginTop: 10 }}>
+        <label>Home system on the map</label>
+        <input
+          type="text"
+          style={{ width: '100%' }}
+          value={home}
+          placeholder="the home system's label, exactly as the map shows it"
+          onChange={(e) => { setHome(e.target.value); void saveSetup({ chainHome: e.target.value }); }}
+          spellCheck={false}
+        />
+      </div>
+      <p className="hint">
+        The chain summary (Aperture → <b>Σ Summary</b>) counts holes from here by default. Type it
+        as the map labels it — a custom name if the map uses one, else the J-code.
       </p>
     </div>
   );

@@ -31,9 +31,16 @@ config.json holds the settings that are YOURS rather than the app's:
                     "in transit" (leave empty if you don't haul)
   apertureUrl       your corporation's web map, embedded as the Aperture
                     module (leave empty to turn the module off)
+  chainHome         the map's label for your home system — where the
+                    chain summary counts holes from (leave empty to type
+                    it in the summary window)
 
 The app writes this file for you when you fill in Settings -> Your setup.
 You can also edit it by hand; the app reads it at startup.
+
+hauls.json (beside it) is your own loot history for relic and data sites,
+logged from the Aperture chain summary — the app's estimate for those
+sites is the average of what YOU have pulled out of them. Safe to copy.
 
 - SAFE TO COPY to another machine — this is your setup, not your data.
 - NO LOGIN TOKENS ARE STORED HERE. EVE rotates them, and a copied token
@@ -53,7 +60,7 @@ writes a plain summary from the same computed facts.
 `;
 
 /** the only keys this file is allowed to carry */
-const KEYS = ['eveClientId', 'transitShipName', 'apertureUrl'];
+const KEYS = ['eveClientId', 'transitShipName', 'apertureUrl', 'chainHome'];
 
 /** anything token-shaped must never be written, whatever the caller passed */
 const looksSecret = (v) =>
@@ -72,7 +79,7 @@ const configPath = (documentsPath) => path.join(configDir(documentsPath), FILE_N
 
 /** the stored setup, or empty values when there is no file yet */
 function read(documentsPath) {
-  const empty = { eveClientId: '', transitShipName: '', apertureUrl: '' };
+  const empty = { eveClientId: '', transitShipName: '', apertureUrl: '', chainHome: '' };
   try {
     const p = path.join(documentsPath, FOLDER_NAME, FILE_NAME);
     if (!fs.existsSync(p)) return empty;
@@ -172,7 +179,42 @@ function writeClones(documentsPath, byFingerprint) {
   }
 }
 
+// ---------------------------------------------------------------------------
+// HAULS (v0.201) — what the player actually pulled out of relic/data sites,
+// one record per run, appraised in the renderer. The player's own history is
+// the only honest estimate for random-loot sites, so it belongs beside
+// config.json: portable, survives a reinstall. Validation lives in the
+// renderer (src/lib/hauls.ts); here the file is stored as given.
+// ---------------------------------------------------------------------------
+
+const HAULS_FILE = 'hauls.json';
+
+function readHauls(documentsPath) {
+  try {
+    const p = path.join(documentsPath, FOLDER_NAME, HAULS_FILE);
+    if (!fs.existsSync(p)) return { v: 1, hauls: [] };
+    const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
+    return raw && typeof raw === 'object' && Array.isArray(raw.hauls) ? raw : { v: 1, hauls: [] };
+  } catch {
+    return { v: 1, hauls: [] };
+  }
+}
+
+/** replace the whole file (the renderer holds the validated list) — atomic */
+function writeHauls(documentsPath, file) {
+  try {
+    if (!file || !Array.isArray(file.hauls)) return false;
+    const target = path.join(configDir(documentsPath), HAULS_FILE);
+    const tmp = `${target}.tmp`;
+    fs.writeFileSync(tmp, `${JSON.stringify({ v: 1, hauls: file.hauls.slice(0, 5000) }, null, 2)}\n`, 'utf8');
+    fs.renameSync(tmp, target);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 module.exports = {
-  FOLDER_NAME, FILE_NAME, CLONES_FILE, configDir, configPath, read, write, KEYS,
+  FOLDER_NAME, FILE_NAME, CLONES_FILE, HAULS_FILE, configDir, configPath, read, write, KEYS, readHauls, writeHauls,
   readClones, writeClones,
 };

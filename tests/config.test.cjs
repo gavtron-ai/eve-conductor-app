@@ -23,21 +23,21 @@ const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'evecfg-'));
 
 // ---- 1. A FRESH INSTALL IS EMPTY, NOT BROKEN ---------------------------
 eq('no file yet reads as an unconfigured setup', cfg.read(tmp),
-  { eveClientId: '', transitShipName: '', apertureUrl: '' });
+  { eveClientId: '', transitShipName: '', apertureUrl: '', chainHome: '' });
 ok('...and reading did not create a config file',
   !fs.existsSync(path.join(tmp, cfg.FOLDER_NAME, cfg.FILE_NAME)));
 
 // ---- 2. WRITING, AND THE FILE THAT RESULTS ------------------------------
 let out = cfg.write(tmp, { eveClientId: 'abc123', transitShipName: 'MY HAULER' });
 eq('a write returns the full new setup', out,
-  { eveClientId: 'abc123', transitShipName: 'MY HAULER', apertureUrl: '' });
+  { eveClientId: 'abc123', transitShipName: 'MY HAULER', apertureUrl: '', chainHome: '' });
 eq('...and reading it back agrees', cfg.read(tmp), out);
 ok('a README explains the folder', fs.existsSync(path.join(tmp, cfg.FOLDER_NAME, 'README.txt')));
 
 // a PARTIAL write must not blank the fields it did not mention
 out = cfg.write(tmp, { apertureUrl: 'https://map.example/1' });
 eq('a partial write leaves other fields alone', out,
-  { eveClientId: 'abc123', transitShipName: 'MY HAULER', apertureUrl: 'https://map.example/1' });
+  { eveClientId: 'abc123', transitShipName: 'MY HAULER', apertureUrl: 'https://map.example/1', chainHome: '' });
 
 // deliberately clearing a field must stick
 out = cfg.write(tmp, { transitShipName: '' });
@@ -64,7 +64,7 @@ ok('NEITHER TOKEN IS IN THE FILE', !body.includes(REFRESH) && !body.includes(JWT
 // unknown keys are not stored — the file holds setup, nothing else
 cfg.write(tmp, { accessToken: JWT, password: 'hunter2', somethingElse: 'x' });
 const keys = Object.keys(JSON.parse(fs.readFileSync(path.join(tmp, cfg.FOLDER_NAME, cfg.FILE_NAME), 'utf8')));
-eq('only the three setup keys are ever written', keys.sort(), [...cfg.KEYS].sort());
+eq('only the setup keys are ever written', keys.sort(), [...cfg.KEYS].sort());
 
 // a 32-char hex client id is NOT a secret and must survive
 eq('a real EVE client id is stored, not mistaken for a token',
@@ -76,7 +76,7 @@ const good = cfg.read(tmp);
 // a corrupt file reads as empty rather than throwing...
 fs.writeFileSync(path.join(tmp, cfg.FOLDER_NAME, cfg.FILE_NAME), '{ this is not json');
 eq('a corrupt file reads as unconfigured instead of crashing', cfg.read(tmp),
-  { eveClientId: '', transitShipName: '', apertureUrl: '' });
+  { eveClientId: '', transitShipName: '', apertureUrl: '', chainHome: '' });
 // ...and writing over it restores a valid file
 eq('writing over a corrupt file works', cfg.write(tmp, { eveClientId: good.eveClientId }).eveClientId,
   good.eveClientId);
@@ -91,7 +91,7 @@ eq('...while the valid field beside it survives', cfg.read(tmp).transitShipName,
 eq('an unwritable path reports failure rather than throwing',
   cfg.write('Z:/definitely/not/real', { eveClientId: 'x' }), null);
 eq('...and reading one is empty, not an exception', cfg.read('Z:/nope'),
-  { eveClientId: '', transitShipName: '', apertureUrl: '' });
+  { eveClientId: '', transitShipName: '', apertureUrl: '', chainHome: '' });
 
 // the write is atomic: no .tmp file is left behind
 const dirFiles = fs.readdirSync(path.join(tmp, cfg.FOLDER_NAME));

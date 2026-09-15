@@ -22,9 +22,12 @@ export interface AppSetup {
   transitShipName: string;
   /** corporation web map embedded as the Aperture module ('' = off) */
   apertureUrl: string;
+  /** the map's label for the corp's home system — the chain summary's
+   * default origin (v0.200.2; '' = type it in the window) */
+  chainHome: string;
 }
 
-const EMPTY: AppSetup = { eveClientId: '', transitShipName: '', apertureUrl: '' };
+const EMPTY: AppSetup = { eveClientId: '', transitShipName: '', apertureUrl: '', chainHome: '' };
 
 let loaded: AppSetup = { ...EMPTY };
 let ready = false;
@@ -48,6 +51,7 @@ export async function loadSetup(): Promise<AppSetup> {
         eveClientId: typeof cfg.eveClientId === 'string' ? cfg.eveClientId : '',
         transitShipName: typeof cfg.transitShipName === 'string' ? cfg.transitShipName : '',
         apertureUrl: typeof cfg.apertureUrl === 'string' ? cfg.apertureUrl : '',
+        chainHome: typeof cfg.chainHome === 'string' ? cfg.chainHome : '',
       };
     }
   } catch {
@@ -68,6 +72,7 @@ export async function loadSetup(): Promise<AppSetup> {
     eveApplication: loaded.eveClientId !== '' ? 'configured' : 'not set',
     transitShip: loaded.transitShipName !== '' ? 'configured' : 'not set',
     apertureMap: loaded.apertureUrl !== '' ? 'configured' : 'not set',
+    chainHome: loaded.chainHome !== '' ? 'configured' : 'not set',
   });
   return loaded;
 }

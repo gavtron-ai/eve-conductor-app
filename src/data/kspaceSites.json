@@ -1,0 +1,3035 @@
+{
+ "built": "2026-09-15",
+ "combat": {
+  "Angel Hideaway": {
+   "isk": 15750,
+   "faction": "Angel",
+   "tier": "Hideaway",
+   "ships": 4,
+   "waves": 4,
+   "note": "lowest of every range",
+   "escalation": "4th reinforcement is a possible 0-1 commander frigate 'Domination ...' (name truncated on page; drops faction ammo/tags, may drop faction modules); no escalatio",
+   "source": "https://wiki.eveuniversity.org/Angel_Hideaway"
+  },
+  "Angel Hidden Hideaway": {
+   "isk": 295250,
+   "faction": "Angel",
+   "tier": "Hidden Hideaway",
+   "ships": 27,
+   "waves": 6,
+   "note": "lowest of every range",
+   "escalation": "Commander Wave (low chance) 0-1 elite frigate Domination Thug; no DED escalation listed.",
+   "source": "https://wiki.eveuniversity.org/Angel_Hidden_Hideaway"
+  },
+  "Angel Forsaken Hideaway": {
+   "isk": 346500,
+   "faction": "Angel",
+   "tier": "Forsaken Hideaway",
+   "ships": 21,
+   "waves": 4,
+   "note": "lowest of every range",
+   "escalation": "Bonus spawn 0-1 faction frigate 'Domination ...' (name truncated on page); escalates to Angel Repurposed Outpost (DED 3/10).",
+   "source": "https://wiki.eveuniversity.org/Angel_Forsaken_Hideaway"
+  },
+  "Angel Forlorn Hideaway": {
+   "isk": 403313,
+   "faction": "Angel",
+   "tier": "Forlorn Hideaway",
+   "ships": 19,
+   "waves": 4,
+   "note": "lowest of every range",
+   "escalation": "Wave 3 may include 0-1 rare commander frigate Domination Ruffian (faction loot possible); page says the site does not appear to escalate.",
+   "source": "https://wiki.eveuniversity.org/Angel_Forlorn_Hideaway"
+  },
+  "Angel Refuge": {
+   "isk": 64250,
+   "faction": "Angel",
+   "tier": "Refuge",
+   "ships": 9,
+   "waves": 5,
+   "note": "lowest of every range",
+   "escalation": "Optional 5th reinforcement 0-1 commander destroyer Domination Defacer (faction ammo/tags, may drop modules); can escalate to Angel's Red Light District.",
+   "source": "https://wiki.eveuniversity.org/Angel_Refuge"
+  },
+  "Angel Den": {
+   "isk": 1234073,
+   "faction": "Angel",
+   "tier": "Den",
+   "ships": 33,
+   "waves": 5,
+   "note": "lowest of every range",
+   "escalation": "Possible 1 commander cruiser 'Domination ...' (name truncated on page), possible Domination modules; no escalation named.",
+   "source": "https://wiki.eveuniversity.org/Angel_Den"
+  },
+  "Angel Hidden Den": {
+   "isk": 6465442,
+   "faction": "Angel",
+   "tier": "Hidden Den",
+   "ships": 104,
+   "waves": 10,
+   "note": "lowest of every range",
+   "escalation": "No escalation or commander spawns documented on the page.",
+   "source": "https://wiki.eveuniversity.org/Angel_Hidden_Den"
+  },
+  "Angel Forsaken Den": {
+   "isk": 4046816,
+   "faction": "Angel",
+   "tier": "Forsaken Den",
+   "ships": 30,
+   "waves": 6,
+   "note": "lowest of every range",
+   "escalation": "No escalation or commander spawns listed on the page.",
+   "source": "https://wiki.eveuniversity.org/Angel_Forsaken_Den"
+  },
+  "Angel Forlorn Den": {
+   "isk": 10934757,
+   "faction": "Angel",
+   "tier": "Forlorn Den",
+   "ships": 63,
+   "waves": 6,
+   "note": "lowest of every range",
+   "escalation": "No escalation or commander spawn listed; 4th wave has a random trigger ship.",
+   "source": "https://wiki.eveuniversity.org/Angel_Forlorn_Den"
+  },
+  "Angel Yard": {
+   "isk": 2684453,
+   "faction": "Angel",
+   "tier": "Yard",
+   "ships": 45,
+   "waves": 11,
+   "note": "lowest of every range",
+   "escalation": "No commander or escalation spawns listed on the page.",
+   "source": "https://wiki.eveuniversity.org/Angel_Yard"
+  },
+  "Angel Rally Point": {
+   "isk": 5444570,
+   "faction": "Angel",
+   "tier": "Rally Point",
+   "ships": 56,
+   "waves": 13,
+   "note": "lowest of every range; 2 rat(s) with no bounty in the export, counted at 0",
+   "escalation": "V1 possible rare 1 commander battlecruiser Domination Legionnaire; V2 possible rare 1 commander battlecruiser Domination Primus (both faction modules); final-wa",
+   "source": "https://wiki.eveuniversity.org/Angel_Rally_Point"
+  },
+  "Angel Hidden Rally Point": {
+   "isk": 28365173,
+   "faction": "Angel",
+   "tier": "Hidden Rally Point",
+   "ships": 79,
+   "waves": 5,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "No faction/commander spawn listed on the page.",
+   "source": "https://wiki.eveuniversity.org/Angel_Hidden_Rally_Point"
+  },
+  "Angel Forsaken Rally Point": {
+   "isk": 35469594,
+   "faction": "Angel",
+   "tier": "Forsaken Rally Point",
+   "ships": 30,
+   "waves": 7,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "No faction/commander spawn listed on the page.",
+   "source": "https://wiki.eveuniversity.org/Angel_Forsaken_Rally_Point"
+  },
+  "Angel Forlorn Rally Point": {
+   "isk": 22028128,
+   "faction": "Angel",
+   "tier": "Forlorn Rally Point",
+   "ships": 57,
+   "waves": 5,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Possible rare spawn of 0-1 Commander Cruiser 'Domination Breaker'.",
+   "source": "https://wiki.eveuniversity.org/Angel_Forlorn_Rally_Point"
+  },
+  "Angel Port": {
+   "isk": 7678216,
+   "faction": "Angel",
+   "tier": "Port",
+   "ships": 28,
+   "waves": 4,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (4.8M / 10.6M); either/or spawns at the average of the alternatives",
+   "escalation": "Asteroid Port variant lists a 0-1 'Domination' Commander Battleship boss (may drop faction ammo/modules/tags); Mining Port variant lists none.",
+   "source": "https://wiki.eveuniversity.org/Angel_Port"
+  },
+  "Angel Hub": {
+   "isk": 12471469,
+   "faction": "Angel",
+   "tier": "Hub",
+   "ships": 27,
+   "waves": 4,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (14.8M / 10.1M); either/or spawns at the average of the alternatives",
+   "escalation": "Small Armory variant: possible rare 1x Commander Battleship Domination Saint/Nephilim; Dirty Shipyard variant: possible 1x Commander Battleship Domination Warlo",
+   "source": "https://wiki.eveuniversity.org/Angel_Hub"
+  },
+  "Angel Hidden Hub": {
+   "isk": 44889410,
+   "faction": "Angel",
+   "tier": "Hidden Hub",
+   "ships": 115,
+   "waves": 9,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "No rare/commander spawn listed on the page.",
+   "source": "https://wiki.eveuniversity.org/Angel_Hidden_Hub"
+  },
+  "Angel Forsaken Hub": {
+   "isk": 32281359,
+   "faction": "Angel",
+   "tier": "Forsaken Hub",
+   "ships": 37,
+   "waves": 6,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "No faction/commander spawn listed on the page.",
+   "source": "https://wiki.eveuniversity.org/Angel_Forsaken_Hub"
+  },
+  "Angel Forlorn Hub": {
+   "isk": 53973250,
+   "faction": "Angel",
+   "tier": "Forlorn Hub",
+   "ships": 46,
+   "waves": 4,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Possible rare reinforcement of 1x Commander Battleship 'Domination War General' (one reported encounter, Feb 2022, faction module drop).",
+   "source": "https://wiki.eveuniversity.org/Angel_Forlorn_Hub"
+  },
+  "Angel Haven": {
+   "isk": 39919302,
+   "faction": "Angel",
+   "tier": "Haven",
+   "ships": 55,
+   "waves": 6,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (44.3M / 35.5M); either/or spawns at the average of the alternatives",
+   "escalation": "Gas Haven: possible 0-1 Commander Battleship Domination Saint and 0-1 Angel Dreadnought; Rock Haven: possible 0-1 Commander Battleship Domination Saint/Warlord,",
+   "source": "https://wiki.eveuniversity.org/Angel_Haven"
+  },
+  "Angel Sanctum": {
+   "isk": 40786875,
+   "faction": "Angel",
+   "tier": "Sanctum",
+   "ships": 47,
+   "waves": 5,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Possible rare spawns: 0-1 Commander Battleship Domination Saint/Warlord and 0-1 Angel Dreadnought (extremely rare).",
+   "source": "https://wiki.eveuniversity.org/Angel_Sanctum"
+  },
+  "Blood Hideaway": {
+   "isk": 24750,
+   "faction": "Blood",
+   "tier": "Hideaway",
+   "ships": 6,
+   "waves": 4,
+   "note": "lowest of every range",
+   "escalation": "Wave 4 (final) is an optional 0-1 Commander Frigate Dark Blood Seeker (tracking disruptor, faction loot); no DED escalation listed.",
+   "source": "https://wiki.eveuniversity.org/Blood_Hideaway"
+  },
+  "Blood Hidden Hideaway": {
+   "isk": 528000,
+   "faction": "Blood",
+   "tier": "Hidden Hideaway",
+   "ships": 28,
+   "waves": 6,
+   "note": "lowest of every range; 2 rat(s) with no bounty in the export, counted at 0",
+   "escalation": "Page lists no commander, faction, rare spawn or escalation.",
+   "source": "https://wiki.eveuniversity.org/Blood_Hidden_Hideaway"
+  },
+  "Blood Forsaken Hideaway": {
+   "isk": 330750,
+   "faction": "Blood",
+   "tier": "Forsaken Hideaway",
+   "ships": 22,
+   "waves": 4,
+   "note": "lowest of every range",
+   "escalation": "Possible rare spawn 0-1 Commander Destroyer 'Dark Blood Commander' (as written); no DED escalation listed.",
+   "source": "https://wiki.eveuniversity.org/Blood_Forsaken_Hideaway"
+  },
+  "Blood Forlorn Hideaway": {
+   "isk": 461250,
+   "faction": "Blood",
+   "tier": "Forlorn Hideaway",
+   "ships": 19,
+   "waves": 4,
+   "note": "lowest of every range",
+   "escalation": "Rare spawn 0-1 Commander Frigate Dark Blood Collector (faction modules/charges/tags); page says the site does not appear to escalate.",
+   "source": "https://wiki.eveuniversity.org/Blood_Forlorn_Hideaway"
+  },
+  "Blood Refuge": {
+   "isk": 127750,
+   "faction": "Blood",
+   "tier": "Refuge",
+   "ships": 14,
+   "waves": 4,
+   "note": "lowest of every range",
+   "escalation": "Optional 1 x Commander Destroyer Dark Blood Converter; site can escalate to Mul-Zatah Monastery (DED).",
+   "source": "https://wiki.eveuniversity.org/Blood_Refuge"
+  },
+  "Blood Den": {
+   "isk": 409876,
+   "faction": "Blood",
+   "tier": "Den",
+   "ships": 20,
+   "waves": 6,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (0.2M / 0.6M); 3 rat(s) with no bounty in the export, counted at 0",
+   "escalation": "Both layouts have a possible rare spawn 0-1 Commander Cruiser 'Corpum Commander' (as written); heavy layout 3rd wave has an optional 0-1 Corpum Arch Templar cru",
+   "source": "https://wiki.eveuniversity.org/Blood_Den"
+  },
+  "Blood Hidden Den": {
+   "isk": 5533378,
+   "faction": "Blood",
+   "tier": "Hidden Den",
+   "ships": 82,
+   "waves": 9,
+   "note": "lowest of every range",
+   "escalation": "May escalate to Crimson Hand Supply Depot (trigger unknown); no commander spawn listed.",
+   "source": "https://wiki.eveuniversity.org/Blood_Hidden_Den"
+  },
+  "Blood Forsaken Den": {
+   "isk": 4134564,
+   "faction": "Blood",
+   "tier": "Forsaken Den",
+   "ships": 27,
+   "waves": 6,
+   "note": "lowest of every range",
+   "escalation": "Possible rare spawn 1 x Commander Cruiser Dark Blood Arch Templar; page lists a 7/10 escalation (name not given).",
+   "source": "https://wiki.eveuniversity.org/Blood_Forsaken_Den"
+  },
+  "Blood Forlorn Den": {
+   "isk": 11069694,
+   "faction": "Blood",
+   "tier": "Forlorn Den",
+   "ships": 58,
+   "waves": 6,
+   "note": "lowest of every range",
+   "escalation": "Wave 6 may include 0-1 Commander Cruiser Dark Blood Arch Templar (Dark Blood tag/modules); may escalate to a 7/10 DED complex.",
+   "source": "https://wiki.eveuniversity.org/Blood_Forlorn_Den"
+  },
+  "Blood Yard": {
+   "isk": 1749881,
+   "faction": "Blood",
+   "tier": "Yard",
+   "ships": 23,
+   "waves": 6,
+   "note": "lowest of every range",
+   "escalation": "Rare final spawn 1 x Commander Cruiser Dark Blood Templar/Reaver; site escalates to Crimson Hand Supply Depot.",
+   "source": "https://wiki.eveuniversity.org/Blood_Yard"
+  },
+  "Blood Rally Point": {
+   "isk": 2351690,
+   "faction": "Blood",
+   "tier": "Rally Point",
+   "ships": 23,
+   "waves": 5,
+   "note": "lowest of every range",
+   "escalation": "Page lists no commander/faction spawn and no escalation.",
+   "source": "https://wiki.eveuniversity.org/Blood_Rally_Point"
+  },
+  "Blood Hidden Rally Point": {
+   "isk": 24437194,
+   "faction": "Blood",
+   "tier": "Hidden Rally Point",
+   "ships": 75,
+   "waves": 5,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Rare commander spawn: 1 x Commander Battlecruiser 'Dark Blood Exorcist/Phantom' (may drop Dark Blood faction modules); no escalation site listed.",
+   "source": "https://wiki.eveuniversity.org/Blood_Hidden_Rally_Point"
+  },
+  "Blood Forsaken Rally Point": {
+   "isk": 22068042,
+   "faction": "Blood",
+   "tier": "Forsaken Rally Point",
+   "ships": 31,
+   "waves": 6,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Page says 'Faction spawns are possible' (no commander row given); anomaly can escalate to Blood Raider Prison Camp.",
+   "source": "https://wiki.eveuniversity.org/Blood_Forsaken_Rally_Point"
+  },
+  "Blood Forlorn Rally Point": {
+   "isk": 18971003,
+   "faction": "Blood",
+   "tier": "Forlorn Rally Point",
+   "ships": 57,
+   "waves": 5,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Wave 5 lists a rare spawn of 1 x Commander Battleship 'Dark Blood Cardinal/Monsignor' (possible Dark Blood faction modules); site has a chance to escalate to Bl",
+   "source": "https://wiki.eveuniversity.org/Blood_Forlorn_Rally_Point"
+  },
+  "Blood Port": {
+   "isk": 8468707,
+   "faction": "Blood",
+   "tier": "Port",
+   "ships": 24,
+   "waves": 5,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Slave Mine variant lists a Possible Rare Spawn of 1 x Commander Battleship 'Dark Blood Oracle' (possible faction charges/modules/tags); anomaly can escalate to ",
+   "source": "https://wiki.eveuniversity.org/Blood_Port"
+  },
+  "Blood Hub": {
+   "isk": 16134125,
+   "faction": "Blood",
+   "tier": "Hub",
+   "ships": 24,
+   "waves": 4,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Possible Rare Spawn in the 3rd reinforcement: 1 x Commander Battleship 'Dark Blood Apostle' (possible faction charges/modules/tags); anomaly can escalate to Blo",
+   "source": "https://wiki.eveuniversity.org/Blood_Hub"
+  },
+  "Blood Hidden Hub": {
+   "isk": 20794419,
+   "faction": "Blood",
+   "tier": "Hidden Hub",
+   "ships": 95,
+   "waves": 9,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "No commander/faction spawn or escalation is listed on the page.",
+   "source": "https://wiki.eveuniversity.org/Blood_Hidden_Hub"
+  },
+  "Blood Forsaken Hub": {
+   "isk": 29382938,
+   "faction": "Blood",
+   "tier": "Forsaken Hub",
+   "ships": 37,
+   "waves": 6,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Possible Rare Spawn in the 5th reinforcement: 0-1 x Commander Battleship 'Dark Blood Commander' (possible faction charges/modules/tags); escalates to Dark Blood",
+   "source": "https://wiki.eveuniversity.org/Blood_Forsaken_Hub"
+  },
+  "Blood Forlorn Hub": {
+   "isk": 36166454,
+   "faction": "Blood",
+   "tier": "Forlorn Hub",
+   "ships": 54,
+   "waves": 5,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Possible Rare Spawn in the 4th reinforcement: 0-1 x Commander Battleship 'Dark Blood Commander' (possible faction charges/modules/tags); no escalation site list",
+   "source": "https://wiki.eveuniversity.org/Blood_Forlorn_Hub"
+  },
+  "Blood Haven": {
+   "isk": 30864375,
+   "faction": "Blood",
+   "tier": "Haven",
+   "ships": 37,
+   "waves": 6,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "The final 'Commander spawn' group also lists 0-1 x Commander Battleship 'Dark Blood Commander' (Dark Blood tag, Blood ammo crystal, possibly Dark Blood modules)",
+   "source": "https://wiki.eveuniversity.org/Blood_Haven"
+  },
+  "Blood Sanctum": {
+   "isk": 25043554,
+   "faction": "Blood",
+   "tier": "Sanctum",
+   "ships": 41,
+   "waves": 5,
+   "note": "lowest of every range",
+   "escalation": "Possible Rare Spawn in the Fifth Spawn: 0-1 x Commander Battleship 'Dark Blood Commander' and 0-1 x Dreadnought 'Blood / Dark Blood Dreadnought' (Station varian",
+   "source": "https://wiki.eveuniversity.org/Blood_Sanctum"
+  },
+  "Guristas Hideaway": {
+   "isk": 61438,
+   "faction": "Guristas",
+   "tier": "Hideaway",
+   "ships": 6,
+   "waves": 4,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Possible rare spawn of 0-1 Commander Frigate Dread Guristas Saboteur/Despoiler (target jammer); no escalation listed.",
+   "source": "https://wiki.eveuniversity.org/Guristas_Hideaway"
+  },
+  "Guristas Hidden Hideaway": {
+   "isk": 324000,
+   "faction": "Guristas",
+   "tier": "Hidden Hideaway",
+   "ships": 23,
+   "waves": 5,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Page says the site does not appear to escalate; no commander spawn listed.",
+   "source": "https://wiki.eveuniversity.org/Guristas_Hidden_Hideaway"
+  },
+  "Guristas Forsaken Hideaway": {
+   "isk": 856083,
+   "faction": "Guristas",
+   "tier": "Forsaken Hideaway",
+   "ships": 15,
+   "waves": 3,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Possible rare spawn of 0-1 Elite Frigate Dread Gurista Despoiler (target jammer, faction modules).",
+   "source": "https://wiki.eveuniversity.org/Guristas_Forsaken_Hideaway"
+  },
+  "Guristas Forlorn Hideaway": {
+   "isk": 959818,
+   "faction": "Guristas",
+   "tier": "Forlorn Hideaway",
+   "ships": 25,
+   "waves": 4,
+   "note": "lowest of every range",
+   "escalation": "Possible rare spawn of 0-1 Commander Frigate Dread Guristas Despoiler/Saboteur; possible faction charges/modules/tags drop.",
+   "source": "https://wiki.eveuniversity.org/Guristas_Forlorn_Hideaway"
+  },
+  "Guristas Refuge": {
+   "isk": 179943,
+   "faction": "Guristas",
+   "tier": "Refuge",
+   "ships": 15,
+   "waves": 5,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (0.2M / 0.1M); either/or spawns at the average of the alternatives",
+   "escalation": "Both variants: possible 0-1 Commander Destroyer Dread Guristas Anarchist/Nihilist.",
+   "source": "https://wiki.eveuniversity.org/Guristas_Refuge"
+  },
+  "Guristas Den": {
+   "isk": 723189,
+   "faction": "Guristas",
+   "tier": "Den",
+   "ships": 24,
+   "waves": 5,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Possible 0-1 Cruiser Dread Guristas Killer (faction modules/implants).",
+   "source": "https://wiki.eveuniversity.org/Guristas_Den"
+  },
+  "Guristas Hidden Den": {
+   "isk": 5567034,
+   "faction": "Guristas",
+   "tier": "Hidden Den",
+   "ships": 82,
+   "waves": 9,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Rare commander spawn of 1 Commander Cruiser Dread Guristas Inferno/Mortifier; may escalate to Guristas Troop Reinvigoration Camp; 2 Habitation Module structures",
+   "source": "https://wiki.eveuniversity.org/Guristas_Hidden_Den"
+  },
+  "Guristas Forsaken Den": {
+   "isk": 2878266,
+   "faction": "Guristas",
+   "tier": "Forsaken Den",
+   "ships": 28,
+   "waves": 6,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Possible 0-1 Commander Cruiser Dread Guristas Inferno/Mortifier (faction modules/implants).",
+   "source": "https://wiki.eveuniversity.org/Guristas_Forsaken_Den"
+  },
+  "Guristas Forlorn Den": {
+   "isk": 12890754,
+   "faction": "Guristas",
+   "tier": "Forlorn Den",
+   "ships": 66,
+   "waves": 6,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Possible 0-1 Commander Battleship Dread Guristas Commander (faction modules/implants); page lists no escalation.",
+   "source": "https://wiki.eveuniversity.org/Guristas_Forlorn_Den"
+  },
+  "Guristas Yard": {
+   "isk": 902164,
+   "faction": "Guristas",
+   "tier": "Yard",
+   "ships": 18,
+   "waves": 6,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (0.8M / 1M); either/or spawns at the average of the alternatives",
+   "escalation": "Both types: rare commander wave of 1 Commander Cruiser Dread Guristas Ascriber/Silencer (faction items/implants).",
+   "source": "https://wiki.eveuniversity.org/Guristas_Yard"
+  },
+  "Guristas Rally Point": {
+   "isk": 2677364,
+   "faction": "Guristas",
+   "tier": "Rally Point",
+   "ships": 29,
+   "waves": 7,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (3.1M / 2.2M); either/or spawns at the average of the alternatives",
+   "escalation": "Both variants: possible 0-1 Commander Cruiser Dread Guristas Inferno/Mortifier; may escalate to Guristas Troop Reinvigoration Camp (DED 6/10).",
+   "source": "https://wiki.eveuniversity.org/Guristas_Rally_Point"
+  },
+  "Guristas Hidden Rally Point": {
+   "isk": 28330880,
+   "faction": "Guristas",
+   "tier": "Hidden Rally Point",
+   "ships": 78,
+   "waves": 5,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Can escalate to Dread Guristas Fleet Staging Point; no commander/faction spawn listed.",
+   "source": "https://wiki.eveuniversity.org/Guristas_Hidden_Rally_Point"
+  },
+  "Guristas Forsaken Rally Point": {
+   "isk": 17252813,
+   "faction": "Guristas",
+   "tier": "Forsaken Rally Point",
+   "ships": 30,
+   "waves": 7,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Wave 8 is a rare spawn of 1x Dread Guristas Nulifier (commander battleship, page spelling); site can escalate to Pith's Penal Complex.",
+   "source": "https://wiki.eveuniversity.org/Guristas_Forsaken_Rally_Point"
+  },
+  "Guristas Forlorn Rally Point": {
+   "isk": 14132909,
+   "faction": "Guristas",
+   "tier": "Forlorn Rally Point",
+   "ships": 55,
+   "waves": 5,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Possible 0-1 commander cruiser 'Dread Guristas Inferno/Mortifier' (may drop faction modules/implant); can escalate to Pith's Penal Complex (DED 8/10).",
+   "source": "https://wiki.eveuniversity.org/Guristas_Forlorn_Rally_Point"
+  },
+  "Guristas Port": {
+   "isk": 7530611,
+   "faction": "Guristas",
+   "tier": "Port",
+   "ships": 30,
+   "waves": 4,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Possible 0-1 commander battleship 'Dread Guristas Obliterator'; may escalate to Gurista Military Operations Complex.",
+   "source": "https://wiki.eveuniversity.org/Guristas_Port"
+  },
+  "Guristas Hub": {
+   "isk": 9030282,
+   "faction": "Guristas",
+   "tier": "Hub",
+   "ships": 22,
+   "waves": 4,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Each of waves 2-4 has an additional randomized spawn group (Wave 2: 3 Pithior Supremacist + 3 Pith Extinguisher, OR 3 Dire Phitum Mortifer + 3 Phitatis Executor",
+   "source": "https://wiki.eveuniversity.org/Guristas_Hub"
+  },
+  "Guristas Hidden Hub": {
+   "isk": 19289818,
+   "faction": "Guristas",
+   "tier": "Hidden Hub",
+   "ships": 107,
+   "waves": 9,
+   "note": "lowest of every range",
+   "escalation": "No commander, faction spawn or escalation listed on the page.",
+   "source": "https://wiki.eveuniversity.org/Guristas_Hidden_Hub"
+  },
+  "Guristas Forsaken Hub": {
+   "isk": 24578875,
+   "faction": "Guristas",
+   "tier": "Forsaken Hub",
+   "ships": 36,
+   "waves": 6,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Possible 0-1 commander battleship 'Dread Guristas Commander' (may drop faction modules); no escalation named.",
+   "source": "https://wiki.eveuniversity.org/Guristas_Forsaken_Hub"
+  },
+  "Guristas Forlorn Hub": {
+   "isk": 27633752,
+   "faction": "Guristas",
+   "tier": "Forlorn Hub",
+   "ships": 53,
+   "waves": 4,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Can escalate to a Dread Guristas Fleet Staging Point; no commander spawn listed.",
+   "source": "https://wiki.eveuniversity.org/Guristas_Forlorn_Hub"
+  },
+  "Guristas Haven": {
+   "isk": 27503875,
+   "faction": "Guristas",
+   "tier": "Haven",
+   "ships": 38,
+   "waves": 6,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Rare spawns in both variants: 1x Dread Guristas Commander (commander battleship) and 1x Guristas Dreadnought (dreadnought, web/neut/point); no DED escalation na",
+   "source": "https://wiki.eveuniversity.org/Guristas_Haven"
+  },
+  "Guristas Sanctum": {
+   "isk": 34930875,
+   "faction": "Guristas",
+   "tier": "Sanctum",
+   "ships": 41,
+   "waves": 5,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Very rare 0-1 commander battleship 'Dread Guristas Massacrer' (Ring wave 5, Station wave 7) and extremely rare 0-1 'Guristas Dreadnought' (Station wave 7); no D",
+   "source": "https://wiki.eveuniversity.org/Guristas_Sanctum"
+  },
+  "Sansha Hideaway": {
+   "isk": 19688,
+   "faction": "Sansha",
+   "tier": "Hideaway",
+   "ships": 5,
+   "waves": 4,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (0M / 0M)",
+   "escalation": "Bonus Spawn in both variants: 0-1x Commander Frigate True Sansha's Plague (rare; tracking disruptor); no escalation named.",
+   "source": "https://wiki.eveuniversity.org/Sansha_Hideaway"
+  },
+  "Sansha Hidden Hideaway": {
+   "isk": 221750,
+   "faction": "Sansha",
+   "tier": "Hidden Hideaway",
+   "ships": 24,
+   "waves": 5,
+   "note": "lowest of every range",
+   "escalation": "Bonus Spawn: 0-1x Commander Frigate True Sansha's Plague (tracking disruptor; faction ammo/tags/rare faction modules).",
+   "source": "https://wiki.eveuniversity.org/Sansha_Hidden_Hideaway"
+  },
+  "Sansha Forsaken Hideaway": {
+   "isk": 340875,
+   "faction": "Sansha",
+   "tier": "Forsaken Hideaway",
+   "ships": 22,
+   "waves": 4,
+   "note": "lowest of every range",
+   "escalation": "Wave 4 may include 0-1x Commander Frigate 'True Sansha's Ship' (page does not name the exact hull; faction ammo/tags/possible faction modules).",
+   "source": "https://wiki.eveuniversity.org/Sansha_Forsaken_Hideaway"
+  },
+  "Sansha Forlorn Hideaway": {
+   "isk": 468000,
+   "faction": "Sansha",
+   "tier": "Forlorn Hideaway",
+   "ships": 20,
+   "waves": 4,
+   "note": "lowest of every range",
+   "escalation": "Wave 4 may include 0-1x Commander Frigate True Sansha's Ravener (rare); page states no escalation.",
+   "source": "https://wiki.eveuniversity.org/Sansha_Forlorn_Hideaway"
+  },
+  "Sansha Refuge": {
+   "isk": 146220,
+   "faction": "Sansha",
+   "tier": "Refuge",
+   "ships": 13,
+   "waves": 5,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (0.1M / 0.2M)",
+   "escalation": "Commander Wave (both variants): 0-1x (variant 2: 0-2x) Frigate Centii Enslaver/Centii Plague plus 0-1x Commander Destroyer True Sansha's Cannibal (faction loot)",
+   "source": "https://wiki.eveuniversity.org/Sansha_Refuge"
+  },
+  "Sansha Den": {
+   "isk": 514033,
+   "faction": "Sansha",
+   "tier": "Den",
+   "ships": 27,
+   "waves": 6,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (0.3M / 0.7M)",
+   "escalation": "Both layouts end with 0-1x Commander Cruiser 'True Sansha Commander' (page's wording; hull not named) with possible faction loot.",
+   "source": "https://wiki.eveuniversity.org/Sansha_Den"
+  },
+  "Sansha Hidden Den": {
+   "isk": 5244194,
+   "faction": "Sansha",
+   "tier": "Hidden Den",
+   "ships": 84,
+   "waves": 9,
+   "note": "lowest of every range",
+   "escalation": "Page lists no commander/faction spawn and no escalation.",
+   "source": "https://wiki.eveuniversity.org/Sansha_Hidden_Den"
+  },
+  "Sansha Forsaken Den": {
+   "isk": 4179564,
+   "faction": "Sansha",
+   "tier": "Forsaken Den",
+   "ships": 27,
+   "waves": 6,
+   "note": "lowest of every range",
+   "escalation": "Wave 5 may add 0-1x elite frigate Centii Loyal Minion/Centii Loyal Ravener; no commander or escalation listed.",
+   "source": "https://wiki.eveuniversity.org/Sansha_Forsaken_Den"
+  },
+  "Sansha Forlorn Den": {
+   "isk": 11703815,
+   "faction": "Sansha",
+   "tier": "Forlorn Den",
+   "ships": 66,
+   "waves": 6,
+   "note": "lowest of every range",
+   "escalation": "Possible rare spawn of 1x unnamed True Sansha ship (faction ammo/tags/modules); no escalation named.",
+   "source": "https://wiki.eveuniversity.org/Sansha_Forlorn_Den"
+  },
+  "Sansha Yard": {
+   "isk": 2320571,
+   "faction": "Sansha",
+   "tier": "Yard",
+   "ships": 40,
+   "waves": 11,
+   "note": "lowest of every range",
+   "escalation": "Rare spawn 0-1x Commander Cruiser: True Sansha's Hellhound (Variation 1) or True Sansha's Fiend (Variation 2); no escalation named.",
+   "source": "https://wiki.eveuniversity.org/Sansha_Yard"
+  },
+  "Sansha Rally Point": {
+   "isk": 2189440,
+   "faction": "Sansha",
+   "tier": "Rally Point",
+   "ships": 24,
+   "waves": 5,
+   "note": "lowest of every range",
+   "escalation": "Possible rare spawn 0-1x Commander Battlecruiser True Sansha's Behemoth/Daemon (faction ammo/tags/modules); site can escalate to Sansha War Supply Complex.",
+   "source": "https://wiki.eveuniversity.org/Sansha_Rally_Point"
+  },
+  "Sansha Hidden Rally Point": {
+   "isk": 32709106,
+   "faction": "Sansha",
+   "tier": "Hidden Rally Point",
+   "ships": 78,
+   "waves": 5,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Can escalate to True Sansha Fleet Staging Point; no faction/commander spawn listed.",
+   "source": "https://wiki.eveuniversity.org/Sansha_Hidden_Rally_Point"
+  },
+  "Sansha Forsaken Rally Point": {
+   "isk": 18899376,
+   "faction": "Sansha",
+   "tier": "Forsaken Rally Point",
+   "ships": 30,
+   "waves": 7,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Can escalate to Sansha Prison Camp; no faction/commander spawn listed.",
+   "source": "https://wiki.eveuniversity.org/Sansha_Forsaken_Rally_Point"
+  },
+  "Sansha Forlorn Rally Point": {
+   "isk": 16422192,
+   "faction": "Sansha",
+   "tier": "Forlorn Rally Point",
+   "ships": 54,
+   "waves": 5,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Bonus spawn of 0-1 commander cruiser 'True Sansha's Beast/Juggernaut'; can escalate to the 8/10 DED site Sansha Prison Camp.",
+   "source": "https://wiki.eveuniversity.org/Sansha_Forlorn_Rally_Point"
+  },
+  "Sansha Port": {
+   "isk": 4773125,
+   "faction": "Sansha",
+   "tier": "Port",
+   "ships": 17,
+   "waves": 4,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Possible rare spawn of 1 commander battlecruiser 'True Sansha's Daemon'; can escalate to Sansha Military Operations Complex.",
+   "source": "https://wiki.eveuniversity.org/Sansha_Port"
+  },
+  "Sansha Hub": {
+   "isk": 12685500,
+   "faction": "Sansha",
+   "tier": "Hub",
+   "ships": 30,
+   "waves": 4,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Can escalate to Sansha Capital Staging; no faction/commander spawn listed.",
+   "source": "https://wiki.eveuniversity.org/Sansha_Hub"
+  },
+  "Sansha Hidden Hub": {
+   "isk": 22339940,
+   "faction": "Sansha",
+   "tier": "Hidden Hub",
+   "ships": 99,
+   "waves": 9,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Faction spawn of 0-1 unknown True Sansha ship is assumed possible but unconfirmed; whether the site can trigger an escalation is unknown.",
+   "source": "https://wiki.eveuniversity.org/Sansha_Hidden_Hub"
+  },
+  "Sansha Forsaken Hub": {
+   "isk": 27381500,
+   "faction": "Sansha",
+   "tier": "Forsaken Hub",
+   "ships": 34,
+   "waves": 6,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "A possibly rare bonus wave of 3 Centus Overlord battleships, a rare spawn of 1 True Sansha battleship, and escalation to the expedition True Sansha Fleet Stagin",
+   "source": "https://wiki.eveuniversity.org/Sansha_Forsaken_Hub"
+  },
+  "Sansha Forlorn Hub": {
+   "isk": 26191272,
+   "faction": "Sansha",
+   "tier": "Forlorn Hub",
+   "ships": 49,
+   "waves": 4,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "No faction/commander spawn or escalation named on the page.",
+   "source": "https://wiki.eveuniversity.org/Sansha_Forlorn_Hub"
+  },
+  "Sansha Haven": {
+   "isk": 31126979,
+   "faction": "Sansha",
+   "tier": "Haven",
+   "ships": 50,
+   "waves": 6,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (35.8M / 26.5M); either/or spawns at the average of the alternatives",
+   "escalation": "Pirate Gate variant: possible rare spawns of 0-1 True Sansha's Tyrant/Dread Lord battleship, 0-1 Sansha's Nation Dreadnought, 0-1 True Sansha's Nation Supercarr",
+   "source": "https://wiki.eveuniversity.org/Sansha_Haven"
+  },
+  "Sansha Sanctum": {
+   "isk": 40291229,
+   "faction": "Sansha",
+   "tier": "Sanctum",
+   "ships": 55,
+   "waves": 6,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (30.7M / 49.9M); either/or spawns at the average of the alternatives",
+   "escalation": "Rare 0-1 commander battleship True Sansha's Tyrant in the final wave of either layout, plus an extremely rare 0-1 Sansha's Dreadnought in the Ring 4th wave; no ",
+   "source": "https://wiki.eveuniversity.org/Sansha_Sanctum"
+  },
+  "Serpentis Hideaway": {
+   "isk": 26563,
+   "faction": "Serpentis",
+   "tier": "Hideaway",
+   "ships": 5,
+   "waves": 4,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Bonus Spawn 0-1 x Commander Frigate 'Shadow Serpentis Watchman' (drops faction ammo/tags, may drop faction modules, mid-grade implants, Daredevil BPC); escalate",
+   "source": "https://wiki.eveuniversity.org/Serpentis_Hideaway"
+  },
+  "Serpentis Hidden Hideaway": {
+   "isk": 246938,
+   "faction": "Serpentis",
+   "tier": "Hidden Hideaway",
+   "ships": 22,
+   "waves": 6,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Bonus Spawn 0-1 x Frigate 'Shadow Serpentis' (drops); escalates to Serpentis Narcotic Warehouses.",
+   "source": "https://wiki.eveuniversity.org/Serpentis_Hidden_Hideaway"
+  },
+  "Serpentis Forsaken Hideaway": {
+   "isk": 311500,
+   "faction": "Serpentis",
+   "tier": "Forsaken Hideaway",
+   "ships": 23,
+   "waves": 4,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Bonus Spawn 0-1 x Frigate 'Shadow Serpentis' (drops); escalates to Serpentis Narcotic Warehouses.",
+   "source": "https://wiki.eveuniversity.org/Serpentis_Forsaken_Hideaway"
+  },
+  "Serpentis Forlorn Hideaway": {
+   "isk": 370251,
+   "faction": "Serpentis",
+   "tier": "Forlorn Hideaway",
+   "ships": 20,
+   "waves": 4,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Third Spawn row lists 0-1 x Frigate 'Shadow Serpentis' marked 'Rare spawn' (drops) — excluded from waves; escalates to Serpentis Narcotic Warehouses.",
+   "source": "https://wiki.eveuniversity.org/Serpentis_Forlorn_Hideaway"
+  },
+  "Serpentis Refuge": {
+   "isk": 98344,
+   "faction": "Serpentis",
+   "tier": "Refuge",
+   "ships": 5,
+   "waves": 5,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Bonus Spawn (rare) 0-1 x Frigate 'Shadow Serpentis Soldier' (drops); escalates to Serpentis Narcotic Warehouses.",
+   "source": "https://wiki.eveuniversity.org/Serpentis_Refuge"
+  },
+  "Serpentis Den": {
+   "isk": 1362674,
+   "faction": "Serpentis",
+   "tier": "Den",
+   "ships": 22,
+   "waves": 4,
+   "layouts": 3,
+   "note": "lowest of every range; 3 layouts averaged (3.5M / 0.3M / 0.3M); either/or spawns at the average of the alternatives",
+   "escalation": "Each type has a Bonus spawn 0-1 x Commander Frigate: Type 1 'Shadow Serpentis Commander', Type 2 'Shadow Serpentis Patroller', Type 3 'Shadow Serpentis' (all dr",
+   "source": "https://wiki.eveuniversity.org/Serpentis_Den"
+  },
+  "Serpentis Hidden Den": {
+   "isk": 6126190,
+   "faction": "Serpentis",
+   "tier": "Hidden Den",
+   "ships": 83,
+   "waves": 9,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Bonus spawn 0-1 x Commander Frigate 'Shadow Serpentis' (drops); escalates to Serpentis Corporation Hydroponics Site.",
+   "source": "https://wiki.eveuniversity.org/Serpentis_Hidden_Den"
+  },
+  "Serpentis Forsaken Den": {
+   "isk": 4827375,
+   "faction": "Serpentis",
+   "tier": "Forsaken Den",
+   "ships": 30,
+   "waves": 6,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives; 2 rat(s) with no bounty in the export, counted at 0",
+   "escalation": "No bonus/commander spawn listed; escalates to Serpentis Paramilitary Complex.",
+   "source": "https://wiki.eveuniversity.org/Serpentis_Forsaken_Den"
+  },
+  "Serpentis Forlorn Den": {
+   "isk": 14562928,
+   "faction": "Serpentis",
+   "tier": "Forlorn Den",
+   "ships": 63,
+   "waves": 6,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Bonus spawn 0-1 x Commander Cruiser 'Shadow Serpentis <Need Confirmation>' (drops faction loot, unconfirmed); escalates to Serpentis Corporation Hydroponics Sit",
+   "source": "https://wiki.eveuniversity.org/Serpentis_Forlorn_Den"
+  },
+  "Serpentis Yard": {
+   "isk": 678297,
+   "faction": "Serpentis",
+   "tier": "Yard",
+   "ships": 8,
+   "waves": 5,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (1.3M / 0M); 16 rat(s) with no bounty in the export, counted at 0",
+   "escalation": "No bonus/commander spawn listed; escalates to Serpentis Logistical Outpost.",
+   "source": "https://wiki.eveuniversity.org/Serpentis_Yard"
+  },
+  "Serpentis Rally Point": {
+   "isk": 3202115,
+   "faction": "Serpentis",
+   "tier": "Rally Point",
+   "ships": 29,
+   "waves": 7,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (3.5M / 2.9M); either/or spawns at the average of the alternatives",
+   "escalation": "Possible commander spawn in the final wave of each variant: Silo variant 1 x Commander Battlecruiser 'Shadow Serpentis Captain Sentry', Workers' Quarters varian",
+   "source": "https://wiki.eveuniversity.org/Serpentis_Rally_Point"
+  },
+  "Serpentis Hidden Rally Point": {
+   "isk": 29095731,
+   "faction": "Serpentis",
+   "tier": "Hidden Rally Point",
+   "ships": 74,
+   "waves": 5,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "No faction/commander/escalation spawn listed on the page.",
+   "source": "https://wiki.eveuniversity.org/Serpentis_Hidden_Rally_Point"
+  },
+  "Serpentis Forsaken Rally Point": {
+   "isk": 20272564,
+   "faction": "Serpentis",
+   "tier": "Forsaken Rally Point",
+   "ships": 26,
+   "waves": 6,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "No escalation, faction or commander spawn documented on the page.",
+   "source": "https://wiki.eveuniversity.org/Serpentis_Forsaken_Rally_Point"
+  },
+  "Serpentis Forlorn Rally Point": {
+   "isk": 18681818,
+   "faction": "Serpentis",
+   "tier": "Forlorn Rally Point",
+   "ships": 56,
+   "waves": 5,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Can escalate to the Serpentis Prison Camp; no faction/commander spawn listed.",
+   "source": "https://wiki.eveuniversity.org/Serpentis_Forlorn_Rally_Point"
+  },
+  "Serpentis Port": {
+   "isk": 8811990,
+   "faction": "Serpentis",
+   "tier": "Port",
+   "ships": 31,
+   "waves": 4,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (8.7M / 8.9M); either/or spawns at the average of the alternatives",
+   "escalation": "Variant 1: possible commander spawn 1x Shadow Serpentis Port Admiral (commander battleship); Variant 2: small chance of a Shadow Serpentis faction spawn and a r",
+   "source": "https://wiki.eveuniversity.org/Serpentis_Port"
+  },
+  "Serpentis Hub": {
+   "isk": 14441563,
+   "faction": "Serpentis",
+   "tier": "Hub",
+   "ships": 29,
+   "waves": 4,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (10.6M / 18.3M); either/or spawns at the average of the alternatives",
+   "escalation": "Bonus spawn of 0-1 commander battleship Shadow Serpentis Vice/Rear Admiral (can drop faction modules); no escalation named.",
+   "source": "https://wiki.eveuniversity.org/Serpentis_Hub"
+  },
+  "Serpentis Hidden Hub": {
+   "isk": 21416913,
+   "faction": "Serpentis",
+   "tier": "Hidden Hub",
+   "ships": 94,
+   "waves": 9,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "No faction, commander or escalation spawn listed on the page.",
+   "source": "https://wiki.eveuniversity.org/Serpentis_Hidden_Hub"
+  },
+  "Serpentis Forsaken Hub": {
+   "isk": 33788625,
+   "faction": "Serpentis",
+   "tier": "Forsaken Hub",
+   "ships": 48,
+   "waves": 6,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Can escalate into the Shadow Serpentis Fleet Staging Point; no faction/commander spawn listed.",
+   "source": "https://wiki.eveuniversity.org/Serpentis_Forsaken_Hub"
+  },
+  "Serpentis Forlorn Hub": {
+   "isk": 43318584,
+   "faction": "Serpentis",
+   "tier": "Forlorn Hub",
+   "ships": 57,
+   "waves": 5,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "0-1 Shadow Serpentis Port Admiral (faction battleship) may appear in the final '? Reinforcement Spawn'; no named escalation.",
+   "source": "https://wiki.eveuniversity.org/Serpentis_Forlorn_Hub"
+  },
+  "Serpentis Haven": {
+   "isk": 30684275,
+   "faction": "Serpentis",
+   "tier": "Haven",
+   "ships": 48,
+   "waves": 6,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (38.9M / 22.4M); either/or spawns at the average of the alternatives",
+   "escalation": "With Wave 5 (both types) a Shadow Serpentis commander battleship (0-1), a Serpentis Dreadnought (0-1, very rare) or a Shadow Serpentis Titan (0-1, extremely rar",
+   "source": "https://wiki.eveuniversity.org/Serpentis_Haven"
+  },
+  "Serpentis Sanctum": {
+   "isk": 34897323,
+   "faction": "Serpentis",
+   "tier": "Sanctum",
+   "ships": 49,
+   "waves": 6,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (24.9M / 44.8M); either/or spawns at the average of the alternatives",
+   "escalation": "Type 1 wave 4 may include 0-1 Shadow Serpentis commander battleship (may drop deadspace/faction modules) and 0-1 Serpentis Dreadnought; Type 2 wave 5 may includ",
+   "source": "https://wiki.eveuniversity.org/Serpentis_Sanctum"
+  },
+  "Drone Cluster": {
+   "isk": 56389,
+   "faction": "Rogue Drones",
+   "tier": "Cluster",
+   "ships": 7,
+   "waves": 5,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (0.1M / 0.1M); either/or spawns at the average of the alternatives",
+   "escalation": "Habitation module: optional Commander Frigate 0-1 Sentient Sunder Alvi. Shuttle wreck: optional Fifth spawn of 3 Frigate Sunder/Raider Alvi OR 1 Commander Friga",
+   "source": "https://wiki.eveuniversity.org/Drone_Cluster"
+  },
+  "Drone Collection": {
+   "isk": 27563,
+   "faction": "Rogue Drones",
+   "tier": "Collection",
+   "ships": 7,
+   "waves": 5,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Page states this site has no escalations; no commander/faction spawn listed.",
+   "source": "https://wiki.eveuniversity.org/Drone_Collection"
+  },
+  "Drone Assembly": {
+   "isk": 130172,
+   "faction": "Rogue Drones",
+   "tier": "Assembly",
+   "ships": 11,
+   "waves": 6,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (0M / 0.2M); either/or spawns at the average of the alternatives",
+   "escalation": "Hollow asteroid: optional Fifth spawn 1 Frigate Hunter Alvi and optional Commander Destroyer 1 Sentient Shatter Alvior; Outpost remains: Commander Destroyer 0-1",
+   "source": "https://wiki.eveuniversity.org/Drone_Assembly"
+  },
+  "Drone Gathering": {
+   "isk": 815518,
+   "faction": "Rogue Drones",
+   "tier": "Gathering",
+   "ships": 20,
+   "waves": 6,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (0.8M / 0.8M); either/or spawns at the average of the alternatives",
+   "escalation": "Both variants: Commander spawn Cruiser 0-1 Sentient Annihilator Alvum (drops drone components, may drop Rogue Drone chips); site can escalate to Rogue Drone Ast",
+   "source": "https://wiki.eveuniversity.org/Drone_Gathering"
+  },
+  "Drone Surveillance": {
+   "isk": 2154510,
+   "faction": "Rogue Drones",
+   "tier": "Surveillance",
+   "ships": 38,
+   "waves": 7,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (2.1M / 2.2M); either/or spawns at the average of the alternatives",
+   "escalation": "Megastructure: Overseer Cruiser 0-1 Sentient Viral Infector Alvum in Seventh spawn; Asteroid Field: rare Commander Cruiser 0-1 Sentient Devastator Alvum with Si",
+   "source": "https://wiki.eveuniversity.org/Drone_Surveillance"
+  },
+  "Drone Menagerie": {
+   "isk": 1049753,
+   "faction": "Rogue Drones",
+   "tier": "Menagerie",
+   "ships": 21,
+   "waves": 5,
+   "note": "lowest of every range; either/or spawns at the average of the alternatives",
+   "escalation": "Commander Battlecruiser 0-1 Sentient Defeater Alvatis (drops drone components, Elite Drone AI; may drop faction modules or Rogue Drone chips); site can escalate",
+   "source": "https://wiki.eveuniversity.org/Drone_Menagerie"
+  },
+  "Drone Herd": {
+   "isk": 13138318,
+   "faction": "Rogue Drones",
+   "tier": "Herd",
+   "ships": 17,
+   "waves": 5,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (19M / 7.3M); either/or spawns at the average of the alternatives",
+   "escalation": "Asteroid Colony: Commander Battleship 0-1 Sentient Alvus Controller / Swarm Preserver Alvus; Ancient Ruin: Commander Battleship 0-1 Sentient Domination Alvus / ",
+   "source": "https://wiki.eveuniversity.org/Drone_Herd"
+  },
+  "Drone Squad": {
+   "isk": 30476400,
+   "faction": "Rogue Drones",
+   "tier": "Squad",
+   "ships": 33,
+   "waves": 5,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (54.8M / 6.1M); either/or spawns at the average of the alternatives",
+   "escalation": "Both variants: optional Battleship 0-1 Sentient Spearhead Alvus (drone components, rare Nexus chip); site can escalate to Outgrowth Rogue Drone Hive (10/10).",
+   "source": "https://wiki.eveuniversity.org/Drone_Squad"
+  },
+  "Drone Patrol": {
+   "isk": 17454917,
+   "faction": "Rogue Drones",
+   "tier": "Patrol",
+   "ships": 36,
+   "waves": 5,
+   "layouts": 3,
+   "note": "lowest of every range; 3 layouts averaged (13.4M / 13.2M / 25.7M); either/or spawns at the average of the alternatives",
+   "escalation": "Page notes a rare sentient spawn (unnamed) and a rare Infested Carrier spawn (dated 18.06.2024); site may escalate to Outgrowth Rogue Drone Hive (10/10).",
+   "source": "https://wiki.eveuniversity.org/Drone_Patrol"
+  },
+  "Drone Horde": {
+   "isk": 26905817,
+   "faction": "Rogue Drones",
+   "tier": "Horde",
+   "ships": 47,
+   "waves": 7,
+   "layouts": 2,
+   "note": "lowest of every range; 2 layouts averaged (27M / 26.8M); either/or spawns at the average of the alternatives",
+   "escalation": "Both variants: rare spawn with the last wave of Commander Battleship 0-1 Sentient Domination Alvus and/or Carrier 0-1 Infested Carrier; both variants may escala",
+   "source": "https://wiki.eveuniversity.org/Drone_Horde"
+  }
+ },
+ "gas": {
+  "Sister Nebula": [
+   {
+    "gas": "Lime Mykoserocin",
+    "units": 2000
+   }
+  ],
+  "Helix Nebula": [
+   {
+    "gas": "Lime Mykoserocin",
+    "units": 6000
+   }
+  ],
+  "Wild Nebula": [
+   {
+    "gas": "Malachite Mykoserocin",
+    "units": 2000
+   }
+  ],
+  "Blackeye Nebula": [
+   {
+    "gas": "Malachite Mykoserocin",
+    "units": 6000
+   }
+  ],
+  "Sunspark Nebula": [
+   {
+    "gas": "Amber Mykoserocin",
+    "units": 2000
+   }
+  ],
+  "Diablo Nebula": [
+   {
+    "gas": "Amber Mykoserocin",
+    "units": 6000
+   }
+  ],
+  "Smoking Nebula": [
+   {
+    "gas": "Golden Mykoserocin",
+    "units": 2000
+   }
+  ],
+  "Ring Nebula": [
+   {
+    "gas": "Golden Mykoserocin",
+    "units": 6000
+   }
+  ],
+  "Calabash Nebula": [
+   {
+    "gas": "Celadon Mykoserocin",
+    "units": 2000
+   }
+  ],
+  "Glass Nebula": [
+   {
+    "gas": "Celadon Mykoserocin",
+    "units": 6000
+   }
+  ],
+  "Bright Nebula": [
+   {
+    "gas": "Viridian Mykoserocin",
+    "units": 2000
+   }
+  ],
+  "Sparking Nebula": [
+   {
+    "gas": "Viridian Mykoserocin",
+    "units": 6000
+   }
+  ],
+  "Ghost Nebula": [
+   {
+    "gas": "Azure Mykoserocin",
+    "units": 2000
+   }
+  ],
+  "Eagle Nebula": [
+   {
+    "gas": "Azure Mykoserocin",
+    "units": 6000
+   }
+  ],
+  "Flame Nebula": [
+   {
+    "gas": "Vermillion Mykoserocin",
+    "units": 2000
+   }
+  ],
+  "Pipe Nebula": [
+   {
+    "gas": "Vermillion Mykoserocin",
+    "units": 6000
+   }
+  ],
+  "Emerald Nebula": [
+   {
+    "gas": "Lime Cytoserocin",
+    "units": 500
+   }
+  ],
+  "Cheetah Nebula": [
+   {
+    "gas": "Lime Cytoserocin",
+    "units": 1000
+   }
+  ],
+  "Duo Nebula": [
+   {
+    "gas": "Lime Cytoserocin",
+    "units": 3000
+   }
+  ],
+  "Leopard Nebula": [
+   {
+    "gas": "Lime Cytoserocin",
+    "units": 18000
+   }
+  ],
+  "Rimy Nebula": [
+   {
+    "gas": "Lime Cytoserocin",
+    "units": 3000
+   }
+  ],
+  "Crimson Nebula": [
+   {
+    "gas": "Malachite Cytoserocin",
+    "units": 1000
+   }
+  ],
+  "Cobra Nebula": [
+   {
+    "gas": "Malachite Cytoserocin",
+    "units": 500
+   }
+  ],
+  "Crab Spider Nebula": [
+   {
+    "gas": "Malachite Cytoserocin",
+    "units": 2000
+   }
+  ],
+  "Hazy Nebula": [
+   {
+    "gas": "Malachite Cytoserocin",
+    "units": 18000
+   }
+  ],
+  "Hidden Nebula": [
+   {
+    "gas": "Malachite Cytoserocin",
+    "units": 6000
+   }
+  ],
+  "Whirling Nebula": [
+   {
+    "gas": "Malachite Cytoserocin",
+    "units": 6000
+   }
+  ],
+  "Bandit Nebula": [
+   {
+    "gas": "Amber Cytoserocin",
+    "units": 1000
+   }
+  ],
+  "Fluttering Nebula": [
+   {
+    "gas": "Amber Cytoserocin",
+    "units": 500
+   }
+  ],
+  "Rocky Nebula": [
+   {
+    "gas": "Amber Cytoserocin",
+    "units": 832
+   }
+  ],
+  "Dewy Nebula": [
+   {
+    "gas": "Amber Cytoserocin",
+    "units": 6000
+   }
+  ],
+  "Foggy Nebula": [
+   {
+    "gas": "Amber Cytoserocin",
+    "units": 6000
+   }
+  ],
+  "Shimmering Nebula": [
+   {
+    "gas": "Amber Cytoserocin",
+    "units": 18000
+   }
+  ],
+  "Spacious Nebula": [
+   {
+    "gas": "Amber Cytoserocin",
+    "units": 6000
+   }
+  ],
+  "Profiteer Nebula": [
+   {
+    "gas": "Golden Cytoserocin",
+    "units": 1000
+   }
+  ],
+  "Moth Nebula": [
+   {
+    "gas": "Golden Cytoserocin",
+    "units": 2000
+   }
+  ],
+  "Swarm Nebula": [
+   {
+    "gas": "Golden Cytoserocin",
+    "units": 2000
+   }
+  ],
+  "Lion Nebula": [
+   {
+    "gas": "Golden Cytoserocin",
+    "units": 6000
+   }
+  ],
+  "Shiny Nebula": [
+   {
+    "gas": "Golden Cytoserocin",
+    "units": 6000
+   }
+  ],
+  "Gaseous Nebula": [
+   {
+    "gas": "Golden Cytoserocin",
+    "units": 18000
+   }
+  ],
+  "Phoenix Nebula": [
+   {
+    "gas": "Celadon Cytoserocin",
+    "units": 1000
+   }
+  ],
+  "Flowing Nebula": [
+   {
+    "gas": "Celadon Cytoserocin",
+    "units": 2000
+   }
+  ],
+  "Thick Nebula": [
+   {
+    "gas": "Celadon Cytoserocin",
+    "units": 1000
+   }
+  ],
+  "Diamond Nebula": [
+   {
+    "gas": "Celadon Cytoserocin",
+    "units": 6000
+   }
+  ],
+  "Massive Nebula": [
+   {
+    "gas": "Celadon Cytoserocin",
+    "units": 14224
+   }
+  ],
+  "Peacock Nebula": [
+   {
+    "gas": "Celadon Cytoserocin",
+    "units": 6000
+   }
+  ],
+  "Forgotten Nebula": [
+   {
+    "gas": "Viridian Cytoserocin",
+    "units": 1000
+   }
+  ],
+  "Frosty Nebula": [
+   {
+    "gas": "Viridian Cytoserocin",
+    "units": 2000
+   }
+  ],
+  "Goose Nebula": [
+   {
+    "gas": "Viridian Cytoserocin",
+    "units": 2000
+   }
+  ],
+  "Icy Nebula": [
+   {
+    "gas": "Viridian Cytoserocin",
+    "units": 6000
+   }
+  ],
+  "Pale Nebula": [
+   {
+    "gas": "Viridian Cytoserocin",
+    "units": 3000
+   }
+  ],
+  "Polar Bear Nebula": [
+   {
+    "gas": "Viridian Cytoserocin",
+    "units": 18000
+   }
+  ],
+  "Rapture Nebula": [
+   {
+    "gas": "Azure Cytoserocin",
+    "units": 1400
+   }
+  ],
+  "Crystal Nebula": [
+   {
+    "gas": "Azure Cytoserocin",
+    "units": 2000
+   }
+  ],
+  "Snowy Owl Nebula": [
+   {
+    "gas": "Azure Cytoserocin",
+    "units": 2000
+   }
+  ],
+  "Arctic Fox Nebula": [
+   {
+    "gas": "Azure Cytoserocin",
+    "units": 9000
+   }
+  ],
+  "Glistening Nebula": [
+   {
+    "gas": "Azure Cytoserocin",
+    "units": 6000
+   }
+  ],
+  "Murky Nebula": [
+   {
+    "gas": "Azure Cytoserocin",
+    "units": 3000
+   }
+  ],
+  "Saintly Nebula": [
+   {
+    "gas": "Vermillion Cytoserocin",
+    "units": 500
+   }
+  ],
+  "Boisterous Nebula": [
+   {
+    "gas": "Vermillion Cytoserocin",
+    "units": 2000
+   }
+  ],
+  "Cardinal Nebula": [
+   {
+    "gas": "Vermillion Cytoserocin",
+    "units": 6000
+   }
+  ],
+  "Red Dragonfly Nebula": [
+   {
+    "gas": "Vermillion Cytoserocin",
+    "units": 18000
+   }
+  ],
+  "Wispy Nebula": [
+   {
+    "gas": "Vermillion Cytoserocin",
+    "units": 6000
+   }
+  ]
+ },
+ "ore": {
+  "Small Omber Deposit|HS": [
+   {
+    "ore": "Golden Omber",
+    "units": 12911
+   },
+   {
+    "ore": "Silvery Omber",
+    "units": 21041
+   },
+   {
+    "ore": "Omber",
+    "units": 129212
+   }
+  ],
+  "Average Omber Deposit|HS": [
+   {
+    "ore": "Omber III-Grade",
+    "units": 32588
+   },
+   {
+    "ore": "Omber II-Grade",
+    "units": 76070
+   },
+   {
+    "ore": "Omber",
+    "units": 311766
+   }
+  ],
+  "Large Omber Deposit|HS": [
+   {
+    "ore": "Golden Omber",
+    "units": 560556
+   },
+   {
+    "ore": "Silvery Omber",
+    "units": 931716
+   },
+   {
+    "ore": "Omber",
+    "units": 535905
+   }
+  ],
+  "Small Kernite and Omber Deposit|HS": [
+   {
+    "ore": "Kernite III-Grade",
+    "units": 11811
+   },
+   {
+    "ore": "Kernite II-Grade",
+    "units": 16965
+   },
+   {
+    "ore": "Kernite",
+    "units": 29726
+   },
+   {
+    "ore": "Omber III-Grade",
+    "units": 12921
+   },
+   {
+    "ore": "Omber II-Grade",
+    "units": 5754
+   },
+   {
+    "ore": "Omber",
+    "units": 47013
+   }
+  ],
+  "Average Kernite and Omber Deposit|HS": [
+   {
+    "ore": "Fiery Kernite",
+    "units": 7933
+   },
+   {
+    "ore": "Luminous Kernite",
+    "units": 18397
+   },
+   {
+    "ore": "Kernite",
+    "units": 39201
+   },
+   {
+    "ore": "Golden Omber",
+    "units": 26286
+   },
+   {
+    "ore": "Silvery Omber",
+    "units": 69902
+   },
+   {
+    "ore": "Omber",
+    "units": 138776
+   }
+  ],
+  "Large Kernite and Omber Deposit|HS": [
+   {
+    "ore": "Fiery Kernite",
+    "units": 103779
+   },
+   {
+    "ore": "Luminous Kernite",
+    "units": 53179
+   },
+   {
+    "ore": "Kernite",
+    "units": 158261
+   },
+   {
+    "ore": "Golden Omber",
+    "units": 210000
+   },
+   {
+    "ore": "Silvery Omber",
+    "units": 390000
+   },
+   {
+    "ore": "Omber",
+    "units": 750000
+   }
+  ],
+  "Average Jaspet Deposit|LS": [
+   {
+    "ore": "Jaspet III-Grade",
+    "units": 59292
+   },
+   {
+    "ore": "Jaspet II-Grade",
+    "units": 76302
+   },
+   {
+    "ore": "Jaspet",
+    "units": 104411
+   }
+  ],
+  "Small Gneiss Deposit|LS": [
+   {
+    "ore": "Gneiss",
+    "units": 49600
+   },
+   {
+    "ore": "Iridescent Gneiss",
+    "units": 62400
+   },
+   {
+    "ore": "Prismatic Gneiss",
+    "units": 36000
+   }
+  ],
+  "Hidden Gneiss Deposit|LS": [
+   {
+    "ore": "Gneiss II-Grade",
+    "units": 49600
+   },
+   {
+    "ore": "Gneiss III-Grade",
+    "units": 62400
+   },
+   {
+    "ore": "Gneiss IV-Grade",
+    "units": 36000
+   }
+  ],
+  "Average Gneiss Deposit|LS": [
+   {
+    "ore": "Gneiss",
+    "units": 348000
+   },
+   {
+    "ore": "Iridescent Gneiss",
+    "units": 132000
+   },
+   {
+    "ore": "Prismatic Gneiss",
+    "units": 163200
+   }
+  ],
+  "Large Gneiss Deposit|LS": [
+   {
+    "ore": "Gneiss",
+    "units": 1392000
+   },
+   {
+    "ore": "Iridescent Gneiss",
+    "units": 528000
+   },
+   {
+    "ore": "Prismatic Gneiss",
+    "units": 652800
+   }
+  ],
+  "Small Dark Ochre and Gneiss Deposit|LS": [
+   {
+    "ore": "Dark Ochre",
+    "units": 25600
+   },
+   {
+    "ore": "Onyx Ochre",
+    "units": 8800
+   },
+   {
+    "ore": "Obsidian Ochre",
+    "units": 7200
+   },
+   {
+    "ore": "Gneiss",
+    "units": 30400
+   },
+   {
+    "ore": "Iridescent Gneiss",
+    "units": 22400
+   },
+   {
+    "ore": "Prismatic Gneiss",
+    "units": 10400
+   }
+  ],
+  "Hidden Dark Ochre and Gneiss Deposit|LS": [
+   {
+    "ore": "Dark Ochre II-Grade",
+    "units": 25600
+   },
+   {
+    "ore": "Dark Ochre III-Grade",
+    "units": 8800
+   },
+   {
+    "ore": "Dark Ochre IV-Grade",
+    "units": 7200
+   },
+   {
+    "ore": "Gneiss II-Grade",
+    "units": 30400
+   },
+   {
+    "ore": "Gneiss III-Grade",
+    "units": 22400
+   },
+   {
+    "ore": "Gneiss IV-Grade",
+    "units": 10400
+   }
+  ],
+  "Average Dark Ochre and Gneiss Deposit|LS": [
+   {
+    "ore": "Dark Ochre",
+    "units": 76000
+   },
+   {
+    "ore": "Onyx Ochre",
+    "units": 36400
+   },
+   {
+    "ore": "Obsidian Ochre",
+    "units": 40800
+   },
+   {
+    "ore": "Gneiss",
+    "units": 167200
+   },
+   {
+    "ore": "Iridescent Gneiss",
+    "units": 73600
+   },
+   {
+    "ore": "Prismatic Gneiss",
+    "units": 12000
+   }
+  ],
+  "Small Crokite and Dark Ochre Deposit|LS": [
+   {
+    "ore": "Crokite",
+    "units": 333000
+   },
+   {
+    "ore": "Dark Ochre",
+    "units": 37500
+   }
+  ],
+  "Average Crokite and Dark Ochre Deposit|LS": [
+   {
+    "ore": "Crokite",
+    "units": 706277
+   },
+   {
+    "ore": "Sharp Crokite",
+    "units": 196116
+   },
+   {
+    "ore": "Crystalline Crokite",
+    "units": 10400
+   },
+   {
+    "ore": "Dark Ochre",
+    "units": 76275
+   },
+   {
+    "ore": "Onyx Ochre",
+    "units": 28150
+   },
+   {
+    "ore": "Obsidian Ochre",
+    "units": 38443
+   }
+  ],
+  "Small Crokite, Dark Ochre and Gneiss Deposit|LS": [
+   {
+    "ore": "Crokite",
+    "units": 180000
+   },
+   {
+    "ore": "Crokite III-Grade",
+    "units": 160000
+   },
+   {
+    "ore": "Dark Ochre",
+    "units": 16800
+   },
+   {
+    "ore": "Ochre III-Grade",
+    "units": 6400
+   },
+   {
+    "ore": "Gneiss",
+    "units": 20400
+   },
+   {
+    "ore": "Gneiss II-Grade",
+    "units": 13600
+   },
+   {
+    "ore": "Gneiss III-Grade",
+    "units": 4800
+   }
+  ],
+  "Large Crokite, Dark Ochre and Gneiss Deposit|LS": [
+   {
+    "ore": "Crokite",
+    "units": 442225
+   },
+   {
+    "ore": "Sharp Crokite",
+    "units": 161109
+   },
+   {
+    "ore": "Crystalline Crokite",
+    "units": 383983
+   },
+   {
+    "ore": "Dark Ochre",
+    "units": 9114
+   },
+   {
+    "ore": "Onyx Ochre",
+    "units": 6664
+   },
+   {
+    "ore": "Obsidian Ochre",
+    "units": 2578
+   },
+   {
+    "ore": "Gneiss",
+    "units": 67943
+   },
+   {
+    "ore": "Iridescent Gneiss",
+    "units": 63059
+   },
+   {
+    "ore": "Prismatic Gneiss",
+    "units": 36316
+   }
+  ],
+  "Hidden Crokite, Dark Ochre and Gneiss Deposit|LS": [
+   {
+    "ore": "Crokite II-Grade",
+    "units": 180000
+   },
+   {
+    "ore": "Crokite IV-Grade",
+    "units": 160000
+   },
+   {
+    "ore": "Dark Ochre II-Grade",
+    "units": 16800
+   },
+   {
+    "ore": "Dark Ochre IV-Grade",
+    "units": 6400
+   },
+   {
+    "ore": "Gneiss II-Grade",
+    "units": 21200
+   },
+   {
+    "ore": "Gneiss III-Grade",
+    "units": 13600
+   },
+   {
+    "ore": "Gneiss IV-Grade",
+    "units": 4800
+   }
+  ],
+  "Small Hedbergite, Hemorphite and Jaspet Deposit|LS": [
+   {
+    "ore": "Hedbergite",
+    "units": 10000
+   },
+   {
+    "ore": "Vitric Hedbergite",
+    "units": 6000
+   },
+   {
+    "ore": "Hemorphite",
+    "units": 13200
+   },
+   {
+    "ore": "Vivid Hemorphite",
+    "units": 5600
+   },
+   {
+    "ore": "Radiant Hemorphite",
+    "units": 1400
+   },
+   {
+    "ore": "Jaspet",
+    "units": 17600
+   },
+   {
+    "ore": "Pure Jaspet",
+    "units": 1600
+   },
+   {
+    "ore": "Pristine Jaspet",
+    "units": 5600
+   }
+  ],
+  "Average Hedbergite, Hemorphite and Jaspet Deposit|LS": [
+   {
+    "ore": "Hedbergite",
+    "units": 30000
+   },
+   {
+    "ore": "Vitric Hedbergite",
+    "units": 26000
+   },
+   {
+    "ore": "Glazed Hedbergite",
+    "units": 18000
+   },
+   {
+    "ore": "Vivid Hemorphite",
+    "units": 26000
+   },
+   {
+    "ore": "Radiant Hemorphite",
+    "units": 38000
+   },
+   {
+    "ore": "Jaspet",
+    "units": 36000
+   },
+   {
+    "ore": "Pure Jaspet",
+    "units": 22000
+   },
+   {
+    "ore": "Pristine Jaspet",
+    "units": 24000
+   }
+  ],
+  "Large Hedbergite, Hemorphite and Jaspet Deposit|LS": [
+   {
+    "ore": "Hedbergite",
+    "units": 190000
+   },
+   {
+    "ore": "Hedbergite II-Grade",
+    "units": 44000
+   },
+   {
+    "ore": "Hedbergite III-Grade",
+    "units": 56000
+   },
+   {
+    "ore": "Hemorphite",
+    "units": 190000
+   },
+   {
+    "ore": "Hemorphite II-Grade",
+    "units": 40000
+   },
+   {
+    "ore": "Hemorphite III-Grade",
+    "units": 42000
+   },
+   {
+    "ore": "Jaspet",
+    "units": 228000
+   },
+   {
+    "ore": "Jaspet II-Grade",
+    "units": 28000
+   },
+   {
+    "ore": "Jaspet III-Grade",
+    "units": 44000
+   }
+  ],
+  "Veiled Asteroid Field|LS": [
+   {
+    "ore": "Crokite IV-Grade",
+    "units": 125183
+   },
+   {
+    "ore": "Crokite III-Grade",
+    "units": 125000
+   },
+   {
+    "ore": "Crokite II-Grade",
+    "units": 125136
+   },
+   {
+    "ore": "Crokite",
+    "units": 125129
+   },
+   {
+    "ore": "Dark Ochre IV-Grade",
+    "units": 62145
+   },
+   {
+    "ore": "Dark Ochre III-Grade",
+    "units": 48654
+   },
+   {
+    "ore": "Dark Ochre II-Grade",
+    "units": 48564
+   },
+   {
+    "ore": "Dark Ochre",
+    "units": 73547
+   },
+   {
+    "ore": "Gneiss II-Grade",
+    "units": 80000
+   },
+   {
+    "ore": "Hedbergite IV-Grade",
+    "units": 83547
+   },
+   {
+    "ore": "Hedbergite III-Grade",
+    "units": 83667
+   },
+   {
+    "ore": "Hedbergite II-Grade",
+    "units": 43600
+   },
+   {
+    "ore": "Hedbergite",
+    "units": 87333
+   },
+   {
+    "ore": "Jaspet IV-Grade",
+    "units": 507555
+   }
+  ],
+  "Mordunium Deposit|LS": [
+   {
+    "ore": "Condensed Scordite",
+    "units": 1600000
+   },
+   {
+    "ore": "Glazed Hedbergite",
+    "units": 40000
+   },
+   {
+    "ore": "Glossy Scordite",
+    "units": 1600000
+   },
+   {
+    "ore": "Golden Omber",
+    "units": 200000
+   },
+   {
+    "ore": "Hedbergite",
+    "units": 80000
+   },
+   {
+    "ore": "Lustrous Hedbergite",
+    "units": 40000
+   },
+   {
+    "ore": "Massive Scordite",
+    "units": 1600000
+   },
+   {
+    "ore": "Mordunium",
+    "units": 6000000
+   },
+   {
+    "ore": "Omber",
+    "units": 400000
+   },
+   {
+    "ore": "Opulent Pyroxeres",
+    "units": 400000
+   },
+   {
+    "ore": "Platinoid Omber",
+    "units": 200000
+   },
+   {
+    "ore": "Plum Mordunium",
+    "units": 9000000
+   },
+   {
+    "ore": "Plunder Mordunium",
+    "units": 6000000
+   },
+   {
+    "ore": "Prize Mordunium",
+    "units": 9000000
+   },
+   {
+    "ore": "Pyroxeres",
+    "units": 800000
+   },
+   {
+    "ore": "Scordite",
+    "units": 3200000
+   },
+   {
+    "ore": "Silvery Omber",
+    "units": 200000
+   },
+   {
+    "ore": "Solid Pyroxeres",
+    "units": 400000
+   },
+   {
+    "ore": "Viscous Pyroxeres",
+    "units": 400000
+   },
+   {
+    "ore": "Vitric Hedbergite",
+    "units": 40000
+   }
+  ],
+  "Small Arkonor and Bistot Deposit|NS": [
+   {
+    "ore": "Arkonor",
+    "units": 7000
+   },
+   {
+    "ore": "Bistot",
+    "units": 7000
+   }
+  ],
+  "Medium Arkonor and Bistot Deposit|NS": [
+   {
+    "ore": "Arkonor",
+    "units": 14000
+   },
+   {
+    "ore": "Bistot",
+    "units": 14000
+   }
+  ],
+  "Average Arkonor and Bistot Deposit|NS": [
+   {
+    "ore": "Arkonor",
+    "units": 13400
+   },
+   {
+    "ore": "Bistot",
+    "units": 13800
+   },
+   {
+    "ore": "Crimson Arkonor",
+    "units": 1000
+   },
+   {
+    "ore": "Monoclinic Bistot",
+    "units": 2000
+   },
+   {
+    "ore": "Prime Arkonor",
+    "units": 3600
+   },
+   {
+    "ore": "Triclinic Bistot",
+    "units": 2200
+   }
+  ],
+  "Large Arkonor and Bistot Deposit|NS": [
+   {
+    "ore": "Arkonor",
+    "units": 50900
+   },
+   {
+    "ore": "Crimson Arkonor",
+    "units": 10000
+   },
+   {
+    "ore": "Prime Arkonor",
+    "units": 9300
+   },
+   {
+    "ore": "Bistot",
+    "units": 55000
+   },
+   {
+    "ore": "Triclinic Bistot",
+    "units": 9300
+   },
+   {
+    "ore": "Monoclinic Bistot",
+    "units": 11300
+   }
+  ],
+  "Large Bistot Deposit|NS": [
+   {
+    "ore": "Bistot",
+    "units": 73497
+   },
+   {
+    "ore": "Monoclinic Bistot",
+    "units": 21484
+   },
+   {
+    "ore": "Triclinic Bistot",
+    "units": 54415
+   }
+  ],
+  "Small Asteroid Cluster|NS": [
+   {
+    "ore": "Arkonor",
+    "units": 5000
+   },
+   {
+    "ore": "Bistot",
+    "units": 5000
+   },
+   {
+    "ore": "Pyroxeres",
+    "units": 599995
+   }
+  ],
+  "Medium Asteroid Cluster|NS": [
+   {
+    "ore": "Pyroxeres",
+    "units": 200000
+   },
+   {
+    "ore": "Omber",
+    "units": 20000
+   },
+   {
+    "ore": "Bistot",
+    "units": 39998
+   },
+   {
+    "ore": "Arkonor",
+    "units": 24998
+   },
+   {
+    "ore": "Mercoxit",
+    "units": 1800
+   }
+  ],
+  "Large Asteroid Cluster|NS": [
+   {
+    "ore": "Omber",
+    "units": 39998
+   },
+   {
+    "ore": "Bistot",
+    "units": 59996
+   },
+   {
+    "ore": "Arkonor",
+    "units": 49998
+   },
+   {
+    "ore": "Mercoxit",
+    "units": 2399
+   }
+  ],
+  "Enormous Asteroid Cluster|NS": [
+   {
+    "ore": "Kernite",
+    "units": 39998
+   },
+   {
+    "ore": "Crokite",
+    "units": 5000
+   },
+   {
+    "ore": "Bistot",
+    "units": 134994
+   },
+   {
+    "ore": "Arkonor",
+    "units": 49997
+   },
+   {
+    "ore": "Mercoxit",
+    "units": 2997
+   }
+  ],
+  "Colossal Asteroid Cluster|NS": [
+   {
+    "ore": "Crokite",
+    "units": 10000
+   },
+   {
+    "ore": "Bistot",
+    "units": 174995
+   },
+   {
+    "ore": "Arkonor",
+    "units": 49998
+   },
+   {
+    "ore": "Mercoxit",
+    "units": 3598
+   }
+  ],
+  "Griemeer Deposit|NS": [
+   {
+    "ore": "Brilliant Gneiss",
+    "units": 6000
+   },
+   {
+    "ore": "Clear Griemeer",
+    "units": 618750
+   },
+   {
+    "ore": "Fiery Kernite",
+    "units": 62500
+   },
+   {
+    "ore": "Gneiss",
+    "units": 15000
+   },
+   {
+    "ore": "Golden Omber",
+    "units": 125000
+   },
+   {
+    "ore": "Griemeer",
+    "units": 1125000
+   },
+   {
+    "ore": "Inky Griemeer",
+    "units": 375000
+   },
+   {
+    "ore": "Iridescent Gneiss",
+    "units": 9000
+   },
+   {
+    "ore": "Kernite",
+    "units": 250000
+   },
+   {
+    "ore": "Luminous Kernite",
+    "units": 125000
+   },
+   {
+    "ore": "Omber",
+    "units": 250000
+   },
+   {
+    "ore": "Opaque Griemeer",
+    "units": 187500
+   },
+   {
+    "ore": "Platinoid Omber",
+    "units": 125000
+   },
+   {
+    "ore": "Prismatic Gneiss",
+    "units": 6000
+   },
+   {
+    "ore": "Resplendant Kernite",
+    "units": 62500
+   },
+   {
+    "ore": "Silvery Omber",
+    "units": 125000
+   }
+  ],
+  "Large Griemeer Deposit|NS": [
+   {
+    "ore": "Gneiss",
+    "units": 157000
+   },
+   {
+    "ore": "Griemeer",
+    "units": 10411108
+   },
+   {
+    "ore": "Kernite",
+    "units": 2183211
+   },
+   {
+    "ore": "Omber",
+    "units": 2728854
+   }
+  ],
+  "Kylixium Deposit|NS": [
+   {
+    "ore": "Adobe Kylixium",
+    "units": 125000
+   },
+   {
+    "ore": "Argil Kylixium",
+    "units": 312500
+   },
+   {
+    "ore": "Azure Plagioclase",
+    "units": 214286
+   },
+   {
+    "ore": "Brilliant Gneiss",
+    "units": 6000
+   },
+   {
+    "ore": "Gneiss",
+    "units": 15000
+   },
+   {
+    "ore": "Immaculate Jaspet",
+    "units": 7500
+   },
+   {
+    "ore": "Iridescent Gneiss",
+    "units": 6000
+   },
+   {
+    "ore": "Jaspet",
+    "units": 15000
+   },
+   {
+    "ore": "Kaolin Kylixium",
+    "units": 625000
+   },
+   {
+    "ore": "Kylixium",
+    "units": 937500
+   },
+   {
+    "ore": "Plagioclase",
+    "units": 300000
+   },
+   {
+    "ore": "Prismatic Gneiss",
+    "units": 6000
+   },
+   {
+    "ore": "Pristine Jaspet",
+    "units": 15000
+   },
+   {
+    "ore": "Pure Jaspet",
+    "units": 15000
+   },
+   {
+    "ore": "Rich Plagioclase",
+    "units": 214286
+   },
+   {
+    "ore": "Sparkling Plagioclase",
+    "units": 214286
+   }
+  ],
+  "Large Kylixium Deposit|NS": [
+   {
+    "ore": "Kylixium",
+    "units": 8666666
+   },
+   {
+    "ore": "Plagioclase",
+    "units": 4085642
+   },
+   {
+    "ore": "Gneiss",
+    "units": 142900
+   },
+   {
+    "ore": "Jaspet",
+    "units": 227300
+   }
+  ],
+  "Small Ueganite Deposit|NS": [
+   {
+    "ore": "Arkonor",
+    "units": 6250
+   },
+   {
+    "ore": "Crimson Arkonor",
+    "units": 4688
+   },
+   {
+    "ore": "Flawless Arkonor",
+    "units": 1563
+   },
+   {
+    "ore": "Foggy Ueganite",
+    "units": 15000
+   },
+   {
+    "ore": "Overcast Ueganite",
+    "units": 10000
+   },
+   {
+    "ore": "Prime Arkonor",
+    "units": 3125
+   },
+   {
+    "ore": "Stormy Ueganite",
+    "units": 5000
+   },
+   {
+    "ore": "Ueganite",
+    "units": 20000
+   }
+  ],
+  "Ueganite Deposit|NS": [
+   {
+    "ore": "Arkonor",
+    "units": 25000
+   },
+   {
+    "ore": "Crimson Arkonor",
+    "units": 5000
+   },
+   {
+    "ore": "Ducinium",
+    "units": 6249
+   },
+   {
+    "ore": "Flawless Arkonor",
+    "units": 2500
+   },
+   {
+    "ore": "Foggy Ueganite",
+    "units": 200000
+   },
+   {
+    "ore": "Imperial Ducinium",
+    "units": 2500
+   },
+   {
+    "ore": "Noble Ducinium",
+    "units": 2500
+   },
+   {
+    "ore": "Overcast Ueganite",
+    "units": 80000
+   },
+   {
+    "ore": "Prime Arkonor",
+    "units": 3750
+   },
+   {
+    "ore": "Royal Ducinium",
+    "units": 2500
+   },
+   {
+    "ore": "Stormy Ueganite",
+    "units": 40000
+   },
+   {
+    "ore": "Ueganite",
+    "units": 320000
+   }
+  ],
+  "Large Ueganite Deposit|NS": [
+   {
+    "ore": "Arkonor",
+    "units": 144924
+   },
+   {
+    "ore": "Ducinium",
+    "units": 54648
+   },
+   {
+    "ore": "Ueganite",
+    "units": 2560000
+   }
+  ],
+  "Small Mercoxit Deposit|NS": [
+   {
+    "ore": "Mercoxit",
+    "units": 250
+   }
+  ],
+  "Average Mercoxit Deposit|NS": [
+   {
+    "ore": "Mercoxit",
+    "units": 1010
+   }
+  ],
+  "Large Mercoxit Deposit|NS": [
+   {
+    "ore": "Mercoxit",
+    "units": 6000
+   }
+  ],
+  "Nocxite Deposit|NS": [
+   {
+    "ore": "Ambrosial Nocxite",
+    "units": 37500
+   },
+   {
+    "ore": "Crokite",
+    "units": 1875
+   },
+   {
+    "ore": "Crystalline Crokite",
+    "units": 938
+   },
+   {
+    "ore": "Dark Ochre",
+    "units": 3750
+   },
+   {
+    "ore": "Fragrant Nocxite",
+    "units": 187500
+   },
+   {
+    "ore": "Glazed Hedbergite",
+    "units": 10000
+   },
+   {
+    "ore": "Hedbergite",
+    "units": 20000
+   },
+   {
+    "ore": "Intoxicating Nocxite",
+    "units": 75000
+   },
+   {
+    "ore": "Jet Ochre",
+    "units": 1875
+   },
+   {
+    "ore": "Lustrous Hedbergite",
+    "units": 5000
+   },
+   {
+    "ore": "Nocxite",
+    "units": 375000
+   },
+   {
+    "ore": "Obsidian Ochre",
+    "units": 1875
+   },
+   {
+    "ore": "Onyx Ochre",
+    "units": 3750
+   },
+   {
+    "ore": "Pellucid Crokite",
+    "units": 469
+   },
+   {
+    "ore": "Sharp Crokite",
+    "units": 1406
+   },
+   {
+    "ore": "Vitric Hedbergite",
+    "units": 10000
+   }
+  ],
+  "Large Mordunium Deposit|NS": [
+   {
+    "ore": "Scordite",
+    "units": 29866667
+   },
+   {
+    "ore": "Hedbergite",
+    "units": 833260
+   },
+   {
+    "ore": "Omber",
+    "units": 1599997
+   },
+   {
+    "ore": "Mordunium",
+    "units": 99742040
+   },
+   {
+    "ore": "Pyroxeres",
+    "units": 6766690
+   }
+  ],
+  "Veldspar Deposit|NS": [
+   {
+    "ore": "Azure Plagioclase",
+    "units": 285714
+   },
+   {
+    "ore": "Concentrated Veldspar",
+    "units": 10000000
+   },
+   {
+    "ore": "Condensed Scordite",
+    "units": 666667
+   },
+   {
+    "ore": "Dense Veldspar",
+    "units": 5000000
+   },
+   {
+    "ore": "Glossy Scordite",
+    "units": 666667
+   },
+   {
+    "ore": "Massive Scordite",
+    "units": 666667
+   },
+   {
+    "ore": "Plagioclase",
+    "units": 571429
+   },
+   {
+    "ore": "Rich Plagioclase",
+    "units": 114286
+   },
+   {
+    "ore": "Scordite",
+    "units": 1333333
+   },
+   {
+    "ore": "Sparkling Plagioclase",
+    "units": 114286
+   },
+   {
+    "ore": "Stable Veldspar",
+    "units": 2000000
+   },
+   {
+    "ore": "Veldspar",
+    "units": 14200000
+   }
+  ],
+  "Large Veldspar Deposit|NS": [
+   {
+    "ore": "Plagioclase",
+    "units": 4614271
+   },
+   {
+    "ore": "Veldspar",
+    "units": 114769310
+   },
+   {
+    "ore": "Scordite",
+    "units": 14166663
+   }
+  ],
+  "Small Hezorime Deposit|NS": [
+   {
+    "ore": "Augmented Eifyrium",
+    "units": 2344
+   },
+   {
+    "ore": "Boosted Eifyrium",
+    "units": 4688
+   },
+   {
+    "ore": "Doped Eifyrium",
+    "units": 7031
+   },
+   {
+    "ore": "Dull Hezorime",
+    "units": 15000
+   },
+   {
+    "ore": "Eifyrium",
+    "units": 9375
+   },
+   {
+    "ore": "Hezorime",
+    "units": 3125
+   },
+   {
+    "ore": "Serrated Hezorime",
+    "units": 15000
+   },
+   {
+    "ore": "Sharp Hezorime",
+    "units": 7500
+   }
+  ],
+  "Hezorime Deposit|NS": [
+   {
+    "ore": "Augmented Eifyrium",
+    "units": 7500
+   },
+   {
+    "ore": "Bistot",
+    "units": 7500
+   },
+   {
+    "ore": "Boosted Eifyrium",
+    "units": 15000
+   },
+   {
+    "ore": "Cubic Bistot",
+    "units": 3750
+   },
+   {
+    "ore": "Dull Hezorime",
+    "units": 240000
+   },
+   {
+    "ore": "Eifyrium",
+    "units": 37500
+   },
+   {
+    "ore": "Hezorime",
+    "units": 420000
+   },
+   {
+    "ore": "Monoclinic Bistot",
+    "units": 3750
+   },
+   {
+    "ore": "Serrated Hezorime",
+    "units": 150000
+   },
+   {
+    "ore": "Sharp Hezorime",
+    "units": 60000
+   },
+   {
+    "ore": "Triclinic Bistot",
+    "units": 3750
+   }
+  ],
+  "Large Hezorime Deposit|NS": [
+   {
+    "ore": "Eifyrium",
+    "units": 329000
+   },
+   {
+    "ore": "Bistot",
+    "units": 73500
+   },
+   {
+    "ore": "Hezorime",
+    "units": 3361504
+   }
+  ],
+  "Interstitial Ore Deposit|NS": [
+   {
+    "ore": "Bezdnacine Grade-II",
+    "units": 79994
+   },
+   {
+    "ore": "Rakovene Grade-II",
+    "units": 79991
+   },
+   {
+    "ore": "Talassonite Grade-II",
+    "units": 79990
+   },
+   {
+    "ore": "Spodumain Grade-II",
+    "units": 80000
+   },
+   {
+    "ore": "Spodumain Grade-III",
+    "units": 40000
+   },
+   {
+    "ore": "Bezdnacine Grade-III",
+    "units": 39998
+   },
+   {
+    "ore": "Rakovene Grade-III",
+    "units": 39989
+   },
+   {
+    "ore": "Talassonite Grade-III",
+    "units": 39998
+   },
+   {
+    "ore": "Mercoxit",
+    "units": 20000
+   }
+  ],
+  "Empire Border Rare Asteroids|HS": [
+   {
+    "ore": "Ytirium",
+    "units": 200000
+   },
+   {
+    "ore": "Ducinium",
+    "units": 2073
+   },
+   {
+    "ore": "Eifyrium",
+    "units": 2073
+   },
+   {
+    "ore": "Dark Ochre IV-Grade",
+    "units": 1036
+   },
+   {
+    "ore": "Crokite IV-Grade",
+    "units": 1036
+   }
+  ],
+  "Nullsec Border Rare Asteroids|HS": [
+   {
+    "ore": "Ytirium, IV-Grade",
+    "units": 172363
+   },
+   {
+    "ore": "Ducinium, IV-Grade",
+    "units": 3086
+   },
+   {
+    "ore": "Eifyrium, IV-Grade",
+    "units": 3086
+   },
+   {
+    "ore": "Mordunium",
+    "units": 771605
+   }
+  ],
+  "Nullsec Blue A0 Rare Asteroids|NS": [
+   {
+    "ore": "Eifyrium IV-Grade",
+    "units": 10776
+   },
+   {
+    "ore": "Ducinium IV-Grade",
+    "units": 17960
+   },
+   {
+    "ore": "Dark Ochre IV-Grade",
+    "units": 7184
+   },
+   {
+    "ore": "Ytirium IV-Grade",
+    "units": 7000000
+   },
+   {
+    "ore": "Crokite IV-Grade",
+    "units": 7184
+   },
+   {
+    "ore": "Mordunium IV-Grade",
+    "units": 1795960
+   }
+  ]
+ },
+ "unknown": {
+  "Gistum Legatus": 1,
+  "Corpior Defacer": 1,
+  "Centii Reaver": 1,
+  "Centii Follower": 1,
+  "Corelatis Captain Sentinel/..": 1,
+  "Corelum": 1
+ },
+ "skipped": []
+}

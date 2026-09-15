@@ -1,0 +1,830 @@
+{
+ "Cataclysmic Variable": {
+  "C1": [
+   {
+    "label": "Local armor repair",
+    "value": "−15%"
+   },
+   {
+    "label": "Local shield boost",
+    "value": "−15%"
+   },
+   {
+    "label": "Remote shield boost",
+    "value": "+30%"
+   },
+   {
+    "label": "Remote armor repair",
+    "value": "+30%"
+   },
+   {
+    "label": "Capacitor capacity",
+    "value": "+30%"
+   },
+   {
+    "label": "Capacitor recharge time",
+    "value": "+15%"
+   },
+   {
+    "label": "Remote capacitor transfer",
+    "value": "−15%"
+   }
+  ],
+  "C2": [
+   {
+    "label": "Local armor repair",
+    "value": "−22%"
+   },
+   {
+    "label": "Local shield boost",
+    "value": "−22%"
+   },
+   {
+    "label": "Remote shield boost",
+    "value": "+44%"
+   },
+   {
+    "label": "Remote armor repair",
+    "value": "+44%"
+   },
+   {
+    "label": "Capacitor capacity",
+    "value": "+44%"
+   },
+   {
+    "label": "Capacitor recharge time",
+    "value": "+22%"
+   },
+   {
+    "label": "Remote capacitor transfer",
+    "value": "−22%"
+   }
+  ],
+  "C3": [
+   {
+    "label": "Local armor repair",
+    "value": "−29%"
+   },
+   {
+    "label": "Local shield boost",
+    "value": "−29%"
+   },
+   {
+    "label": "Remote shield boost",
+    "value": "+58%"
+   },
+   {
+    "label": "Remote armor repair",
+    "value": "+58%"
+   },
+   {
+    "label": "Capacitor capacity",
+    "value": "+58%"
+   },
+   {
+    "label": "Capacitor recharge time",
+    "value": "+29%"
+   },
+   {
+    "label": "Remote capacitor transfer",
+    "value": "−29%"
+   }
+  ],
+  "C4": [
+   {
+    "label": "Local armor repair",
+    "value": "−36%"
+   },
+   {
+    "label": "Local shield boost",
+    "value": "−36%"
+   },
+   {
+    "label": "Remote shield boost",
+    "value": "+72%"
+   },
+   {
+    "label": "Remote armor repair",
+    "value": "+72%"
+   },
+   {
+    "label": "Capacitor capacity",
+    "value": "+72%"
+   },
+   {
+    "label": "Capacitor recharge time",
+    "value": "+36%"
+   },
+   {
+    "label": "Remote capacitor transfer",
+    "value": "−36%"
+   }
+  ],
+  "C6": [
+   {
+    "label": "Local armor repair",
+    "value": "−50%"
+   },
+   {
+    "label": "Local shield boost",
+    "value": "−50%"
+   },
+   {
+    "label": "Remote shield boost",
+    "value": "+100%"
+   },
+   {
+    "label": "Remote armor repair",
+    "value": "+100%"
+   },
+   {
+    "label": "Capacitor capacity",
+    "value": "+100%"
+   },
+   {
+    "label": "Capacitor recharge time",
+    "value": "+50%"
+   },
+   {
+    "label": "Remote capacitor transfer",
+    "value": "−50%"
+   }
+  ],
+  "C5": [
+   {
+    "label": "Local armor repair",
+    "value": "−43%"
+   },
+   {
+    "label": "Local shield boost",
+    "value": "−43%"
+   },
+   {
+    "label": "Remote shield boost",
+    "value": "+86%"
+   },
+   {
+    "label": "Remote armor repair",
+    "value": "+86%"
+   },
+   {
+    "label": "Capacitor capacity",
+    "value": "+86%"
+   },
+   {
+    "label": "Capacitor recharge time",
+    "value": "+43%"
+   },
+   {
+    "label": "Remote capacitor transfer",
+    "value": "−43%"
+   }
+  ]
+ },
+ "Magnetar": {
+  "C1": [
+   {
+    "label": "Targeting range",
+    "value": "−15%"
+   },
+   {
+    "label": "Turret tracking",
+    "value": "−15%"
+   },
+   {
+    "label": "Weapon damage",
+    "value": "+30%"
+   },
+   {
+    "label": "Missile explosion radius",
+    "value": "+30%"
+   },
+   {
+    "label": "Target painter strength",
+    "value": "−15%"
+   }
+  ],
+  "C2": [
+   {
+    "label": "Targeting range",
+    "value": "−22%"
+   },
+   {
+    "label": "Turret tracking",
+    "value": "−22%"
+   },
+   {
+    "label": "Weapon damage",
+    "value": "+44%"
+   },
+   {
+    "label": "Missile explosion radius",
+    "value": "+44%"
+   },
+   {
+    "label": "Target painter strength",
+    "value": "−22%"
+   }
+  ],
+  "C3": [
+   {
+    "label": "Targeting range",
+    "value": "−29%"
+   },
+   {
+    "label": "Turret tracking",
+    "value": "−29%"
+   },
+   {
+    "label": "Weapon damage",
+    "value": "+58%"
+   },
+   {
+    "label": "Missile explosion radius",
+    "value": "+58%"
+   },
+   {
+    "label": "Target painter strength",
+    "value": "−29%"
+   }
+  ],
+  "C4": [
+   {
+    "label": "Targeting range",
+    "value": "−36%"
+   },
+   {
+    "label": "Turret tracking",
+    "value": "−36%"
+   },
+   {
+    "label": "Weapon damage",
+    "value": "+72%"
+   },
+   {
+    "label": "Missile explosion radius",
+    "value": "+72%"
+   },
+   {
+    "label": "Target painter strength",
+    "value": "−36%"
+   }
+  ],
+  "C5": [
+   {
+    "label": "Targeting range",
+    "value": "−43%"
+   },
+   {
+    "label": "Turret tracking",
+    "value": "−43%"
+   },
+   {
+    "label": "Weapon damage",
+    "value": "+86%"
+   },
+   {
+    "label": "Missile explosion radius",
+    "value": "+86%"
+   },
+   {
+    "label": "Target painter strength",
+    "value": "−43%"
+   }
+  ],
+  "C6": [
+   {
+    "label": "Targeting range",
+    "value": "−50%"
+   },
+   {
+    "label": "Turret tracking",
+    "value": "−50%"
+   },
+   {
+    "label": "Weapon damage",
+    "value": "+100%"
+   },
+   {
+    "label": "Missile explosion radius",
+    "value": "+100%"
+   },
+   {
+    "label": "Target painter strength",
+    "value": "−50%"
+   }
+  ]
+ },
+ "Black Hole": {
+  "C1": [
+   {
+    "label": "Inertia (align time)",
+    "value": "+15%"
+   },
+   {
+    "label": "Targeting range",
+    "value": "+30%"
+   },
+   {
+    "label": "Missile velocity",
+    "value": "+15%"
+   },
+   {
+    "label": "Ship velocity",
+    "value": "+30%"
+   },
+   {
+    "label": "Missile explosion velocity",
+    "value": "+30%"
+   },
+   {
+    "label": "Stasis web strength",
+    "value": "−15%"
+   }
+  ],
+  "C2": [
+   {
+    "label": "Inertia (align time)",
+    "value": "+22%"
+   },
+   {
+    "label": "Targeting range",
+    "value": "+44%"
+   },
+   {
+    "label": "Missile velocity",
+    "value": "+22%"
+   },
+   {
+    "label": "Ship velocity",
+    "value": "+44%"
+   },
+   {
+    "label": "Missile explosion velocity",
+    "value": "+44%"
+   },
+   {
+    "label": "Stasis web strength",
+    "value": "−22%"
+   }
+  ],
+  "C3": [
+   {
+    "label": "Inertia (align time)",
+    "value": "+29%"
+   },
+   {
+    "label": "Targeting range",
+    "value": "+58%"
+   },
+   {
+    "label": "Missile velocity",
+    "value": "+29%"
+   },
+   {
+    "label": "Ship velocity",
+    "value": "+58%"
+   },
+   {
+    "label": "Missile explosion velocity",
+    "value": "+58%"
+   },
+   {
+    "label": "Stasis web strength",
+    "value": "−29%"
+   }
+  ],
+  "C4": [
+   {
+    "label": "Inertia (align time)",
+    "value": "+36%"
+   },
+   {
+    "label": "Targeting range",
+    "value": "+72%"
+   },
+   {
+    "label": "Missile velocity",
+    "value": "+36%"
+   },
+   {
+    "label": "Ship velocity",
+    "value": "+72%"
+   },
+   {
+    "label": "Missile explosion velocity",
+    "value": "+72%"
+   },
+   {
+    "label": "Stasis web strength",
+    "value": "−36%"
+   }
+  ],
+  "C5": [
+   {
+    "label": "Inertia (align time)",
+    "value": "+43%"
+   },
+   {
+    "label": "Targeting range",
+    "value": "+86%"
+   },
+   {
+    "label": "Missile velocity",
+    "value": "+43%"
+   },
+   {
+    "label": "Ship velocity",
+    "value": "+86%"
+   },
+   {
+    "label": "Missile explosion velocity",
+    "value": "+86%"
+   },
+   {
+    "label": "Stasis web strength",
+    "value": "−43%"
+   }
+  ],
+  "C6": [
+   {
+    "label": "Inertia (align time)",
+    "value": "+50%"
+   },
+   {
+    "label": "Targeting range",
+    "value": "+100%"
+   },
+   {
+    "label": "Missile velocity",
+    "value": "+50%"
+   },
+   {
+    "label": "Ship velocity",
+    "value": "+100%"
+   },
+   {
+    "label": "Missile explosion velocity",
+    "value": "+100%"
+   },
+   {
+    "label": "Stasis web strength",
+    "value": "−50%"
+   }
+  ]
+ },
+ "Pulsar": {
+  "C1": [
+   {
+    "label": "Shield HP",
+    "value": "+30%"
+   },
+   {
+    "label": "Signature radius",
+    "value": "+30%"
+   },
+   {
+    "label": "Armor resistances",
+    "value": "+15%"
+   },
+   {
+    "label": "Capacitor recharge time",
+    "value": "−15%"
+   },
+   {
+    "label": "Neut / nos strength",
+    "value": "+30%"
+   }
+  ],
+  "C2": [
+   {
+    "label": "Shield HP",
+    "value": "+44%"
+   },
+   {
+    "label": "Signature radius",
+    "value": "+44%"
+   },
+   {
+    "label": "Armor resistances",
+    "value": "+22%"
+   },
+   {
+    "label": "Capacitor recharge time",
+    "value": "−22%"
+   },
+   {
+    "label": "Neut / nos strength",
+    "value": "+44%"
+   }
+  ],
+  "C3": [
+   {
+    "label": "Shield HP",
+    "value": "+58%"
+   },
+   {
+    "label": "Signature radius",
+    "value": "+58%"
+   },
+   {
+    "label": "Armor resistances",
+    "value": "+29%"
+   },
+   {
+    "label": "Capacitor recharge time",
+    "value": "−29%"
+   },
+   {
+    "label": "Neut / nos strength",
+    "value": "+58%"
+   }
+  ],
+  "C4": [
+   {
+    "label": "Shield HP",
+    "value": "+72%"
+   },
+   {
+    "label": "Signature radius",
+    "value": "+72%"
+   },
+   {
+    "label": "Armor resistances",
+    "value": "+36%"
+   },
+   {
+    "label": "Capacitor recharge time",
+    "value": "−36%"
+   },
+   {
+    "label": "Neut / nos strength",
+    "value": "+72%"
+   }
+  ],
+  "C5": [
+   {
+    "label": "Shield HP",
+    "value": "+86%"
+   },
+   {
+    "label": "Signature radius",
+    "value": "+86%"
+   },
+   {
+    "label": "Armor resistances",
+    "value": "+43%"
+   },
+   {
+    "label": "Capacitor recharge time",
+    "value": "−43%"
+   },
+   {
+    "label": "Neut / nos strength",
+    "value": "+86%"
+   }
+  ],
+  "C6": [
+   {
+    "label": "Shield HP",
+    "value": "+100%"
+   },
+   {
+    "label": "Signature radius",
+    "value": "+100%"
+   },
+   {
+    "label": "Armor resistances",
+    "value": "+50%"
+   },
+   {
+    "label": "Capacitor recharge time",
+    "value": "−50%"
+   },
+   {
+    "label": "Neut / nos strength",
+    "value": "+100%"
+   }
+  ]
+ },
+ "Wolf-Rayet": {
+  "C1": [
+   {
+    "label": "Armor HP",
+    "value": "+30%"
+   },
+   {
+    "label": "Signature radius",
+    "value": "−15%"
+   },
+   {
+    "label": "Shield resistances",
+    "value": "+15%"
+   },
+   {
+    "label": "Small weapon damage",
+    "value": "+60%"
+   }
+  ],
+  "C2": [
+   {
+    "label": "Armor HP",
+    "value": "+44%"
+   },
+   {
+    "label": "Signature radius",
+    "value": "−22%"
+   },
+   {
+    "label": "Shield resistances",
+    "value": "+22%"
+   },
+   {
+    "label": "Small weapon damage",
+    "value": "+88%"
+   }
+  ],
+  "C3": [
+   {
+    "label": "Armor HP",
+    "value": "+58%"
+   },
+   {
+    "label": "Signature radius",
+    "value": "−29%"
+   },
+   {
+    "label": "Shield resistances",
+    "value": "+29%"
+   },
+   {
+    "label": "Small weapon damage",
+    "value": "+116%"
+   }
+  ],
+  "C4": [
+   {
+    "label": "Armor HP",
+    "value": "+72%"
+   },
+   {
+    "label": "Signature radius",
+    "value": "−36%"
+   },
+   {
+    "label": "Shield resistances",
+    "value": "+36%"
+   },
+   {
+    "label": "Small weapon damage",
+    "value": "+144%"
+   }
+  ],
+  "C5": [
+   {
+    "label": "Armor HP",
+    "value": "+86%"
+   },
+   {
+    "label": "Signature radius",
+    "value": "−43%"
+   },
+   {
+    "label": "Shield resistances",
+    "value": "+43%"
+   },
+   {
+    "label": "Small weapon damage",
+    "value": "+172%"
+   }
+  ],
+  "C6": [
+   {
+    "label": "Armor HP",
+    "value": "+100%"
+   },
+   {
+    "label": "Signature radius",
+    "value": "−50%"
+   },
+   {
+    "label": "Shield resistances",
+    "value": "+50%"
+   },
+   {
+    "label": "Small weapon damage",
+    "value": "+200%"
+   }
+  ]
+ },
+ "Red Giant": {
+  "C1": [
+   {
+    "label": "Heat damage",
+    "value": "+15%"
+   },
+   {
+    "label": "Overheat bonus",
+    "value": "+30%"
+   },
+   {
+    "label": "Smartbomb range",
+    "value": "+30%"
+   },
+   {
+    "label": "Smartbomb damage",
+    "value": "+30%"
+   }
+  ],
+  "C2": [
+   {
+    "label": "Heat damage",
+    "value": "+22%"
+   },
+   {
+    "label": "Overheat bonus",
+    "value": "+44%"
+   },
+   {
+    "label": "Smartbomb range",
+    "value": "+44%"
+   },
+   {
+    "label": "Smartbomb damage",
+    "value": "+44%"
+   }
+  ],
+  "C3": [
+   {
+    "label": "Heat damage",
+    "value": "+29%"
+   },
+   {
+    "label": "Overheat bonus",
+    "value": "+58%"
+   },
+   {
+    "label": "Smartbomb range",
+    "value": "+58%"
+   },
+   {
+    "label": "Smartbomb damage",
+    "value": "+58%"
+   }
+  ],
+  "C4": [
+   {
+    "label": "Heat damage",
+    "value": "+36%"
+   },
+   {
+    "label": "Overheat bonus",
+    "value": "+72%"
+   },
+   {
+    "label": "Smartbomb range",
+    "value": "+72%"
+   },
+   {
+    "label": "Smartbomb damage",
+    "value": "+72%"
+   }
+  ],
+  "C5": [
+   {
+    "label": "Heat damage",
+    "value": "+43%"
+   },
+   {
+    "label": "Overheat bonus",
+    "value": "+86%"
+   },
+   {
+    "label": "Smartbomb range",
+    "value": "+86%"
+   },
+   {
+    "label": "Smartbomb damage",
+    "value": "+86%"
+   }
+  ],
+  "C6": [
+   {
+    "label": "Heat damage",
+    "value": "+50%"
+   },
+   {
+    "label": "Overheat bonus",
+    "value": "+100%"
+   },
+   {
+    "label": "Smartbomb range",
+    "value": "+100%"
+   },
+   {
+    "label": "Smartbomb damage",
+    "value": "+100%"
+   }
+  ]
+ }
+}

@@ -48,8 +48,8 @@ interface StatsBridge {
 }
 
 interface ConfigBridge {
-  read: () => Promise<{ eveClientId?: string; transitShipName?: string; apertureUrl?: string }>;
-  write: (patch: Record<string, string>) => Promise<{ eveClientId: string; transitShipName: string; apertureUrl: string } | null>;
+  read: () => Promise<{ eveClientId?: string; transitShipName?: string; apertureUrl?: string; chainHome?: string }>;
+  write: (patch: Record<string, string>) => Promise<{ eveClientId: string; transitShipName: string; apertureUrl: string; chainHome: string } | null>;
   path: () => Promise<string>;
 }
 
@@ -124,6 +124,11 @@ declare global {
       /** absolute path of the guest-side popup shim for the Aperture webview */
       aperturePreloadPath?: string;
       config?: ConfigBridge;
+      /** the player's loot history for random-loot sites (v0.201) */
+      hauls?: {
+        read: () => Promise<unknown>;
+        write: (file: { v: 1; hauls: unknown[] }) => Promise<boolean>;
+      };
       backup?: BackupBridge;
       win?: WinBridge;
       fittings?: {
@@ -136,6 +141,15 @@ declare global {
       };
       overlay?: OverlayBridge;
       clones?: ClonesBridge;
+      /** the chain summary pop-out (v0.200) */
+      chain?: {
+        open: () => Promise<boolean>;
+        post: (payload: unknown) => void;
+        get: () => Promise<unknown | null>;
+        onData?: (cb: (d: unknown) => void) => void;
+        refresh: () => void;
+        onRefreshRequest?: (cb: () => void) => void;
+      };
       /** zKillboard's JSON API, called from the main process with an
        * identifying user agent, one request at a time (v0.199.1) */
       zkill?: {

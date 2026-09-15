@@ -12,6 +12,7 @@
 // label, or a "do not undock in this" alert, stick to a clone at all.
 const { app, ipcMain, BrowserWindow } = require('electron');
 const appConfig = require('./appConfig.cjs');
+const cloneMerge = require('./cloneMerge.cjs');
 const fs = require('fs');
 const path = require('path');
 
@@ -207,9 +208,38 @@ function record(obs, now = Date.now()) {
     first: prev.first ?? now,
     seen: now,
     lastWorn: obs.worn ? now : prev.lastWorn ?? 0,
+    // when ESI last listed it as a JUMP clone (worn=false) — the proof that
+    // an old fingerprint is a separate body and not this pod before an
+    // implant was plugged in (cloneMerge.cjs, v0.200.5)
+    lastListed: obs.worn === false ? now : prev.lastListed ?? 0,
   };
   data.chars[key] = prune(byChar, now);
   saveSoon();
+}
+
+/**
+ * THE SAME POD, MODIFIED (v0.200.6): after a batch that carried a
+ * character's worn pod AND the complete jump-clone list (obs.listedNow),
+ * fold every once-worn fingerprint that is neither worn now nor on that
+ * list into the worn pod when its implants are a small edit away — see
+ * cloneMerge.cjs. Runs per batch, after every observation is recorded, so
+ * the listed records already carry lastListed === now.
+ */
+function sweep(list, now) {
+  let changed = false;
+  for (const obs of list) {
+    if (!obs || !obs.worn || !obs.listedNow || typeof obs.sig !== 'string') continue;
+    const key = String(obs.characterId);
+    const byChar = data.chars[key];
+    if (!byChar) continue;
+    const { byChar: next, folded } = cloneMerge.sweepGhosts(byChar, obs.sig, now);
+    if (folded.length === 0) continue;
+    data.chars[key] = next;
+    changed = true;
+    for (const f of folded) console.log(`[clones] ${obs.characterName || key}: a pod modified, not a new pod — ${f.edit.added.length} implant(s) in, ${f.edit.removed.length} out; folded the old record into ${f.intoSig === obs.sig ? 'the worn pod' : 'the jump clone it became'}`);
+  }
+  if (changed) saveSoon();
+  return changed;
 }
 
 /** many observations in one go, ONE broadcast — a 12-character poll would
@@ -217,6 +247,7 @@ function record(obs, now = Date.now()) {
 function recordMany(list, now = Date.now()) {
   if (!Array.isArray(list) || list.length === 0) return;
   for (const obs of list) record(obs, now);
+  sweep(list, now);
   broadcast();
 }
 
@@ -273,6 +304,6 @@ function register() {
 }
 
 module.exports = {
-  register, all, record, recordMany, setConfig, forget, prune, saveNow,
+  register, all, record, recordMany, sweep, setConfig, forget, prune, saveNow,
   _reset: (d) => { data = d ?? { v: 1, chars: {} }; loaded = true; loadFailed = false; },
 };
