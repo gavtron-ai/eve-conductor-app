@@ -28,6 +28,16 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.201.10', date: '2026-09-15', headline: 'Baked dataset refreshed: measurements through 15 September', published: true,
+    changes: [
+      <>A <b>new install</b> now starts with the project's collected history to date: the market radar summary (108,269 item rates, up from 102,632 in the previous bake), its region coverage, and the skyhook raid history (48,055 observations, the last on 15 September). Same three files, same format, same allowlist — only impersonal measurements derived from public data; never wallets, orders, fits or trend events.</>,
+      <>An <b>existing install</b> is untouched. The app seeds only files missing from your stats folder, so your own collected history always wins.</>,
+      <>Housekeeping on the public source repository: its history was rebuilt so a test fixture's map label is gone from every past commit, not only the current one.</>,
+    ],
+    why: <>"We should update our public dataset, again ensuring we keep things in the same format and prevent anything private to me from being shared."</>,
+    policy: <>The bake is scanned against the owner's personal-pattern list before a byte is copied, and the ship guard scans it again inside the packaged app; the file shapes were compared record for record against the previous bake before building.</>,
+  },
+  {
     version: '0.201.9', date: '2026-09-15', headline: 'Jumps, not holes; the selected system glows apart from its route', published: true,
     changes: [
       <>Distance reads as <b>jumps</b> everywhere — the column heads, the filter, the table column, the bar chart, the card labels and tooltips.</>,
