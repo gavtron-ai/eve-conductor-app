@@ -271,6 +271,7 @@ ipcMain.handle('clipboard-read', () => {
 // game: open→read→close per call, no held handles, nothing written) ----
 ipcMain.handle('gamelog-list', () => gamelog.list(app.getPath('documents')));
 ipcMain.handle('gamelog-read', (_e, file) => gamelog.read(app.getPath('documents'), String(file)));
+ipcMain.handle('gamelog-read-from', (_e, file, offset) => gamelog.readFrom(app.getPath('documents'), String(file), Number(offset)));
 ipcMain.handle('stats-append', (_event, lines) =>
   stats.appendEvents(app.getPath('documents'), lines),
 );

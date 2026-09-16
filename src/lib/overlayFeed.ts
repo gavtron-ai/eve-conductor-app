@@ -31,6 +31,11 @@ import { useApp } from './store';
 import { buildRaidAlerts, type RaidAlert } from './raidAlerts';
 import { piPlanets } from './pi';
 import { parseJournal, pushUndock, UNDOCK_KEY } from './undockJournal';
+import { emptyWatch, updateWatch, type MiningAlert, type MinerLoc } from './miningWatch';
+import { emptyFeed, pollMiningSamples } from './miningFeed';
+import { miningAlertSettings, type MiningAlertSettings } from './store';
+import { logInfo } from './devlog';
+import { ALERTS_SNAPSHOT_KEY, MUTES_KEY, isMuted, miningKey, piKey, raidKey, parseMutes, pruneMutes, type AlertsSnapshot } from './overlayMutes';
 import type { OverlayChar } from '../components/Overlay';
 
 export type { RaidAlert } from './raidAlerts';
@@ -563,6 +568,10 @@ async function tick(): Promise<void> {
       raidCache = { at: Date.now(), alerts: await computeRaidAlerts().catch(() => []) };
     }
 
+    // the mining watch reads local files only — a failure there must never
+    // hold the pod rows back
+    try { await withTimeout(updateMining(rows), 4_000, undefined); } catch { /* next poll */ }
+
     lastRows = rows;
     push(rows, notice, raidCache.alerts);
   } finally {
@@ -608,12 +617,89 @@ function piOverlayAlerts(): PiOverlayAlert[] {
     }));
 }
 
+// ---- MINING WATCH (v0.202): each character's own game log, followed by
+// byte offset, feeds the pure model in miningWatch.ts; the alerts ride the
+// same push as the pod rows. The toggle is read FRESH from the persisted
+// blob (the setup window patches it there — same rule as the PI toggle).
+let miningWatch = emptyWatch();
+const miningFeed = emptyFeed();
+let miningAlerts: MiningAlert[] = [];
+/** the ⛏ page's settings, read FRESH from the persisted blob (the setup
+ * window patches them there) and merged with the defaults */
+function miningSettings(): MiningAlertSettings {
+  let p = useApp.getState().alerts.mining;
+  try {
+    const raw = JSON.parse(localStorage.getItem('eve-trade-conductor') ?? '{}') as
+      { state?: { alerts?: { mining?: Partial<MiningAlertSettings> } } };
+    if (raw.state?.alerts) p = raw.state.alerts.mining as MiningAlertSettings | undefined;
+  } catch { /* fall back to the in-memory copy */ }
+  return miningAlertSettings(p);
+}
+async function updateMining(rows: OverlayChar[]): Promise<void> {
+  const bridge = window.appInfo?.gamelog;
+  const s = miningSettings();
+  if (!s.enabled || !bridge?.readFrom) {
+    // off: nothing is read from disk and nothing is remembered
+    miningWatch = emptyWatch();
+    miningAlerts = [];
+    return;
+  }
+  const now = Date.now();
+  const samples = await pollMiningSamples(miningFeed, { list: bridge.list, readFrom: bridge.readFrom }, now);
+  const locs = new Map<number, MinerLoc>();
+  for (const r of rows) {
+    if (r.error !== undefined) continue; // an unreadable character: location unknown, not "offline"
+    locs.set(r.characterId, {
+      online: r.online,
+      docked: lastDockedState.get(r.characterId) ?? false,
+      systemId: r.systemId ?? null,
+      shipTypeId: r.shipTypeId,
+    });
+  }
+  const next = updateWatch(miningWatch, samples, locs, now, {
+    delayMs: s.delayS * 1000, dropRatio: s.dropRatio, keepStoppedMs: s.keepMin * 60_000,
+  });
+  // every raise and clear goes to the diagnostic log (v0.202.3), so a real
+  // mining session can be checked afterwards against what the box said —
+  // the overlay window itself cannot be driven from the rig
+  const key = (a: MiningAlert) => `${a.charId}:${a.kind}:${a.since}`;
+  const before = new Set(miningAlerts.map(key)), after = new Set(next.alerts.map(key));
+  for (const a of next.alerts) if (!before.has(key(a))) {
+    const m = next.state.miners.find((x) => x.charId === a.charId);
+    logInfo('mining', `alert raised: ${a.charName} ${a.kind}`, { charId: a.charId, kind: a.kind, periodS: m?.period ? Math.round(m.period / 1000) : null, cur: m?.cur ?? null, peak: m?.peak ?? null, delayS: s.delayS });
+  }
+  for (const a of miningAlerts) if (!after.has(key(a))) {
+    const m = next.state.miners.find((x) => x.charId === a.charId);
+    logInfo('mining', `alert cleared: ${a.charName} ${a.kind}`, { charId: a.charId, kind: a.kind, afterS: Math.round((now - a.since) / 1000), status: m?.status ?? 'gone' });
+  }
+  miningWatch = next.state;
+  miningAlerts = next.alerts;
+}
+
 function push(rows: OverlayChar[], notice: OverlayNotice | null = null, raids: RaidAlert[] = raidCache.alerts): void {
+  const now = Date.now();
+  const s = miningSettings();
+  // dismissed / snoozed alerts (the settings window's Alerts page, v0.202.1),
+  // read fresh: that window writes them, this one only reads
+  let mutes = parseMutes(null);
+  try { mutes = pruneMutes(parseMutes(localStorage.getItem(MUTES_KEY)), now); } catch { /* none */ }
+  const pi = piOverlayAlerts();
+  const mining = miningAlerts.filter((a) => (a.kind === 'stopped' ? s.notMining : s.rateDown));
+  // what is on offer BEFORE mutes, so the Alerts page can list what it hid
+  const snapshot: AlertsSnapshot = {
+    at: now,
+    mining,
+    pi,
+    raids: raids.map((r) => ({ planetId: r.planetId, systemName: r.systemName, state: r.state, minsLeft: r.minsLeft, jumps: r.jumps })),
+  };
+  try { localStorage.setItem(ALERTS_SNAPSHOT_KEY, JSON.stringify(snapshot)); } catch { /* a nicety */ }
   window.appInfo?.overlay?.push({
     chars: rows.filter((r) => r.online || r.error !== undefined),
     notice,
-    pi: piOverlayAlerts(),
-    raids,
+    pi: pi.filter((a) => !isMuted(mutes, piKey(a), now)),
+    raids: raids.filter((r) => !isMuted(mutes, raidKey(r), now)),
+    mining: mining.filter((a) => !isMuted(mutes, miningKey(a), now)),
+    miningBlink: s.blink,
   });
 }
 

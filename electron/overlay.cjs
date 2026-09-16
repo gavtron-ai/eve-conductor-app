@@ -10,6 +10,8 @@
 // native keyboard hook (an extra native dependency). Press-to-toggle is the
 // same two keystrokes and needs nothing extra.
 const { BrowserWindow, screen, globalShortcut, ipcMain } = require('electron');
+/** opens the settings window on its Alerts page (v0.202.1) */
+const ALERTS_HOTKEY = 'Alt+]';
 const path = require('path');
 
 /** Alt+\ — a bare "\" would swallow the character while typing in game */
@@ -102,12 +104,15 @@ function create() {
  * means it can never receive typed text. Custom clone names need a real
  * focusable window.
  */
-function openConfig() {
+function openConfig(tab) {
   if (cfgIsOpen()) {
     cfgWin.show();
     cfgWin.focus();
+    // switch an open window to the asked-for page (v0.202.1: Alt+] → Alerts)
+    if (tab) { try { cfgWin.webContents.send('clone-config-tab', String(tab)); } catch { /* closing */ } }
     return cfgWin;
   }
+  const hash = tab ? `clone-config/${String(tab)}` : 'clone-config';
   cfgWin = new BrowserWindow({
     width: 940,
     height: 680,
@@ -127,9 +132,9 @@ function openConfig() {
   cfgWin.setAlwaysOnTop(true, 'screen-saver');
   cfgWin.setMenuBarVisibility(false);
   if (process.env.VITE_DEV_SERVER_URL) {
-    cfgWin.loadURL(`${process.env.VITE_DEV_SERVER_URL}#clone-config`);
+    cfgWin.loadURL(`${process.env.VITE_DEV_SERVER_URL}#${hash}`);
   } else {
-    cfgWin.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), { hash: 'clone-config' });
+    cfgWin.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), { hash });
   }
   // closing the setup window LOCKS the boxes again — otherwise the overlay
   // would silently stay interactive and keep swallowing clicks from the game
@@ -176,11 +181,18 @@ function open() {
   if (!globalShortcut.isRegistered(EDIT_HOTKEY)) {
     globalShortcut.register(EDIT_HOTKEY, () => toggleEdit());
   }
+  // Alt+] (v0.202.1): the settings window on its Alerts page — dismiss,
+  // snooze or switch off what the notice boxes are showing, from the game,
+  // without entering setup mode
+  if (!globalShortcut.isRegistered(ALERTS_HOTKEY)) {
+    globalShortcut.register(ALERTS_HOTKEY, () => { openConfig('alerts'); });
+  }
   broadcastOpen();
 }
 
 function close() {
   globalShortcut.unregister(EDIT_HOTKEY);
+  globalShortcut.unregister(ALERTS_HOTKEY);
   editMode = false;
   // NOTE: the config window deliberately STAYS open — its overlay toggle is
   // now how you turn the overlay back on, so closing the overlay must not
@@ -202,11 +214,13 @@ function register() {
   });
   // the overlay asks to leave edit mode when the user clicks "done"
   ipcMain.on('overlay-edit', (_e, on) => setEdit(on));
-  // the setup window can be opened from the Tools menu too, not only Alt+\
-  ipcMain.handle('clone-config-open', () => {
+  // the setup window can be opened from the Tools menu too, not only Alt+\.
+  // With a page named (v0.202.1: 'alerts') it opens THERE and does not
+  // force setup mode — dismissing an alert is not box-positioning.
+  ipcMain.handle('clone-config-open', (_e, tab) => {
     if (!isOpen()) open();
-    setEdit(true);
-    openConfig();
+    if (!tab) setEdit(true);
+    openConfig(tab ? String(tab) : undefined);
     return true;
   });
   ipcMain.handle('clone-config-close', () => {

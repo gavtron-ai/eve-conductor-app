@@ -18,7 +18,7 @@ import Tip from './Tip';
 import { CHAIN_EXTRACT, chainSigsScript, type ChainExtract, type FeedRead } from '../lib/apertureExtract';
 import { inferMap, inferSignatures, type FeedReport } from '../lib/chainFeed';
 import type { ChainSig } from '../lib/chain';
-import { logUser } from '../lib/devlog';
+import { logInfo, logUser } from '../lib/devlog';
 import { useZoom } from '../lib/zoom';
 import ChainSummary from './ChainSummary';
 
@@ -62,6 +62,28 @@ export default function ApertureModule({ view = 'map' }: { view?: 'map' | 'summa
   // a pop-out; the map's guest page stays mounted underneath, hidden, so
   // it keeps its login and can still be read)
   const [latest, setLatest] = useState<(ChainExtract & { at: number }) | null>(null);
+  // THE FIRST READ (v0.202.6, "it takes a minute to populate"): this module
+  // unmounts when another module is opened, so on return the guest page
+  // loads from scratch and the summary's opening read hit a guest that was
+  // not there yet — it failed silently and nothing tried again until the
+  // 5-minute timer or a click on ⟳ (measured in the log: "map read failed"
+  // in the same millisecond as "module: aperture", then a successful read
+  // 29 s later when the pilot pressed refresh). Now: a read asked for
+  // before the guest has loaded is queued and runs on did-stop-loading; the
+  // first load runs one on its own; an empty or failed read retries a few
+  // times with a short backoff; and the last reading main is holding is
+  // shown at once so the tab is never blank on return.
+  const guestReady = useRef(false);
+  const pendingRead = useRef(false);
+  const firstReadDone = useRef(false);
+  const attempts = useRef(0);
+  const runRef = useRef<() => void>(() => {});
+  const [extracting, setExtracting] = useState(false);
+  useEffect(() => {
+    void window.appInfo?.chain?.get().then((d) => {
+      if (d && typeof d === 'object') setLatest((cur) => cur ?? (d as ChainExtract & { at: number }));
+    }).catch(() => { /* nothing kept yet */ });
+  }, []);
   // PER-SCREEN ZOOM: this screen hosts another page, so the level is
   // applied to the guest (its own text and drawing scale) rather than to
   // the <webview> box; the toolbar follows via CSS zoom below
@@ -78,13 +100,21 @@ export default function ApertureModule({ view = 'map' }: { view?: 'map' | 'summa
   useEffect(() => {
     const wv = ref.current;
     if (!wv) return;
-    const start = () => setBusy(true);
+    const start = () => { setBusy(true); guestReady.current = false; };
     const stop = () => {
       setBusy(false);
       try {
         setUrl(wv.getURL());
       } catch {
         // guest not ready yet
+      }
+      // the guest can be read now: a queued read, and the first read of
+      // this mount on its own so the Σ tab is ready before it is opened
+      guestReady.current = true;
+      if (pendingRead.current || !firstReadDone.current) {
+        pendingRead.current = false;
+        firstReadDone.current = true;
+        runRef.current();
       }
     };
     wv.addEventListener('did-start-loading', start);
@@ -110,11 +140,34 @@ export default function ApertureModule({ view = 'map' }: { view?: 'map' | 'summa
   // table and the drawn chain — and hand it to the summary window through
   // main. The structure probe rides along into the diagnostics log so the
   // parser can be locked to the real map after the first press.
+  const MAX_TRIES = 10;
+  const retryLater = () => {
+    if (attempts.current >= MAX_TRIES) return;
+    attempts.current++;
+    window.setTimeout(() => runRef.current(), Math.min(6000, 2500 * attempts.current));
+  };
   const runChainExtract = async () => {
     const w = ref.current;
     if (!w) return;
+    if (!guestReady.current) { pendingRead.current = true; return; }   // runs on did-stop-loading
+    setExtracting(true);
+    const tRead = performance.now();
     try {
       const res = (await w.executeJavaScript(CHAIN_EXTRACT, true)) as ChainExtract;
+      const guestMs = Math.round(performance.now() - tRead);
+      // SETTLED? (v0.202.9, "the summary tab opens and never loads"): an
+      // early read — the page up, its drawing not yet rendered — carries no
+      // nodes, or nodes with no text yet; the feed inference then finds no
+      // systems, or labels them by J-code (custom names come from the drawn
+      // text), the typed home is not found, nothing is linked, and the tab
+      // sits empty until the 5-minute timer. Measured in the log: a read 3 s
+      // after the page load → 492 signatures, 0 rows; the same map 20 s
+      // later → 421 rows. So an unsettled reading is NOT published: the
+      // last good one stands and the read runs again shortly.
+      const nodes = res.graph.nodes.length;
+      const blank = res.graph.nodes.filter((n) => !n.text || n.text.trim().length < 3).length;
+      const drawn = nodes > 0 && blank <= nodes * 0.2;
+      if (!res.feed?.map && !res.sigText) { retryLater(); return; }   // the page is up but its data is not
       const rows = res.sigText ? res.sigText.split('\n').length : 0;
       // THE FEED (v0.200.3): the map's own JSON, complete and unfiltered,
       // whatever the panel shows. Field roles are inferred (chainFeed.ts)
@@ -150,17 +203,29 @@ export default function ApertureModule({ view = 'map' }: { view?: 'map' | 'summa
         }
         feedRead = { systems: m.systems, edges: m.edges, sigs, home: m.home ? { id: m.home.id, label: m.home.label } : null, report, status: res.feed.status };
       }
+      const settled = drawn && (!res.feed?.map || (feedRead?.systems.length ?? 0) > 0);
+      if (!settled && attempts.current < MAX_TRIES) {
+        logUser('chain: map not settled yet', { nodes, blank, systems: feedRead?.systems.length ?? 0, sigs: feedRead?.sigs.length ?? 0, attempt: attempts.current, guestMs });
+        retryLater();
+        return;
+      }
+      attempts.current = 0;
       logUser('chain: map read', { rows, header: res.sigHeader, probe: res.probe, feed: feedRead ? { systems: feedRead.systems.length, edges: feedRead.edges.length, sigs: feedRead.sigs.length, report: feedRead.report, status: feedRead.status } : null });
       const payload = { ...res, feed: undefined, feedRead, at: Date.now() };
+      // the read's own timings, small and separate from the big probe line
+      logInfo('chain', 'read timings', { guestMs, inferMs: Math.round(performance.now() - tRead) - guestMs, sigs: feedRead?.sigs.length ?? 0, ...((res.probe?.timings as Record<string, number> | undefined) ?? {}) });
       setLatest(payload);
       window.appInfo?.chain?.post(payload);
     } catch (e) {
-      logUser('chain: map read failed', { err: e instanceof Error ? e.message : String(e) });
+      logUser('chain: map read failed', { err: e instanceof Error ? e.message : String(e), attempt: attempts.current });
+      retryLater();
+    } finally {
+      setExtracting(false);
     }
   };
+  runRef.current = () => { void runChainExtract(); };
   useEffect(() => {
-    window.appInfo?.chain?.onRefreshRequest?.(() => { void runChainExtract(); });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    window.appInfo?.chain?.onRefreshRequest?.(() => { runRef.current(); });
   }, []);
 
   const nav = (fn: (wv: WebviewEl) => void) => () => {
@@ -203,7 +268,7 @@ export default function ApertureModule({ view = 'map' }: { view?: 'map' | 'summa
     <div className="aperture-wrap" style={{ position: 'relative' }}>
       {summaryTab && (
         <div className="aperture-summary" style={{ flex: 1, minHeight: 0, overflow: 'auto', zoom }}>
-          <ChainSummary embedded={{ reading: latest, onRefresh: () => { void runChainExtract(); } }} />
+          <ChainSummary embedded={{ reading: latest, onRefresh: () => { runRef.current(); }, busy: extracting || !guestReady.current }} />
         </div>
       )}
       {!summaryTab && (

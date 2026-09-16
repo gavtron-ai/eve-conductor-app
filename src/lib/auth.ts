@@ -105,8 +105,11 @@ interface ClonesBridge {
   forget: (cfg: unknown) => Promise<any>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   onChanged: (cb: (registry: any) => void) => void;
-  openConfig: () => Promise<boolean>;
+  /** optional page ('alerts') opens the settings window there, without setup mode */
+  openConfig: (tab?: string) => Promise<boolean>;
   closeConfig: () => Promise<boolean>;
+  /** settings window: main asks it to switch page (the Alt+] hotkey while open) */
+  onConfigTab?: (cb: (tab: string) => void) => void;
 }
 
 declare global {
@@ -192,6 +195,8 @@ declare global {
             size: number;
           }[];
         }>;
+        /** the bytes appended since offset (v0.202, the mining watch) */
+        readFrom?: (file: string, offset: number) => Promise<{ ok: boolean; size?: number; mtimeMs?: number; next?: number; text?: string }>;
         read: (file: string) => Promise<{
           ok: boolean;
           truncated: boolean;

@@ -15,7 +15,7 @@ import MyOrders from './components/MyOrders';
 import Dashboard from './components/Dashboard';
 import SellingChip from './components/SellingChip';
 import StockChip from './components/StockChip';
-import { useApp, useHubs, type ModuleId } from './lib/store';
+import { useApp, useHubs, type MiningAlertSettings, type ModuleId } from './lib/store';
 import { useAuth, shortLabel, charLabel } from './lib/auth';
 import { useMyMarket } from './lib/myMarket';
 import { useStock } from './lib/stock';
@@ -98,6 +98,15 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
   // Aperture's tabs: the corp map, and the chain summary (a tab since
   // v0.200.12 — it was a pop-out window)
   const [apertureView, setApertureView] = useState<'map' | 'summary'>('map');
+  // APERTURE STAYS WARM (v0.202.7): the module used to unmount whenever
+  // another module was opened, so every return reloaded the corp map from
+  // scratch (a Next.js page with its login, data and drawing — seconds of
+  // "loading", and the Σ Summary waiting on it: "it really lags there for a
+  // minute"). Once opened it now stays mounted and merely hidden — by
+  // visibility, never display:none, which unloads a <webview> — so the map
+  // and the last reading are there the instant you come back.
+  const [apertureWarm, setApertureWarm] = useState(module === 'aperture');
+  useEffect(() => { if (module === 'aperture') setApertureWarm(true); }, [module]);
   /** Battle Conductor tabs: saved battle reports vs the live game-log feed */
   const [battleView, setBattleView] = useState<'reports' | 'live' | 'sim'>('reports');
   // MAKE BATTLE REPORT moved into the EVE Battle Conductor module
@@ -156,7 +165,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
       if (e.key !== 'eve-trade-conductor' || !e.newValue) return;
       try {
         const parsed = JSON.parse(e.newValue) as {
-          state?: { settings?: { raidAlert?: boolean; raidAlertJumps?: number }; alerts?: { piOverlay?: boolean } };
+          state?: { settings?: { raidAlert?: boolean; raidAlertJumps?: number }; alerts?: { piOverlay?: boolean; mining?: MiningAlertSettings } };
         };
         const s = parsed.state?.settings;
         if (s) {
@@ -172,6 +181,10 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
         const a = parsed.state?.alerts;
         if (a && a.piOverlay !== useApp.getState().alerts.piOverlay) {
           useApp.getState().setAlerts({ piOverlay: a.piOverlay });
+        }
+        // the ⛏ mining-alert settings object (v0.202) rides the same path
+        if (a && JSON.stringify(a.mining ?? null) !== JSON.stringify(useApp.getState().alerts.mining ?? null)) {
+          useApp.getState().setAlerts({ mining: a.mining });
         }
       } catch { /* not our payload */ }
     };
@@ -689,7 +702,13 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
             overflowed the app shell, the PAGE itself scrolled, and the
             statusbar (fixed at the shell's bottom) appeared stranded mid-list */}
         {module === 'pi' && <div className="content"><PiModule /></div>}
-        {module === 'aperture' && <ApertureModule view={apertureView} />}
+        {apertureWarm && (
+          <div className="aperture-keep" style={module === 'aperture'
+            ? { display: 'contents' }
+            : { position: 'absolute', inset: 0, visibility: 'hidden', pointerEvents: 'none', zIndex: -1, overflow: 'hidden', display: 'flex' }}>
+            <ApertureModule view={apertureView} />
+          </div>
+        )}
         {module === 'trade' && view === 'explorer' && <Sidebar />}
         <div className="content">
           {module === 'trade' && view === 'finder' && (

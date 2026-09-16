@@ -15,9 +15,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ChainExtract } from '../lib/apertureExtract';
 import {
-  hopsFrom, parseSigSearch, resolveEdges, summarize, systemOfNodeText, tagOfNodeText,
-  type ChainFilters, type ChainSig, type SigGroup,
+  CHAIN_SORT_NATURAL, basePriceName, hopsFrom, parseSigSearch, resolveEdges, sortChainRows, summarize, systemOfNodeText, tagOfNodeText,
+  type ChainFilters, type ChainSig, type ChainSort, type ChainSortKey, type SigGroup,
 } from '../lib/chain';
+
+/** the table's headings, in column order, with the sort key each carries */
+const SORT_COLUMNS: [ChainSortKey, string, string][] = [
+  ['hops', 'Jumps', "jumps from the chosen origin, along the map's drawn links"],
+  ['system', 'System', ''], ['cls', 'Class', ''], ['group', 'Activity', ''], ['name', 'Site', ''],
+  ['value', 'Value', 'if untouched — see the basis'], ['age', 'Age', ''], ['basis', 'Basis', ''],
+];
+const SORT_KEY = 'etc-chain-sort';
+const readSort = (): ChainSort | null => {
+  try {
+    const j = JSON.parse(localStorage.getItem(SORT_KEY) ?? 'null') as ChainSort | null;
+    return j && SORT_COLUMNS.some(([k]) => k === j.key) && (j.dir === 'asc' || j.dir === 'desc') ? j : null;
+  } catch { return null; }
+};
 import { GAS_SITES, KSPACE_COMBAT, KSPACE_GAS, KSPACE_ORE, ORE_SITES, priceableTypeNames } from '../lib/chainTables';
 import { haulBasis, haulStats, parseHaulsFile, type Haul } from '../lib/hauls';
 import HaulLogger from './HaulLogger';
@@ -28,7 +42,7 @@ import { getLocation } from '../lib/esiChar';
 import { knownSystem, resolveSystems } from '../lib/systemNames';
 import { useAuth } from '../lib/auth';
 import { iskShort } from '../lib/format';
-import { logUser } from '../lib/devlog';
+import { logInfo, logUser } from '../lib/devlog';
 import { GROUP_COLOR, ageBuckets, classColor, iskByHop, layoutChain, normEffect, paletteFromProbe, routeBetween } from '../lib/chainViz';
 import WH_SYSTEMS from '../data/whSystems.json';
 import ChainDashboard from './ChainDashboard';
@@ -47,6 +61,8 @@ type Extract = ChainExtract & { at?: number };
 export interface ChainSummaryEmbed {
   reading: Extract | null;
   onRefresh: () => void;
+  /** the map page is loading or being read right now (v0.202.6) */
+  busy?: boolean;
 }
 
 export default function ChainSummary({ embedded = null }: { embedded?: ChainSummaryEmbed | null }) {
@@ -84,6 +100,8 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
   const zoomLevel = embedded ? 1 : ownZoom;
   const [me, setMe] = useState<{ system: string | null; note: string }>({ system: null, note: '' });
   const [prices, setPrices] = useState<Map<string, number> | null>(null);
+  /** where this window's own time goes per reading (v0.202.7) — logged once per read */
+  const timings = useRef({ summarizeMs: 0, vizMs: 0 });
   // THE PLAYER'S OWN HAULS (v0.201): the estimate for random-loot sites.
   // Loaded from the portable file, written back on every change.
   const [hauls, setHauls] = useState<Haul[]>([]);
@@ -102,6 +120,19 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
   const [classes, setClasses] = useState<Set<string>>(() => new Set());
   const [groups, setGroups] = useState<Set<SigGroup>>(() => new Set());
   const [maxAgeH, setMaxAgeH] = useState<number | null>(null);
+  // "linked only" (v0.202.2): leave out the systems with no drawn link back
+  // to the origin — a view preference, remembered, not cleared with the filters
+  const [linkedOnly, setLinkedOnly] = useState<boolean>(() => { try { return localStorage.getItem('etc-chain-linked-only') === '1'; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem('etc-chain-linked-only', linkedOnly ? '1' : '0'); } catch { /* nicety */ } }, [linkedOnly]);
+  // column sorting (v0.202.5): a heading click sorts its natural way, a
+  // second reverses, a third returns to the default order; remembered
+  const [sort, setSort] = useState<ChainSort | null>(readSort);
+  useEffect(() => { try { if (sort) localStorage.setItem(SORT_KEY, JSON.stringify(sort)); else localStorage.removeItem(SORT_KEY); } catch { /* nicety */ } }, [sort]);
+  const cycleSort = (k: ChainSortKey) => setSort((s) => {
+    if (!s || s.key !== k) return { key: k, dir: CHAIN_SORT_NATURAL[k] };
+    if (s.dir === CHAIN_SORT_NATURAL[k]) return { key: k, dir: s.dir === 'asc' ? 'desc' : 'asc' };
+    return null;
+  });
   const activeId = useAuth((s) => s.activeId);
   const activeName = useAuth((s) => s.characters.find((c) => c.characterId === s.activeId)?.characterName ?? '');
 
@@ -152,11 +183,21 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
     const names = priceableTypeNames();
     const ids = names.map((n) => findByName(n)?.id).filter((x): x is number => typeof x === 'number');
     const jita = BUILTIN_HUBS.find((h) => h.id === 'jita') ?? BUILTIN_HUBS[0];
+    const t0 = performance.now();
     void fetchAggregates(jita, ids).then((agg) => {
       const m = new Map<string, number>();
       for (const n of names) { const id = findByName(n)?.id; const a = id !== undefined ? agg.get(id) : undefined; if (a?.sell?.min) m.set(n, a.sell.min); }
+      // ore variants the type list does not carry take their base ore's
+      // price — a floor, a variant yields at least that (v0.202.8)
+      let floored = 0;
+      for (const n of names) {
+        if (m.has(n)) continue;
+        const base = basePriceName(n, (x) => m.has(x));
+        if (base) { m.set(n, m.get(base)!); floored++; }
+      }
+      logInfo('chain', 'prices', { ms: Math.round(performance.now() - t0), types: ids.length, priced: m.size - floored, floored });
       setPrices(m);
-    }).catch(() => setPrices(new Map()));
+    }).catch(() => { logInfo('chain', 'prices failed', { ms: Math.round(performance.now() - t0), types: ids.length }); setPrices(new Map()); });
   }, []);
 
   // the active character's current system, from CCP — the "me" origin and
@@ -256,10 +297,18 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
       if (!hit) return null;
       return parsed.nodeSys.get(hit.id) ?? systemOfNodeText(hit.text, [...parsed.systems]).system ?? null;
     };
-    if (origin === 'home') return homeLabel ? viaLabel(homeLabel) ?? homeLabel : '';
+    if (origin === 'home') {
+      const typed = homeLabel ? viaLabel(homeLabel) : null;
+      if (typed) return typed;
+      // the typed label is not on THIS reading (v0.202.9: a reading taken
+      // before the drawing settled labels systems by J-code) — the map's own
+      // home is the same system under whatever label this reading uses
+      if (feedHome && parsed.systems.has(feedHome)) return feedHome;
+      return homeLabel || '';
+    }
     if (!me.system) return null;
     return viaLabel(me.system);
-  }, [parsed, origin, homeLabel, me.system]);
+  }, [parsed, origin, homeLabel, feedHome, me.system]);
 
   const hops = useMemo(() => (parsed && originSystem && parsed.edges.length > 0 ? hopsFrom(originSystem, parsed.edges) : null), [parsed, originSystem]);
   // ONE view under EVERY filter, the clicked system included (v0.200.11 —
@@ -269,22 +318,46 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
   // in view" and stay clickable.
   const summary = useMemo(() => {
     if (!parsed) return null;
-    const filters: ChainFilters = { maxHops, classes, groups, maxAgeH, systems: focus ? new Set([focus]) : new Set() };
+    const filters: ChainFilters = { maxHops, classes, groups, maxAgeH, systems: focus ? new Set([focus]) : new Set(), linkedOnly };
     const priceOf = (n: string) => prices?.get(n) ?? null;
-    return summarize(parsed.sigs, hops, filters, priceOf, { gas: GAS_SITES, ore: ORE_SITES, kcombat: KSPACE_COMBAT, kgas: KSPACE_GAS, kore: KSPACE_ORE,
+    const t0 = performance.now();
+    const out = summarize(parsed.sigs, hops, filters, priceOf, { gas: GAS_SITES, ore: ORE_SITES, kcombat: KSPACE_COMBAT, kgas: KSPACE_GAS, kore: KSPACE_ORE,
       hauls: (site, group) => { const a = haulAvg.lookup(site, group); return a ? { isk: a.mean, basis: haulBasis(a, site) } : null; } });
-  }, [parsed, focus, hops, maxHops, classes, groups, maxAgeH, prices, haulAvg]);
+    timings.current.summarizeMs = Math.round(performance.now() - t0);
+    return out;
+  }, [parsed, focus, hops, maxHops, classes, groups, maxAgeH, prices, haulAvg, linkedOnly]);
+  /** every system on the map with no drawn link back to the origin */
+  const unlinkedAll = useMemo(() => (parsed && hops ? [...parsed.systems].filter((s) => !hops.has(s)) : []), [parsed, hops]);
+  /** the table's rows in the chosen column order (the summary's own order when none) */
+  const rowsShown = useMemo(() => (summary ? sortChainRows(summary.rows, sort) : []), [summary, sort]);
   const viz = useMemo(() => {
     if (!parsed || !summary) return null;
     const rows = summary.rows.map((r) => ({ system: r.system, cls: r.cls, group: r.group, hops: r.hops, isk: r.value.isk, ageH: r.ageH }));
-    const systems = [...parsed.systems].map((s) => ({ system: s, cls: parsed.clsOf.get(s) ?? '', tag: parsed.tagOf.get(s) ?? '', effect: parsed.effectOf.get(s) ?? '', shattered: parsed.shattered.has(s) }));
-    return {
+    // "linked only" drops the unlinked systems from the drawing too
+    const drawn = linkedOnly && hops ? [...parsed.systems].filter((s) => hops.has(s)) : [...parsed.systems];
+    const systems = drawn.map((s) => ({ system: s, cls: parsed.clsOf.get(s) ?? '', tag: parsed.tagOf.get(s) ?? '', effect: parsed.effectOf.get(s) ?? '', shattered: parsed.shattered.has(s) }));
+    const t0 = performance.now();
+    const out = {
       layout: layoutChain(systems, parsed.edges, hops ?? new Map(), rows),
       bars: iskByHop(rows),
       ages: ageBuckets(rows),
       offChain: rows.filter((r) => r.hops === null).length,
+      unlinkedHidden: parsed.systems.size - drawn.length,
     };
-  }, [parsed, summary, hops]);
+    timings.current.vizMs = Math.round(performance.now() - t0);
+    return out;
+  }, [parsed, summary, hops, linkedOnly]);
+  // one line per NEW reading with where this window's time went
+  useEffect(() => {
+    if (!data || !summary) return;
+    logInfo('chain', 'summary computed', {
+      ...timings.current, sigs: parsed?.sigs.length ?? 0, rows: summary.rows.length, systems: parsed?.systems.size ?? 0,
+      // why rows may be missing (v0.202.9)
+      hiddenUnlinked: summary.hiddenUnlinked, hiddenNoHops: summary.hiddenNoHops, hiddenNoClass: summary.hiddenNoClass,
+      origin: originSystem, originOk, hops: hops?.size ?? null, edges: parsed?.edges.length ?? 0, drawnNodes: data.graph.nodes.length, linkedOnly, maxHops,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.at]);
 
   // THE ROUTE (v0.201.1): from the active character's system to the clicked
   // hole, over the chain's links; the character's system is mapped to the
@@ -306,14 +379,51 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
   const originOk = !!originSystem && (!parsed || parsed.systems.has(originSystem) || (hops?.has(originSystem) ?? false));
   const graphReadable = !!parsed && parsed.edges.length > 0;
 
+  // SELF-HEAL (v0.202.9): a reading with no signature list, or one on which
+  // the origin cannot be placed (nothing linked), must not leave the tab
+  // empty until the 5-minute timer — "most users won't troubleshoot, it
+  // just needs to work". Ask the map for another reading in a few seconds,
+  // say so on screen, and give up loudly (with what to do) after a dozen.
+  const healTries = useRef<{ at: number; n: number; total: number }>({ at: 0, n: 0, total: 0 });
+  const [healing, setHealing] = useState('');
+  // the module hands a fresh `embedded` object on every render; the effect
+  // keys on the facts, not on that identity, or a re-render would count as
+  // a try
+  const onRefreshRef = useRef<(() => void) | null>(null);
+  onRefreshRef.current = embedded?.onRefresh ?? null;
+  const inTab = !!embedded;
+  useEffect(() => {
+    if (!inTab || !data) return undefined;
+    const sigs = parsed?.sigs.length ?? 0;
+    const empty = sigs === 0;
+    const unplaced = !!summary && sigs > 0 && summary.rows.length === 0 && (summary.hiddenUnlinked + summary.hiddenNoHops) >= sigs * 0.5;
+    const lost = !!parsed && sigs > 0 && !originOk;
+    if (!empty && !unplaced && !lost) { setHealing(''); return undefined; }
+    const key = data.at ?? 0;
+    if (healTries.current.at !== key) healTries.current = { ...healTries.current, at: key, n: 0 };
+    if (healTries.current.n >= 3 || healTries.current.total >= 12) {
+      setHealing(empty
+        ? 'the map gave no signature list — log in on the Corp Map tab if it asks, then press ⟳ refresh'
+        : 'the origin could not be placed on the map from this reading — press ⟳ refresh once the map has drawn, or check the home label');
+      return undefined;
+    }
+    healTries.current.n++; healTries.current.total++;
+    setHealing(empty ? 'the map has not answered with its signature list yet — reading again…' : 'the map\'s drawing had not settled when it was read — reading again…');
+    logInfo('chain', 'self-heal read', { why: empty ? 'no sigs' : unplaced ? 'nothing placed' : 'origin lost', sigs, rows: summary?.rows.length ?? 0, origin: originSystem, n: healTries.current.total });
+    const t = window.setTimeout(() => onRefreshRef.current?.(), 3000);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inTab, data?.at, summary?.rows.length, parsed?.sigs.length, originOk]);
+
   return (
     <div className="chain-root" style={embedded ? { padding: 14, boxSizing: 'border-box' } : { padding: 14, minHeight: '100vh', boxSizing: 'border-box', zoom: zoomLevel }}>
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
         <h1 style={{ margin: 0, fontSize: 18 }}>Chain summary</h1>
         <span className="dim" style={{ fontSize: 12 }}>
-          {data ? `map read ${data.at ? new Date(data.at).toISOString().slice(11, 16) : ''} EVE · ${parsed?.sigs.length ?? 0} signatures · ${parsed?.nodeCount ?? 0} systems drawn · source: ${parsed?.source ?? '—'}` : embedded ? 'reading the map… (log in on the Corp Map tab first if it asks)' : 'waiting for the map — press Summary on the Aperture module'}
+          {data ? `map read ${data.at ? new Date(data.at).toISOString().slice(11, 16) : ''} EVE · ${parsed?.sigs.length ?? 0} signatures · ${parsed?.nodeCount ?? 0} systems drawn · source: ${parsed?.source ?? '—'}` : embedded ? (embedded.busy ? 'reading the map… (the map page is loading; a few seconds)' : 'waiting for the map — log in on the Corp Map tab if it asks, or press ⟳ refresh') :'waiting for the map — press Summary on the Aperture module'}
         </span>
         {stale && <span style={{ fontSize: 12, color: 'var(--warn, #e0a13a)', flexBasis: '100%' }}>⚠ {stale}</span>}
+        {healing && <span style={{ fontSize: 12, color: 'var(--warn, #e0a13a)', flexBasis: '100%' }}>⟳ {healing}</span>}
         {!stale && data && !data.sigText && !(data.feedRead && data.feedRead.sigs.length > 0) && data.probe?.tableVisible === false && (
           <span style={{ fontSize: 12, color: 'var(--warn, #e0a13a)', flexBasis: '100%' }}>⚠ the map's Signature Search panel is not on screen — open it on the map once (any filter) and the list appears here; the app never changes what the map shows</span>
         )}
@@ -340,10 +450,10 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
             {!parsed ? '' : !graphReadable ? '⚠ chain links not readable from this map yet — distances unavailable (structure recorded in Diagnostics)'
               : origin === 'home' && !homeLabel ? '⚠ type your home system\'s label (as the map shows it) to count distances'
               : !originOk ? `⚠ "${originSystem ?? '?'}" is not on the map — distances unavailable`
-                : `${hops?.size ?? 0} systems linked to ${originSystem} over ${parsed.edges.length} links${viz && viz.layout.unlinked.length > 0 ? ` · ${viz.layout.unlinked.length} on the map but not linked (${viz.layout.unlinked.slice(0, 4).join(', ')}${viz.layout.unlinked.length > 4 ? '…' : ''})` : ''}${summary && summary.unreachable > 0 ? ` · ${summary.unreachable} site(s) there carry no distance` : ''}`}
-            {summary && (summary.hiddenNoClass > 0 || summary.hiddenNoHops > 0) && (
+                : `${hops?.size ?? 0} systems linked to ${originSystem} over ${parsed.edges.length} links${unlinkedAll.length > 0 ? ` · ${unlinkedAll.length} on the map but not linked (${unlinkedAll.slice(0, 4).join(', ')}${unlinkedAll.length > 4 ? '…' : ''})${linkedOnly ? ' · hidden' : ''}` : ''}${summary && summary.unreachable > 0 ? ` · ${summary.unreachable} site(s) there carry no distance` : ''}`}
+            {summary && (summary.hiddenNoClass > 0 || summary.hiddenNoHops > 0 || summary.hiddenUnlinked > 0) && (
               <> · <span title="rows the filters dropped only because the map showed no class, or no distance could be counted">
-                {[summary.hiddenNoClass > 0 ? `${summary.hiddenNoClass} hidden (no class)` : '', summary.hiddenNoHops > 0 ? `${summary.hiddenNoHops} hidden (no distance)` : ''].filter(Boolean).join(' · ')}
+                {[summary.hiddenNoClass > 0 ? `${summary.hiddenNoClass} hidden (no class)` : '', summary.hiddenNoHops > 0 ? `${summary.hiddenNoHops} hidden (no distance)` : '', summary.hiddenUnlinked > 0 ? `${summary.hiddenUnlinked} hidden (not linked)` : ''].filter(Boolean).join(' · ')}
               </span></>
             )}
           </span>
@@ -369,24 +479,20 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
         </div>
       </div>
 
-      {/* ---- the dashboard ---- */}
-      {viz && summary && (
-        <ChainDashboard
-          origin={originSystem ?? ''} layout={viz.layout} bars={viz.bars} ages={viz.ages} byGroup={summary.byGroup}
-          focus={focus} onFocus={setFocus} maxHops={maxHops} onMaxHops={setMaxHops} offChain={viz.offChain}
-          routeHome={routeHome} routeMe={routeMe} routeNote={routeNote} routeFrom={activeName || 'you'} originLabel={originSystem ?? ''} effectOf={parsed?.effectOf ?? new Map()} tagOf={parsed?.tagOf ?? new Map()} clsOf={parsed?.clsOf ?? new Map()} palette={parsed?.palette ?? null} shattered={parsed?.shattered ?? new Set()}
-          note={!graphReadable ? 'the chain links could not be read from the map — distances and the drawing need them' : !originOk ? `"${originSystem ?? '?'}" is not on the map` : ''}
-        />
-      )}
-
-      {/* ---- filters ---- */}
-      <div className="panel" style={{ padding: 10, marginBottom: 8, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', fontSize: 12 }}>
+      {/* ---- filters (v0.202.2: between the tiles and the drawing, where the
+           eye goes; every filter drives the tiles, the drawing and the table) ---- */}
+      <div className="panel chain-filters" style={{ padding: 10, marginBottom: 8, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', fontSize: 12 }}>
         <label style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
           jumps ≤
           <select value={maxHops ?? ''} onChange={(e) => setMaxHops(e.target.value === '' ? null : Number(e.target.value))} style={{ fontSize: 12 }}>
             <option value="">any</option>
             {[0, 1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}
           </select>
+        </label>
+        <label style={{ display: 'flex', gap: 4, alignItems: 'center', cursor: 'pointer' }}
+          title={`Leave out the systems that are on the map but have no drawn link back to ${originSystem || 'the origin'} — they carry no distance. Their sites leave the tiles and the table and the dashed column leaves the drawing. Remembered.`}>
+          <input type="checkbox" checked={linkedOnly} onChange={(e) => setLinkedOnly(e.target.checked)} />
+          linked only{unlinkedAll.length > 0 ? <span className="dim"> ({unlinkedAll.length} unlinked)</span> : null}
         </label>
         <span style={{ display: 'flex', gap: 3 }}>
           <span className="dim">class</span>
@@ -415,6 +521,16 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
         )}
       </div>
 
+      {/* ---- the dashboard ---- */}
+      {viz && summary && (
+        <ChainDashboard
+          origin={originSystem ?? ''} layout={viz.layout} bars={viz.bars} ages={viz.ages} byGroup={summary.byGroup}
+          focus={focus} onFocus={setFocus} maxHops={maxHops} onMaxHops={setMaxHops} offChain={viz.offChain} unlinkedHidden={viz.unlinkedHidden}
+          routeHome={routeHome} routeMe={routeMe} routeNote={routeNote} routeFrom={activeName || 'you'} originLabel={originSystem ?? ''} effectOf={parsed?.effectOf ?? new Map()} tagOf={parsed?.tagOf ?? new Map()} clsOf={parsed?.clsOf ?? new Map()} palette={parsed?.palette ?? null} shattered={parsed?.shattered ?? new Set()}
+          note={!graphReadable ? 'the chain links could not be read from the map — distances and the drawing need them' : !originOk ? `"${originSystem ?? '?'}" is not on the map` : ''}
+        />
+      )}
+
       {/* ---- log a haul (v0.201) ---- */}
       {logging && (
         <HaulLogger target={logging} hauls={hauls} activeId={activeId}
@@ -428,12 +544,21 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
         <table className="data chain-table" style={{ fontSize: 12.5 }}>
           <thead>
             <tr>
-              <th title="jumps from the chosen origin, along the map's drawn links">Jumps</th><th>System</th><th>Class</th><th>Activity</th><th>Site</th>
-              <th title="if untouched — see the basis">Value</th><th>Age</th><th>Basis</th>
+              {SORT_COLUMNS.map(([k, label, title]) => {
+                const on = sort?.key === k;
+                const hint = !on ? 'click to sort' : sort!.dir === CHAIN_SORT_NATURAL[k] ? 'click again to reverse' : 'click again for the default order (nearest, then richest)';
+                return (
+                  <th key={k} onClick={() => cycleSort(k)} aria-sort={on ? (sort!.dir === 'asc' ? 'ascending' : 'descending') : 'none'}
+                    style={{ cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap', color: on ? 'var(--accent)' : undefined }}
+                    title={`${title ? `${title} · ` : ''}${hint}`}>
+                    {label}{on ? <span style={{ marginLeft: 4, fontSize: 10 }}>{sort!.dir === 'asc' ? '▲' : '▼'}</span> : null}
+                  </th>
+                );
+              })}
             </tr>
           </thead>
           <tbody>
-            {summary?.rows.map((r) => (
+            {rowsShown.map((r) => (
               <tr key={`${r.system}-${r.sig}`}>
                 <td style={{ fontVariantNumeric: 'tabular-nums', textAlign: 'center' }}>{r.hops ?? <span className="dim">?</span>}</td>
                 <td>{r.system}</td>
@@ -453,7 +578,7 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
               </tr>
             ))}
             {summary && summary.rows.length === 0 && (
-              <tr><td colSpan={8} className="dim" style={{ padding: 12 }}>{parsed && parsed.sigs.length > 0
+              <tr><td colSpan={8} className="dim" style={{ padding: 12 }}>{healing ? `⟳ ${healing}` : parsed && parsed.sigs.length > 0
                 ? `nothing matches the filters${summary.hiddenNoClass > 0 ? ` — ${summary.hiddenNoClass} row(s) have no class on the map` : ''}${summary.hiddenNoHops > 0 ? ` — ${summary.hiddenNoHops} row(s) have no distance (chain links unread, or the system is not connected to the origin)` : ''}`
                 : 'no signatures read from the map — is the Signature Search panel showing all types and classes?'}</td></tr>
             )}

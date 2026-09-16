@@ -169,7 +169,7 @@ export const SHARED: HelpGroup[] = [
             <Steps items={[
               <>Press <Keys keys={['Alt', '\\']} /> in game (or open Tools ▾ → Multibox overlay settings…). A banner says <b>SETUP MODE</b> and blue corner squares appear on every box.</>,
               <>Drag a box to move it. Positions are remembered per character.</>,
-              <>Drag a blue corner to resize. <b>Pod boxes share one size</b> — resize any one and they all follow (icon and text scale with the height). <b>Each notice-type box has its own width</b> (⚠ notice, 🪐 planets, 🎯 raids are independent of the pods and of each other); their height follows the text.</>,
+              <>Drag a blue corner to resize. <b>Pod boxes share one size</b> — resize any one and they all follow (icon and text scale with the height). <b>Each notice-type box has its own width</b> (⚠ notice, 🪐 planets, 🎯 raids, ⛏ mining are independent of the pods and of each other); their height follows the text.</>,
               <>Boxes with nothing to show right now appear as dimmed <b>templates</b> in setup mode, so you can place them before they are ever needed.</>,
               <>Press <Keys keys={['Alt', '\\']} /> again, or <b>done</b> in the banner, to lock.</>,
             ]} />
@@ -180,13 +180,52 @@ export const SHARED: HelpGroup[] = [
         id: 'overlay-window', title: 'The overlay settings window',
         body: (
           <>
-            <p>Tools ▾ → <b>⚑ Multibox overlay settings…</b> opens a separate window (the overlay itself cannot accept typing). Three tabs:</p>
+            <p>Tools ▾ → <b>⚑ Multibox overlay settings…</b> opens a separate window (the overlay itself cannot accept typing). Five tabs:</p>
             <ul>
               <li><b>🧍 Pod Overlay</b> — the overlay <b>on/off</b> switch; every clone the app has seen, per character (expand a character to see them). Type a <b>name</b> for a clone, set an <b>alert</b> with a colour and optional blink, or forget a clone (it returns if seen again). A "wearing now" badge marks the current clone.</li>
               <li><b>⚠ Notification Box</b> — the tick that lets urgent <b>planet</b> warnings use their own 🪐 box on the overlay.</li>
               <li><b>🎯 Raid Alert</b> — show raidable skyhooks near your imported Theft map as an amber box, and how many jumps still count as near.</li>
+              <li><b>⛏ Mining Alert</b> — name a miner on the overlay when their rate drops or they stop while the crew keeps going, with its own knobs (next page).</li>
+              <li><b>🔔 Alerts</b> — what the notice boxes are showing right now: dismiss one, snooze one or everything, or switch a box off. <Keys keys={['Alt', ']']} /> in game opens this page directly (the page after next).</li>
             </ul>
             <p>Changes apply within one poll (a few seconds) — no restart.</p>
+          </>
+        ),
+      },
+      {
+        id: 'mining-alert', title: '⛏ Mining alert — who is not pulling',
+        body: (
+          <>
+            <p>
+              Every mining cycle that finishes writes a <i>“You mined …”</i> line to that character&apos;s own game log — one line per module, every cycle. The app follows each character&apos;s live log (read-only, nothing is ever written to the game&apos;s files), learns their cycle length from the lines themselves, and watches for lines that stop coming. Nothing is written when a module shuts down — a broken crystal, a depleted rock, a full hold — so silence is the only trace.
+            </p>
+            <ul>
+              <li><b>rate down</b> — fewer lines than that character normally manages (below three quarters, by default, and at least two lines short — one missed cycle is a crystal swap and never counts), held for the <b>reaction delay</b> you set. At the crew&apos;s 15-second cycles the default 30 s names a dead module about a minute after it died.</li>
+              <li><b>not mining</b> — no line for a whole cycle (never less than 30 s) plus the same delay, while others in the crew are still mining, and the character has neither docked nor left the system they mined in.</li>
+            </ul>
+            <p>The box names the character and how long ago; it blinks for its first seconds. It does <b>not</b> say why — that is for the pilot to look at.</p>
+            <p>The knobs, on the ⛏ Mining Alert page: the master switch; <b>react after</b> (0–180 s — lower names sooner, higher forgives a slow retarget); <b>what counts as a drop</b> (any module lost, a third of the rate, half the rate); which of the two things to say; blink on or off; and how long a “not mining” line stays on screen.</p>
+            <Limit>
+              Deliberately silent while <b>nobody in the crew is still mining</b> — the whole crew stopped, which is a move or an unload run and happens all the time — and for about two cycles after the first of them starts again, so the slow ones locking rocks are not named. Also silent when the character <b>docks or leaves the system</b>, <b>changes ship</b>, or is a <b>lone miner</b> (one character is the whole crew, so their stopping is a move by definition — a lone miner losing one of several modules is still named). “Rate down” clears once the rate is back for a few cycles or after half an hour at the lower rate (it becomes the new normal); “not mining” clears when they mine again, dock, move, or after the keep time. Two modules cycling exactly half a cycle apart read as one module at double speed, and one of them stopping then goes unnoticed — rare, but possible. Switch it off in the settings window (⛏ Mining Alert); off means no log is read at all.
+            </Limit>
+          </>
+        ),
+      },
+      {
+        id: 'alerts-page', title: '🔔 Alerts — dismiss, snooze, switch off',
+        body: (
+          <>
+            <p>
+              The overlay is click-through, so you cannot click an alert away on the overlay itself. The <b>🔔 Alerts</b> page of the settings window is where you act on one — and <Keys keys={['Alt', ']']} /> in game opens that page straight away, without setup mode.
+            </p>
+            <ul>
+              <li><b>On the overlay now</b> lists what the three notice boxes are showing (⛏ mining, 🪐 planets, 🎯 raids), refreshed every few seconds.</li>
+              <li><b>dismiss</b> hides that one alert until it goes away on its own; when the same character or planet comes up afresh later, it shows again.</li>
+              <li><b>10 min</b> / <b>1 h</b> snooze that one alert for a while. A snoozed or dismissed line stays in the list, dimmed, with a <b>show again</b> button.</li>
+              <li><b>Snooze everything</b> (15 min, 1 h, 4 h) quiets all three boxes at once — the pod boxes are untouched. <b>Clear all</b> shows everything again.</li>
+              <li><b>Switch off entirely</b> — the three master switches in one place. Off is off: that box never appears, and for mining no log is read at all. Snoozes are the gentler option.</li>
+            </ul>
+            <Limit>Dismissals and snoozes live on this machine and reach the overlay within one poll (a few seconds). A dismissal is forgotten after a day.</Limit>
           </>
         ),
       },

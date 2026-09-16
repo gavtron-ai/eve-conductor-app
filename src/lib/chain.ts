@@ -391,6 +391,9 @@ export interface ChainFilters {
   maxAgeH: number | null;
   /** only these systems (a click on the chain drawing); empty/absent = all */
   systems?: Set<string>;
+  /** drop sites in systems with no drawn link back to the origin (v0.202.2
+   * "linked only"); only meaningful when hops are known */
+  linkedOnly?: boolean;
 }
 
 export interface ChainRow extends ChainSig {
@@ -407,6 +410,8 @@ export interface ChainSummary {
   hiddenNoClass: number;
   /** rows a distance filter dropped only because their distance is unknown */
   hiddenNoHops: number;
+  /** rows "linked only" dropped: their system has no drawn link to the origin */
+  hiddenUnlinked: number;
 }
 
 export function summarize(
@@ -416,7 +421,7 @@ export function summarize(
   const byGroup = {} as ChainSummary['byGroup'];
   for (const g of ['Combat', 'Ore', 'Gas', 'Relic', 'Data', 'Wormhole', 'Other'] as SigGroup[]) byGroup[g] = { count: 0, isk: 0, unvalued: 0 };
   const rows: ChainRow[] = [];
-  let unreachable = 0, hiddenNoClass = 0, hiddenNoHops = 0;
+  let unreachable = 0, hiddenNoClass = 0, hiddenNoHops = 0, hiddenUnlinked = 0;
   for (const s of sigs) {
     if (filters.groups.size > 0 ? !filters.groups.has(s.group) : s.group === 'Wormhole') continue;
     if (filters.systems && filters.systems.size > 0 && !filters.systems.has(s.system)) continue;
@@ -424,6 +429,9 @@ export function summarize(
     if (filters.maxAgeH !== null && s.ageH !== null && s.ageH > filters.maxAgeH) continue;
     const h = hops ? (hops.get(s.system) ?? null) : null;
     if (hops && h === null) unreachable++;
+    // "linked only" (v0.202.2): a system with no drawn link to the origin is
+    // left out altogether — counted apart from a distance filter's drops
+    if (filters.linkedOnly && hops && h === null) { hiddenUnlinked++; continue; }
     if (filters.maxHops !== null && (h === null || h > filters.maxHops)) { if (h === null) hiddenNoHops++; continue; }
     const value = valueSig(s, priceOf, tables);
     rows.push({ ...s, hops: h, value });
@@ -433,5 +441,70 @@ export function summarize(
   }
   rows.sort((a, b) => (a.hops ?? 99) - (b.hops ?? 99) || (b.value.isk ?? -1) - (a.value.isk ?? -1) || a.system.localeCompare(b.system));
   const totalIsk = Object.values(byGroup).reduce((s, g) => s + g.isk, 0);
-  return { rows, byGroup, totalIsk, unreachable, hiddenNoClass, hiddenNoHops };
+  return { rows, byGroup, totalIsk, unreachable, hiddenNoClass, hiddenNoHops, hiddenUnlinked };
+}
+
+// ---- ORE VARIANTS (v0.202.8): the site tables name rocks by their exact
+// variant ("Golden Omber", "Concentrated Veldspar", "Bezdnacine Grade-II"),
+// and the shipped type list carries the base ores only — measured: 74 of
+// 151 priceable names resolved, the 77 others all variants (plus three
+// comma typos, "Ytirium, IV-Grade"). A variant yields at least its base
+// ore, so the base ore's price is an honest FLOOR for it. Given a name the
+// price map does not know, this finds the longest known name it contains.
+export function basePriceName(name: string, known: (n: string) => boolean): string | null {
+  const clean = name.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
+  if (known(clean)) return clean;
+  const words = clean.split(' ');
+  // every contiguous run of words, longest first
+  for (let len = words.length - 1; len >= 1; len--) {
+    for (let i = 0; i + len <= words.length; i++) {
+      const cand = words.slice(i, i + len).join(' ');
+      if (known(cand)) return cand;
+    }
+  }
+  return null;
+}
+
+// ---- COLUMN SORTING (v0.202.5) — the table's headings. Pure; the rows
+// come in the default order (nearest, then richest) and that order is the
+// tie-break, so a sort never shuffles equal rows. Unknowns (no distance,
+// no value, no age, no name, no class) go LAST whichever way the sort
+// runs — a "?" is never the top row.
+export type ChainSortKey = 'hops' | 'system' | 'cls' | 'group' | 'name' | 'value' | 'age' | 'basis';
+export interface ChainSort { key: ChainSortKey; dir: 'asc' | 'desc' }
+/** the direction a first click gives each column */
+export const CHAIN_SORT_NATURAL: Record<ChainSortKey, 'asc' | 'desc'> = {
+  hops: 'asc', system: 'asc', cls: 'asc', group: 'asc', name: 'asc', value: 'desc', age: 'asc', basis: 'asc',
+};
+/** the class ladder: easiest first, then k-space by security */
+export const CLASS_SORT_RANK = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C13', 'HS', 'LS', 'NS'];
+export const GROUP_SORT_RANK: SigGroup[] = ['Combat', 'Ore', 'Gas', 'Relic', 'Data', 'Wormhole', 'Other'];
+
+export function sortChainRows(rows: readonly ChainRow[], sort: ChainSort | null): ChainRow[] {
+  const base = rows.slice();
+  if (!sort) return base;
+  const mul = sort.dir === 'asc' ? 1 : -1;
+  const rank = (list: readonly string[], v: string): number => { const i = list.indexOf(v); return i < 0 ? list.length : i; };
+  const keyOf = (r: ChainRow): number | string | null => {
+    switch (sort.key) {
+      case 'hops': return r.hops;
+      case 'system': return r.system.toLowerCase();
+      case 'cls': return r.cls ? rank(CLASS_SORT_RANK, r.cls) : null;
+      case 'group': return rank(GROUP_SORT_RANK, r.group);
+      case 'name': return r.name ? r.name.toLowerCase() : null;
+      case 'value': return r.value.isk;
+      case 'age': return r.ageH;
+      case 'basis': return r.value.basis.toLowerCase();
+    }
+  };
+  return base
+    .map((r, i) => ({ r, i, k: keyOf(r) }))
+    .sort((a, b) => {
+      if (a.k === null && b.k === null) return a.i - b.i;
+      if (a.k === null) return 1;
+      if (b.k === null) return -1;
+      const c = typeof a.k === 'number' && typeof b.k === 'number' ? a.k - b.k : String(a.k).localeCompare(String(b.k));
+      return c !== 0 ? c * mul : a.i - b.i;
+    })
+    .map((x) => x.r);
 }

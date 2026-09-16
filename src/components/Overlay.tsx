@@ -11,6 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type { OverlayNotice, RaidAlert } from '../lib/overlayFeed';
+import { alertText, FRESH_MS, type MiningAlert } from '../lib/miningWatch';
 
 export interface OverlayChar {
   characterId: number;
@@ -69,6 +70,8 @@ const RAID_ID = -2;
 const PI_ID = -3;
 // (−4 was the v0.198 "needs you" box, removed in v0.199 — EVE logs nothing
 // when a trade opens, so it could never do the one job it was for)
+/** reserved layout key for the ⛏ mining-watch box (v0.202) */
+const MINING_ID = -5;
 const MIN_W = 120;
 const MIN_H = 48;
 const DEFAULT_NOTICE_W = 300;
@@ -141,6 +144,8 @@ export default function Overlay() {
   const [notice, setNotice] = useState<OverlayNotice | null>(null);
   const [raids, setRaids] = useState<RaidAlert[]>([]);
   const [pi, setPi] = useState<{ charName: string; planetName: string; text: string; sev: number }[]>([]);
+  const [mining, setMining] = useState<MiningAlert[]>([]);
+  const [miningBlink, setMiningBlink] = useState(true);
   const [edit, setEdit] = useState(false);
   const [layout, setLayout] = useState<Layout>(loadLayout);
   const nwOf = (id: number): number => layout.widths?.[id] ?? layout.noticeW ?? DEFAULT_NOTICE_W;
@@ -157,9 +162,9 @@ export default function Overlay() {
   }, []);
 
   useEffect(() => {
-    window.appInfo?.overlay?.onData((payload: OverlayChar[] | { chars: OverlayChar[]; notice: OverlayNotice | null; raids?: RaidAlert[]; pi?: { charName: string; planetName: string; text: string; sev: number }[] }) => {
-      if (Array.isArray(payload)) { setChars(payload); setNotice(null); setRaids([]); setPi([]); }
-      else { setChars(payload.chars); setNotice(payload.notice); setRaids(payload.raids ?? []); setPi(payload.pi ?? []); }
+    window.appInfo?.overlay?.onData((payload: OverlayChar[] | { chars: OverlayChar[]; notice: OverlayNotice | null; raids?: RaidAlert[]; pi?: { charName: string; planetName: string; text: string; sev: number }[]; mining?: MiningAlert[]; miningBlink?: boolean }) => {
+      if (Array.isArray(payload)) { setChars(payload); setNotice(null); setRaids([]); setPi([]); setMining([]); }
+      else { setChars(payload.chars); setNotice(payload.notice); setRaids(payload.raids ?? []); setPi(payload.pi ?? []); setMining(payload.mining ?? []); setMiningBlink(payload.miningBlink !== false); }
     });
     window.appInfo?.overlay?.onEdit((on: boolean) => setEdit(on));
   }, []);
@@ -409,6 +414,36 @@ export default function Overlay() {
           </div>
         );
       })()}
+      {mining.length > 0 && (() => {
+        const mpos = layout.pos[MINING_ID] ?? { x: DEFAULT_POS.x, y: 176 };
+        const mw = nwOf(MINING_ID);
+        // a freshly raised alert blinks for its first seconds, then settles
+        // (unless the pilot turned the blink off in the settings window)
+        const fresh = miningBlink && mining.some((a) => now - a.since < FRESH_MS);
+        return (
+          <div className={`ovl-box ovl-notice${fresh ? ' alert blink' : ''}`}
+            style={{ left: mpos.x, top: mpos.y, width: mw, minHeight: 40,
+              ['--alert' as string]: '#f0c674' } as React.CSSProperties}
+            onMouseDown={start(MINING_ID, 'move')}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '7px 10px' }}>
+              <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#f0c674' }}>
+                ⛏ miner{mining.length === 1 ? '' : 's'} need{mining.length === 1 ? 's' : ''} you
+              </div>
+              {mining.slice(0, 6).map((a) => (
+                <div key={a.charId} style={{ fontSize: 12, lineHeight: 1.4, color: '#e6e9ef', display: 'flex', gap: 6, flexWrap: 'wrap' }}
+                  title={a.kind === 'stopped'
+                    ? 'no mining cycle has completed for two and a half cycles (at least two minutes) while the rest of the crew is still mining, and this character is neither docked nor gone from the system'
+                    : 'fewer mining cycles are completing than this character managed earlier, and it has stayed that way for two minutes — a module has stopped'}>
+                  <b style={{ color: a.kind === 'stopped' ? '#ff8a8a' : '#ffd24d' }}>{a.charName}</b>
+                  <span style={{ color: a.kind === 'stopped' ? '#ff8a8a' : '#e6e9ef' }}>{alertText(a, now)}</span>
+                </div>
+              ))}
+              {mining.length > 6 && <div style={{ fontSize: 11, color: '#9aa0aa' }}>+{mining.length - 6} more…</div>}
+            </div>
+            {handles(MINING_ID)}
+          </div>
+        );
+      })()}
       {/* TEMPLATE BOXES (edit mode only): the notice and raid boxes appear
           rarely, so without these they could never be POSITIONED until the
           moment they were already in the way. Same reserved layout ids, so
@@ -438,6 +473,20 @@ export default function Overlay() {
               <div style={{ fontSize: 12, lineHeight: 1.45, color: '#c9d1d9' }}>Drag me where nearby-raidable-skyhook alerts should appear. Only shown in setup mode.</div>
             </div>
             {handles(RAID_ID)}
+          </div>
+        );
+      })()}
+      {edit && mining.length === 0 && (() => {
+        const mpos = layout.pos[MINING_ID] ?? { x: DEFAULT_POS.x, y: 176 };
+        const mw = nwOf(MINING_ID);
+        return (
+          <div className="ovl-box ovl-notice" style={{ left: mpos.x, top: mpos.y, width: mw, minHeight: 44, opacity: 0.65, ['--alert' as string]: '#8b949e' } as React.CSSProperties}
+            onMouseDown={start(MINING_ID, 'move')}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, padding: '7px 10px' }}>
+              <div style={{ fontSize: 12, fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.04em', color: '#8b949e' }}>⛏ mining alert — template</div>
+              <div style={{ fontSize: 12, lineHeight: 1.45, color: '#c9d1d9' }}>Drag me where a miner whose rate dropped or who stopped should be named. Only shown in setup mode.</div>
+            </div>
+            {handles(MINING_ID)}
           </div>
         );
       })()}

@@ -116,4 +116,32 @@ function read(documents, file) {
   }
 }
 
-module.exports = { list, read, gamelogDir };
+/** the bytes appended since `offset` (v0.202: the mining watch follows each
+ * live session file this way instead of re-reading whole files every poll).
+ * Same discipline: open → read → close, nothing held. An offset past the
+ * end (a rewritten file) starts over from 0 — the caller sees next <
+ * offset and resets. Chunks are capped at 4 MB per call. */
+function readFrom(documents, file, offset) {
+  if (!NAME_RE.test(file)) return { ok: false };
+  const full = path.join(gamelogDir(documents), file);
+  let fd = null;
+  try {
+    const st = fs.statSync(full);
+    let start = Math.max(0, Math.floor(Number(offset) || 0));
+    if (start > st.size) start = 0;
+    const len = Math.min(st.size - start, 4 * 1024 * 1024);
+    if (len <= 0) return { ok: true, size: st.size, mtimeMs: st.mtimeMs, next: start, text: '' };
+    fd = fs.openSync(full, 'r');
+    const buf = Buffer.alloc(len);
+    const got = fs.readSync(fd, buf, 0, len, start);
+    return { ok: true, size: st.size, mtimeMs: st.mtimeMs, next: start + got, text: buf.toString('utf8', 0, got) };
+  } catch {
+    return { ok: false };
+  } finally {
+    if (fd !== null) {
+      try { fs.closeSync(fd); } catch { /* already closed */ }
+    }
+  }
+}
+
+module.exports = { list, read, readFrom, gamelogDir };

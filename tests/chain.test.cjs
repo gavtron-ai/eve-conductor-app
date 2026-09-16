@@ -105,6 +105,53 @@ check('D4 class C4 + Combat → exactly Frontier Barracks', c4.rows.length === 1
 const fresh = C.summarize(sigs, h, { maxHops: null, classes: new Set(), groups: new Set(), maxAgeH: 3 }, price, tables);
 check('D5 max age 3 h drops the 5 h and 7 h rows', fresh.rows.every((r) => r.ageH === null || r.ageH <= 3) && fresh.rows.length === 6, String(fresh.rows.length));
 check('D6 rows sort nearest first, then richest', all.rows[0].hops === 1 && (all.rows[0].value.isk ?? 0) >= (all.rows[1].value.isk ?? 0) || all.rows[0].hops < all.rows[1].hops);
+// v0.202.2 "linked only": the rows whose system has no link to the origin
+// leave, counted on their own — a distance filter's count stays untouched
+const offChainRows = all.rows.filter((r) => r.hops === null).length;
+const linked = C.summarize(sigs, h, { maxHops: null, classes: new Set(), groups: new Set(), maxAgeH: null, linkedOnly: true }, price, tables);
+check('D7 linked only drops exactly the no-link rows and counts them apart', offChainRows > 0 && linked.rows.every((r) => r.hops !== null) && linked.hiddenUnlinked === offChainRows && linked.hiddenNoHops === 0 && linked.rows.length + linked.hiddenUnlinked === all.rows.length, JSON.stringify({ offChainRows, hiddenUnlinked: linked.hiddenUnlinked, rows: linked.rows.length, allRows: all.rows.length }));
+const linkedNear = C.summarize(sigs, h, { maxHops: 2, classes: new Set(), groups: new Set(), maxAgeH: null, linkedOnly: true }, price, tables);
+check('D8 with a distance filter too, the no-link rows are "not linked", not "no distance"', linkedNear.hiddenUnlinked === offChainRows && linkedNear.hiddenNoHops === 0 && linkedNear.rows.length === near.rows.length);
+const noGraph = C.summarize(sigs, null, { maxHops: null, classes: new Set(), groups: new Set(), maxAgeH: null, linkedOnly: true }, price, tables);
+check('D9 with no chain links read at all, linked only drops nothing', noGraph.rows.length === all.rows.length && noGraph.hiddenUnlinked === 0);
+
+// v0.202.5 column sorting (pure): unknowns last either way, equal rows keep
+// the default order, every column sorts both ways
+const S = (key, dir) => C.sortChainRows(all.rows, { key, dir });
+const mono = (xs, cmp) => xs.every((v, i) => i === 0 || cmp(xs[i - 1], v));
+check('T1 no sort keeps the summary\'s own order', JSON.stringify(C.sortChainRows(all.rows, null)) === JSON.stringify(all.rows));
+const valued = all.rows.filter((r) => r.value.isk !== null);
+const vDesc = S('value', 'desc'), vAsc = S('value', 'asc');
+check('T2 value desc: richest first, unvalued last', vDesc[0].value.isk === Math.max(...valued.map((r) => r.value.isk)) && mono(vDesc.slice(0, valued.length).map((r) => r.value.isk), (a, b) => a >= b) && vDesc.slice(valued.length).every((r) => r.value.isk === null));
+check('T3 value asc: poorest first, unvalued STILL last', vAsc[0].value.isk === Math.min(...valued.map((r) => r.value.isk)) && mono(vAsc.slice(0, valued.length).map((r) => r.value.isk), (a, b) => a <= b) && vAsc.slice(valued.length).every((r) => r.value.isk === null));
+const withHops = all.rows.filter((r) => r.hops !== null);
+const hDesc = S('hops', 'desc');
+check('T4 jumps desc: farthest first, no-distance rows last', mono(hDesc.slice(0, withHops.length).map((r) => r.hops), (a, b) => a >= b) && hDesc.slice(withHops.length).every((r) => r.hops === null) && withHops.length > 0 && hDesc.length === all.rows.length);
+const crank = (r) => (r.cls ? C.CLASS_SORT_RANK.indexOf(r.cls) : 99);
+check('T5 class asc follows the ladder C1…C6 then HS/LS/NS, blanks last', mono(S('cls', 'asc').map(crank), (a, b) => a <= b));
+check('T6 class desc reverses the ladder but blanks stay last', (() => { const xs = S('cls', 'desc'); const known = xs.filter((r) => r.cls).map(crank); return mono(known, (a, b) => a >= b) && xs.slice(known.length).every((r) => !r.cls); })());
+const grank = (r) => C.GROUP_SORT_RANK.indexOf(r.group);
+check('T7 activity asc follows Combat, Ore, Gas, Relic, Data', mono(S('group', 'asc').map(grank), (a, b) => a <= b));
+check('T8 equal rows keep the default order (within one activity: nearest, then richest)', C.GROUP_SORT_RANK.every((g) => JSON.stringify(S('group', 'asc').filter((r) => r.group === g)) === JSON.stringify(all.rows.filter((r) => r.group === g))));
+const named = all.rows.filter((r) => r.name);
+const nAsc = S('name', 'asc');
+check('T9 site asc is alphabetical, unnamed last', mono(nAsc.slice(0, named.length).map((r) => r.name.toLowerCase()), (a, b) => a.localeCompare(b) <= 0) && nAsc.slice(named.length).every((r) => !r.name));
+const aged = all.rows.filter((r) => r.ageH !== null);
+const aAsc = S('age', 'asc');
+check('T10 age asc: freshest first, unknown age last', mono(aAsc.slice(0, aged.length).map((r) => r.ageH), (a, b) => a <= b) && aAsc.slice(aged.length).every((r) => r.ageH === null));
+check('T11 system asc is alphabetical, case-blind', mono(S('system', 'asc').map((r) => r.system.toLowerCase()), (a, b) => a.localeCompare(b) <= 0));
+check('T12 the natural first-click directions', C.CHAIN_SORT_NATURAL.value === 'desc' && C.CHAIN_SORT_NATURAL.hops === 'asc' && C.CHAIN_SORT_NATURAL.age === 'asc');
+
+// v0.202.8 ore variants fall back to their base ore's price (a floor)
+const knownOres = new Set(['Omber', 'Veldspar', 'Bezdnacine', 'Ytirium IV-Grade', 'Dark Ochre', 'Kernite', 'Gneiss IV-Grade']);
+const base = (n) => C.basePriceName(n, (x) => knownOres.has(x));
+check('V1 a known name is itself', base('Omber') === 'Omber' && base('Gneiss IV-Grade') === 'Gneiss IV-Grade');
+check('V2 a +5/+10 % variant takes its base ore', base('Golden Omber') === 'Omber' && base('Concentrated Veldspar') === 'Veldspar' && base('Fiery Kernite') === 'Kernite');
+check('V3 the newer Grade-II/III belts take their base ore', base('Bezdnacine Grade-II') === 'Bezdnacine');
+check('V4 a two-word base survives inside a three-word variant', base('Onyx Dark Ochre') === 'Dark Ochre');
+check('V5 the longest known run wins over a shorter one', base('Ytirium, IV-Grade') === 'Ytirium IV-Grade');
+check('V6 a comma typo is healed', base('Ytirium, IV-Grade') !== null);
+check('V7 nothing known inside → null, never a wrong ore', base('Mercoxit') === null && base('Fullerite-C50') === null);
 
 // E: v0.200.1 — what the REAL map showed on the first press (2026-09-14):
 // innerText glued the class chip to the name; node text starts with a

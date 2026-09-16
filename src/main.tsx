@@ -11,7 +11,8 @@ import './styles.css';
 // entry point, and each window gets only the UI it needs
 const route = window.location.hash;
 const isOverlay = route === '#overlay';
-const isCloneConfig = route === '#clone-config';
+// '#clone-config' or '#clone-config/<page>' (v0.202.1: Alt+] lands on /alerts)
+const isCloneConfig = route === '#clone-config' || route.startsWith('#clone-config/');
 // the chain summary pop-out (v0.200) — a report window fed by the Aperture module
 const isChain = route === '#chain-summary';
 // a pop-out window: `#module:<id>` renders the full App locked to one module

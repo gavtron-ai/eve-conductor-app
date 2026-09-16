@@ -22,6 +22,7 @@
 // keeps its last reading and tells the user.
 export const CHAIN_EXTRACT = `
   (async () => {
+    const tStart = performance.now();
     const vis = (el) => !!el && el.offsetParent !== null;
     const squash = (s) => (s || '').replace(/\\s+/g, ' ').trim();
     const txt = (el) => squash(el && el.innerText);
@@ -96,8 +97,18 @@ export const CHAIN_EXTRACT = `
     // same-origin scripts are searched for each effect's name next to a
     // colour literal. Structure only: effect → colour.
     const effectPalette = {};
-    const paletteScan = { files: 0, bytes: 0, hits: 0 };
-    try {
+    const paletteScan = { files: 0, bytes: 0, hits: 0, cached: false, ms: 0 };
+    const tPalette = performance.now();
+    // ONCE PER PAGE LOAD (v0.202.7): the scan below fetches and reads every
+    // same-origin script and stylesheet — measured 28 files, 2.6 MB, on
+    // EVERY read — for a palette that cannot change until the page reloads.
+    // The result is kept on the page's window and reused.
+    const prior = window.__etcPaletteScan;
+    if (prior && prior.palette && prior.scan) {
+      Object.assign(effectPalette, prior.palette);
+      Object.assign(paletteScan, prior.scan);
+      paletteScan.cached = true;
+    } else try {
       // every same-origin script and stylesheet the page has loaded — the
       // map's route chunks arrive through dynamic import(), so
       // document.scripts alone misses them; performance timings see all
@@ -128,6 +139,9 @@ export const CHAIN_EXTRACT = `
         }
       }
     } catch { /* the palette is a nicety */ }
+    paletteScan.ms = Math.round(performance.now() - tPalette);
+    if (!paletteScan.cached) window.__etcPaletteScan = { palette: effectPalette, scan: { ...paletteScan } };
+    const tFeed = performance.now();
 
     // the map's own JSON feeds, SHAPE ONLY (v0.200.2): same origin, same
     // login, the same paths the page itself just loaded. Strings masked,
@@ -179,6 +193,9 @@ export const CHAIN_EXTRACT = `
       feed,
       probe: {
         tableVisible: !!t, mapId: mid,
+        // where the guest's time went (v0.202.7): the palette scan, the feed
+        // fetches, and the whole script — read from the log after a real open
+        timings: { paletteMs: paletteScan.ms, feedMs: Math.round(performance.now() - tFeed), totalMs: Math.round(performance.now() - tStart) },
         resources,
         tables: [...document.querySelectorAll('table')].map((x) => ((x.rows[0] && x.rows[0].innerText) || '').replace(/\\s+/g, ' ').slice(0, 80)),
         rfNodes: nodes.length, rfEdges: edges.length, svgs: document.querySelectorAll('svg').length,

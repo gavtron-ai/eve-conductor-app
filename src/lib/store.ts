@@ -97,6 +97,34 @@ export interface AlertSettings {
   };
   /** show urgent PI warnings in the multibox overlay's notice box (v0.179) */
   piOverlay?: boolean;
+  /** the overlay's ⛏ mining alert (v0.202): undefined = every default */
+  mining?: MiningAlertSettings;
+}
+
+/** the ⛏ Mining Alert page of the overlay settings window; the overlay feed
+ * reads these FRESH from the persisted blob on every poll */
+export interface MiningAlertSettings {
+  /** master switch: off = no game log is read at all */
+  enabled: boolean;
+  /** seconds to wait beyond the bare minimum before naming a character */
+  delayS: number;
+  /** a rate drop counts when the count is at most this share of normal */
+  dropRatio: number;
+  /** show "rate down" alerts */
+  rateDown: boolean;
+  /** show "not mining" alerts */
+  notMining: boolean;
+  /** blink the box for a new alert's first seconds */
+  blink: boolean;
+  /** minutes a "not mining" line stays on screen */
+  keepMin: number;
+}
+export const DEFAULT_MINING_ALERT: MiningAlertSettings = {
+  enabled: true, delayS: 30, dropRatio: 0.75, rateDown: true, notMining: true, blink: true, keepMin: 15,
+};
+/** merge a partial (or absent) saved setting with the defaults */
+export function miningAlertSettings(p: Partial<MiningAlertSettings> | undefined | null): MiningAlertSettings {
+  return { ...DEFAULT_MINING_ALERT, ...(p ?? {}) };
 }
 
 const DEFAULT_ALERTS: AlertSettings = {

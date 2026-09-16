@@ -95,6 +95,8 @@ contextBridge.exposeInMainWorld('appInfo', {
   gamelog: {
     list: () => ipcRenderer.invoke('gamelog-list'),
     read: (file) => ipcRenderer.invoke('gamelog-read', file),
+    /** the bytes appended since offset — the mining watch's tail follow */
+    readFrom: (file, offset) => ipcRenderer.invoke('gamelog-read-from', file, offset),
   },
   /** AI fight write-ups. The Anthropic key lives in Documents/EVE Conductor/
    * anthropic.json and is read by the MAIN process only — the renderer sends
@@ -144,7 +146,10 @@ contextBridge.exposeInMainWorld('appInfo', {
     setConfig: (cfg) => ipcRenderer.invoke('clones-set', cfg),
     forget: (cfg) => ipcRenderer.invoke('clones-forget', cfg),
     onChanged: (cb) => ipcRenderer.on('clones-changed', (_e, d) => cb(d)),
-    openConfig: () => ipcRenderer.invoke('clone-config-open'),
+    /** optional page: 'alerts' opens the Alerts tab without setup mode */
+    openConfig: (tab) => ipcRenderer.invoke('clone-config-open', tab),
     closeConfig: () => ipcRenderer.invoke('clone-config-close'),
+    /** settings window: main asks it to switch page (Alt+] while open) */
+    onConfigTab: (cb) => ipcRenderer.on('clone-config-tab', (_e, tab) => cb(tab)),
   },
 });

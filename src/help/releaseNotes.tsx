@@ -28,6 +28,99 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.202.9', date: '2026-09-16', headline: 'The Σ Summary never sits empty: unsettled readings are retried, the origin always lands', published: true,
+    changes: [
+      <>A reading taken before the map&apos;s drawing had settled could carry no signature list, or label every system by its J-code — then the typed home was not found, nothing was linked, and the tab sat empty until the five-minute re-read. Three fixes: the app <b>does not publish a reading until the drawing has settled</b> (it keeps the last good one and reads again in a few seconds); when the typed home label is not on a reading the <b>map&apos;s own home system</b> is used under whatever label that reading carries; and if the tab still comes up empty it <b>asks for another reading on its own</b>, says so on screen, and only after a dozen tries tells you plainly what to do.</>,
+      <>The status line now explains an empty table in words (“the map&apos;s drawing had not settled when it was read — reading again…”) instead of a blank.</>,
+    ],
+    why: <>"As a user that doesn&apos;t know what to look for, the summary tab opens and never loads. Most users won&apos;t troubleshoot, it just needs to work — and if something is holding it up we need to be working on getting that dashboard running again ASAP."</>,
+    policy: <>Nothing new: the same reads of the map&apos;s own data, only better timed and retried.</>,
+  },
+  {
+    version: '0.202.8', date: '2026-09-16', headline: 'Ore variants are priced at their base ore, so fewer sites read "without an estimate"',
+    changes: [
+      <>The site tables name rocks by their exact variant — Golden Omber, Concentrated Veldspar, the Grade-II and Grade-III belts — and the app&apos;s type list carries the base ores only, so those rocks went unpriced and their sites showed no estimate. A variant yields at least its base ore, so a rock the list does not know now takes its <b>base ore&apos;s Jita price as a floor</b>. Measured: 74 of the 151 priceable names resolved before; the rest were all variants (and three comma typos, now healed).</>,
+    ],
+    why: <>Found while measuring the summary&apos;s load: the price fetch resolved only 74 of 151 names.</>,
+    policy: <>Nothing new. Still Jita sell, still a floor: a variant is never valued above what its base ore fetches.</>,
+  },
+  {
+    version: '0.202.7', date: '2026-09-16', headline: 'Aperture stays warm: no page reload when you come back, and a lighter map read',
+    changes: [
+      <>Once opened, the <b>Aperture module stays alive in the background</b> when you visit another module, hidden rather than torn down. Coming back is instant: the corp map is where you left it, logged in, and the Σ Summary shows its last reading immediately instead of waiting for the page to load again.</>,
+      <>Each map read used to fetch and comb through every script and stylesheet of the map page — 28 files, 2.6 MB — hunting for the effect colours, on every single read. That hunt now runs once per page load and its result is reused.</>,
+      <>The read now leaves its timings in the diagnostic log (how long the page took, the feed, the app&apos;s own number crunching and the price fetch), so any remaining slowness can be measured rather than guessed.</>,
+    ],
+    why: <>"It really lags there for a minute, I feel like you can find an efficiency gain."</>,
+    policy: <>Nothing new. The map page keeps running in the background exactly as it does under the Σ tab today; nothing is sent to it.</>,
+  },
+  {
+    version: '0.202.6', date: '2026-09-16', headline: 'The Σ Summary fills in on its own when you open Aperture',
+    changes: [
+      <>Opening Aperture from another module and going straight to <b>Σ Summary</b> used to leave the tab on “reading the map…” until you pressed ⟳ or five minutes passed: the map page was still loading when the tab asked for its first reading, the read failed quietly, and nothing tried again. Now a read asked for too early waits for the page and runs the moment it has loaded, the first load reads on its own, and an empty or failed read tries again a few times.</>,
+      <>Coming back to Aperture shows the <b>previous reading straight away</b> (with its time) while the fresh one is fetched, instead of a blank tab.</>,
+    ],
+    why: <>"Do a quick check on the loading of the Aperture summary — it takes a minute for it to populate and felt like I might need to open Aperture to populate it or something."</>,
+    policy: <>Nothing new: the same read of the map's own data through your own login.</>,
+  },
+  {
+    version: '0.202.5', date: '2026-09-16', headline: 'Chain summary table: click a heading to sort, again to reverse',
+    changes: [
+      <>Every column heading in the chain summary&apos;s table sorts the table — jumps, system, class, activity, site, value, age, basis. The first click sorts the way you would expect (value richest first, jumps nearest first, age freshest first); a second click reverses; a third returns to the default order. The active heading shows an arrow, and the choice is remembered.</>,
+      <>Rows with no distance, value, age or name go <b>last either way</b>, so a “?” never sits at the top. Equal rows keep the default order beneath the sort (nearest, then richest).</>,
+    ],
+    why: <>"What about sorting the tables by category label clicks, both ways."</>,
+    policy: <>Nothing new.</>,
+  },
+  {
+    version: '0.202.4', date: '2026-09-15', headline: 'Summary charts really fill their panels now, and a grabbed panel follows the mouse',
+    changes: [
+      <>The three charts on the right of the chain summary <b>draw to the room they have from the moment they appear</b>. Before, they only re-fitted if the panel changed size after the data was already there, which in the real app it never was — so they sat at a fixed small size in a tall panel. The ISK bars widen and their labels grow with the panel, the activity mix rows and bars thicken, the freshness bars stretch.</>,
+      <>Grabbing a right-hand panel&apos;s corner <b>no longer makes it jump bigger first</b>. The panel is pinned at its current height the moment you press on the corner, and from then on only the handle sizes it; the other two share what is left. The three split spare room four parts to two to two.</>,
+    ],
+    why: <>"The bars and resizing is really not great, when I grab the bottom it jumps bigger then I need to drag up and they all look bad and not taking up the proportions they have to fill with their graphics."</>,
+    policy: <>Nothing new.</>,
+  },
+  {
+    version: '0.202.3', date: '2026-09-15', headline: 'Summary panels drag again; the mining alert leaves a trail in the log',
+    changes: [
+      <>The <b>drag handles on the three right-hand panels</b> of the chain summary work again — the first cut of 0.202.2 sized those panels in a way that ignored the handle. Drag one and the other two share what is left; drag the drawing and the three grow with it, three parts to two to two.</>,
+      <>Every time the ⛏ mining alert names or clears a character it now writes a line to the diagnostic log (Documents → EVE Conductor Logs) with the cycle length it measured, the counts it compared and the delay in force — so a real mining session can be checked afterwards against what the box said.</>,
+    ],
+    why: <>"I can't adjust the size of the panels in summary page."</>,
+    policy: <>Nothing new.</>,
+  },
+  {
+    version: '0.202.2', date: '2026-09-15', headline: 'Chain summary: a linked-only toggle, the filters where the eye goes, and charts that fit their panels',
+    changes: [
+      <>A <b>linked only</b> tick in the filter row leaves out the systems that are on the map but have no drawn link back to the origin: their dashed column leaves the drawing, their sites leave the tiles and the table, and the header says how many are hidden. The tick is remembered.</>,
+      <>The <b>filter row now sits between the tiles and the drawing</b>, not under it.</>,
+      <>The three charts on the right — ISK by jumps, activity mix, freshness — now <b>share the column&apos;s height and draw to whatever room they have</b>: the bars, rows and freshness columns scale with the panel. Drag a panel&apos;s bottom-right handle, or let a long chain stretch the row, and nothing sits marooned in empty space any more.</>,
+    ],
+    why: <>"There should be a toggle to filter out the systems that are not connected, also the filters should be between the top panels and the chain panel, not below that panel. Also I would like the right panel to self dynamic fit the content to the resized panels."</>,
+    policy: <>Nothing new.</>,
+  },
+  {
+    version: '0.202.1', date: '2026-09-15', headline: 'Mining alert: faster by default, your own knobs, and a page to dismiss or snooze any overlay alert',
+    changes: [
+      <>The mining alert now reacts after <b>30 seconds</b> by default instead of two minutes — at the crew&apos;s 15-second cycles a dead module is named about a minute after it died — and the wait is yours to set: the ⛏ Mining Alert page has a <b>react-after</b> slider (0–180 s), <b>what counts as a drop</b> (any module lost / a third of the rate / half), which of the two things to say (dropped rate, stopped miner), <b>blink</b> on or off, and how long a “not mining” line stays on screen. Every control explains itself.</>,
+      <>A new <b>🔔 Alerts</b> page in the overlay settings window lists what the ⛏ mining, 🪐 planets and 🎯 raids boxes are showing right now, with <b>dismiss</b> (hidden until it goes away on its own), <b>snooze</b> (10 min / 1 h), <b>snooze everything</b> (15 min / 1 h / 4 h) and the three master switches in one place. <b>Alt+]</b> in game opens that page directly, without setup mode.</>,
+    ],
+    why: <>"2 min is too long of a calibration time, we want to bring those mining cycles online ASAP… controls in the overlay settings pop up in its own tab with nice descriptions… calibration should be control delay time, maybe some other things like turning on and off completely and better settings for it. Also we should be able to quickly dismiss these or snooze these types of alerts or even disable these alerts."</>,
+    policy: <>Nothing new. A global hotkey (Alt+]) opens the app&apos;s own settings window; nothing is sent to the game.</>,
+  },
+  {
+    version: '0.202.0', date: '2026-09-15', headline: 'Mining alert on the overlay: the miner who is not pulling gets named',
+    changes: [
+      <>A new <b>⛏ box on the multibox overlay</b> names a character whose <b>mining rate dropped</b> — a module has stopped feeding the log and stayed that way for two minutes (a crystal gone, a rock depleted and not retargeted) — or who has <b>stopped mining</b> while the rest of the crew is still going (a full hold, a forgotten module). It says who, and for how long; it does not guess why. New alerts blink for their first seconds.</>,
+      <>Read from each character&apos;s own game log, the same lines the Log Visualizer&apos;s mining dashboard uses (<i>“You mined …”</i>, one per module per cycle), followed live by byte offset — read-only, nothing is ever written to the game&apos;s files. The cycle length is learned from the lines themselves, so lasers, strips, ice and gas all work.</>,
+      <>Deliberately quiet when <b>nobody in the crew is still mining</b> (the whole crew stopped: a move, an unload run), for about two cycles after the first of them starts again, when a character <b>docks or leaves the system</b>, <b>changes ship</b>, or is a <b>lone miner</b> stopping. A crystal swap or a retarget stays silent.</>,
+      <><b>On by default; switch it off</b> in the overlay settings window (Tools ▾ → Multibox overlay settings… → ⛏ Mining Alert). Off means no log is read at all. The box has its own position and width in setup mode (Alt+\), like the other notice boxes.</>,
+    ],
+    why: <>The CEO&apos;s ask: "Add mining alert for a drop in mining rate using the logs we can already read… notify when a mining module shuts down due to crystal loss, full capacity, etc. You don&apos;t need to specify why, just state which character is not running optimally. This should be toggleable… you need to not notify when every single miner stops, that will happen a lot when moving."</>,
+      policy: <>Nothing new: the game&apos;s own log files, read as before, plus the location the overlay already polls from ESI. No input is ever sent to the client.</>,
+  },
+  {
     version: '0.201.11', date: '2026-09-15', headline: 'Florida is the chain summary\'s home out of the box', published: true,
     changes: [
       <>The chain summary's <b>home</b> is <b>Florida</b> by default — prefilled in ⚙ Settings → Your setup and in the tab's own field — so a fresh install counts jumps from the corp's home without typing anything. An install set up before this version, whose file never had the key, gets the same default.</>,
