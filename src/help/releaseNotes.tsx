@@ -28,6 +28,15 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.202.10', date: '2026-09-16', headline: 'Chain drawing: filtered-out systems dim; lighter class and effect tags', published: true,
+    changes: [
+      <>Filter the summary — say C1 to C3 combat sites — and the chain drawing now <b>dims every card that has nothing in view</b> under those filters, and the links that only touch dimmed cards. The systems stay where they are so the chain remains readable; the ones that matter stand out at a glance, and the header counts the dimmed ones.</>,
+      <>The class tag (“C2A”) and the effect tag (“MAG”) on each card, and the chips on the route strip, are set lighter — the heaviest weight made the letters bleed together.</>,
+    ],
+    why: <>"When I filter the summary by for example C1–C3 combat sites only it should dim anything that does not match in the chain table, with all the systems shown… make the data easier to glance at as you filter and sort. Also the text in the rectangles within the system box is a bit hard to read due to being too bold."</>,
+    policy: <>Nothing new.</>,
+  },
+  {
     version: '0.202.9', date: '2026-09-16', headline: 'The Σ Summary never sits empty: unsettled readings are retried, the origin always lands', published: true,
     changes: [
       <>A reading taken before the map&apos;s drawing had settled could carry no signature list, or label every system by its J-code — then the typed home was not found, nothing was linked, and the tab sat empty until the five-minute re-read. Three fixes: the app <b>does not publish a reading until the drawing has settled</b> (it keeps the last good one and reads again in a few seconds); when the typed home label is not on a reading the <b>map&apos;s own home system</b> is used under whatever label that reading carries; and if the tab still comes up empty it <b>asks for another reading on its own</b>, says so on screen, and only after a dozen tries tells you plainly what to do.</>,

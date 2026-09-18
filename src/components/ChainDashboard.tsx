@@ -71,7 +71,7 @@ function EffectPill({ effect, w, x, y, palette, onEnter, onLeave }: { effect: st
   return (
     <g transform={`translate(${x - w},${y})`} onMouseEnter={(e) => onEnter(e.currentTarget)} onMouseLeave={onLeave} style={{ cursor: 'help' }}>
       <rect width={w} height={size + 5} rx={4} fill="rgba(0,0,0,0.35)" stroke={dark ? 'rgba(255,255,255,0.45)' : col} strokeWidth={1.5} />
-      <text x={w / 2} y={size + 1} textAnchor="middle" fontSize={size} fontWeight={800} fill={dark ? '#e6e6e6' : col} style={{ letterSpacing: 0.4 }}>{effectAbbrev(effect)}</text>
+      <text x={w / 2} y={size + 1} textAnchor="middle" fontSize={size} fontWeight={650} fill={dark ? '#e6e6e6' : col} style={{ letterSpacing: 0.4 }}>{effectAbbrev(effect)}</text>
     </g>
   );
 }
@@ -86,7 +86,7 @@ function ClassPill({ cls, tag, x, y }: { cls: string; tag: string; x: number; y:
   return (
     <g transform={`translate(${x - w},${y})`}>
       <rect width={w} height={PILL_SIZE + 7} rx={5} fill="rgba(0,0,0,0.35)" stroke={col} strokeWidth={1.5} />
-      <text x={w / 2} y={PILL_SIZE + 1} textAnchor="middle" fontSize={PILL_SIZE} fontWeight={800} fill={col} style={{ letterSpacing: 0.3 }}>{text}</text>
+      <text x={w / 2} y={PILL_SIZE + 1} textAnchor="middle" fontSize={PILL_SIZE} fontWeight={650} fill={col} style={{ letterSpacing: 0.3 }}>{text}</text>
     </g>
   );
 }
@@ -101,9 +101,9 @@ function RouteLine({ label, colour, route, clsOf, tagOf, effectOf, palette, shat
         <span key={s} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
           {i > 0 && <span className="dim">→</span>}
           <span style={{ fontWeight: i === 0 || i === route.length - 1 ? 700 : 500 }}>{s}{shattered.has(s) ? <span title="shattered wormhole" style={{ marginLeft: 3, fontSize: 12 }}>{SHATTERED_GLYPH}</span> : null}</span>
-          <span style={{ padding: '0 5px', borderRadius: 4, fontSize: 10.5, fontWeight: 800, background: 'rgba(0,0,0,0.35)', border: `1px solid ${clsOf.get(s) ? classColor(clsOf.get(s)!) : '#9aa0aa'}`, color: clsOf.get(s) ? classColor(clsOf.get(s)!) : '#9aa0aa' }}>{clsOf.get(s) ? `${clsOf.get(s)}${tagOf.get(s) ?? ''}` : '—'}</span>
+          <span style={{ padding: '0 5px', borderRadius: 4, fontSize: 10.5, fontWeight: 650, background: 'rgba(0,0,0,0.35)', border: `1px solid ${clsOf.get(s) ? classColor(clsOf.get(s)!) : '#9aa0aa'}`, color: clsOf.get(s) ? classColor(clsOf.get(s)!) : '#9aa0aa' }}>{clsOf.get(s) ? `${clsOf.get(s)}${tagOf.get(s) ?? ''}` : '—'}</span>
           {effectOf.get(s) && (() => { const col = effectColor(effectOf.get(s)!, palette); const dark = isDarkColor(col); return (
-            <span title={`${effectOf.get(s)} in ${clsOf.get(s) ?? '?'}\n${effectModsText(effectOf.get(s)!, clsOf.get(s) ?? '')}`} style={{ padding: '0 5px', borderRadius: 4, fontSize: 10.5, fontWeight: 800, background: 'rgba(0,0,0,0.35)', border: `1px solid ${dark ? 'rgba(255,255,255,0.45)' : col}`, color: dark ? '#e6e6e6' : col, cursor: 'help' }}>
+            <span title={`${effectOf.get(s)} in ${clsOf.get(s) ?? '?'}\n${effectModsText(effectOf.get(s)!, clsOf.get(s) ?? '')}`} style={{ padding: '0 5px', borderRadius: 4, fontSize: 10.5, fontWeight: 650, background: 'rgba(0,0,0,0.35)', border: `1px solid ${dark ? 'rgba(255,255,255,0.45)' : col}`, color: dark ? '#e6e6e6' : col, cursor: 'help' }}>
               {effectAbbrev(effectOf.get(s)!)}
             </span>); })()}
         </span>
@@ -118,6 +118,11 @@ function ChainMap({ origin, layout, focus, onFocus, offChain, note, routeHome, r
   const maxIsk = layout.nodes.reduce((m, n) => Math.max(m, n.isk), 0) || 1;
   const pos = new Map(layout.nodes.map((n) => [n.system, n]));
   const w = layout.width + pad * 2, h = Math.max(layout.height, NODE_H + 8) + pad * 2;
+  // QUIET cards (v0.202.10): a system with nothing in view under the current
+  // filters stays on the drawing (the chain must stay navigable) but dims,
+  // and so do the links that only touch quiet systems — so a class or
+  // activity filter makes the systems that matter stand out at a glance
+  const quiet = new Set(layout.nodes.filter((n) => n.count === 0 && !n.isOrigin).map((n) => n.system));
   const edgeKeys = (r: string[] | null) => { const s = new Set<string>(); if (r) for (let i = 1; i < r.length; i++) { const a = r[i - 1], b = r[i]; s.add(a < b ? `${a}|${b}` : `${b}|${a}`); } return s; };
   const homeSet = new Set(routeHome ?? []), homeEdges = edgeKeys(routeHome);
   const meSet = new Set(routeMe ?? []), meEdges = edgeKeys(routeMe);
@@ -138,6 +143,7 @@ function ChainMap({ origin, layout, focus, onFocus, offChain, note, routeHome, r
         <span className="dim" style={{ fontSize: 11 }}
           title={layout.unlinked.length ? `Drawn on the map but with no drawn link back to ${origin || 'the origin'}: ${layout.unlinked.join(', ')}. The chain is walked along the map's links, so these carry no distance; their sites show "?" for jumps and drop out under a distance filter.` : undefined}>
           {layout.nodes.length - layout.unlinked.length} systems linked · click one to focus the table{focus ? ` · focused on ${focus}` : ''}
+          {quiet.size > 0 ? <> · <span title="a system with nothing in view under the current filters stays on the drawing but dims, and so do the links that only touch dimmed systems">{quiet.size} dimmed (nothing in view)</span></> : null}
           {layout.unlinked.length > 0 ? <> · <span style={{ color: '#ff8080' }}>{layout.unlinked.length} on the map but not linked to {origin || 'the origin'}</span></> : unlinkedHidden > 0 ? <> · <span title="untick “linked only” in the filters to draw them">{unlinkedHidden} not linked, hidden</span></> : null}
           {offChain > 0 ? ` · ${offChain} site(s) without a distance` : ''}
         </span>
@@ -209,7 +215,8 @@ function ChainMap({ origin, layout, focus, onFocus, offChain, note, routeHome, r
                 const key = e.a < e.b ? `${e.a}|${e.b}` : `${e.b}|${e.a}`;
                 const onHome = homeEdges.has(key), onMe = meEdges.has(key);
                 const lit = onHome || onMe || (focus && (e.a === focus || e.b === focus));
-                return <path key={key} d={d} fill="none" stroke={onHome ? ACCENT : onMe ? ME : lit ? ACCENT : LINE} strokeWidth={onHome || onMe ? 3 : lit ? 2 : 1.2} opacity={focus && !lit ? 0.35 : 1} />;
+                const dimEdge = !lit && (quiet.has(e.a) || quiet.has(e.b));
+                return <path key={key} d={d} fill="none" stroke={onHome ? ACCENT : onMe ? ME : lit ? ACCENT : LINE} strokeWidth={onHome || onMe ? 3 : lit ? 2 : 1.2} opacity={focus && !lit ? 0.35 : dimEdge ? 0.3 : 1} />;
               })}
               {/* systems */}
               {layout.nodes.map((n) => {
@@ -222,8 +229,10 @@ function ChainMap({ origin, layout, focus, onFocus, offChain, note, routeHome, r
                 const barW = Math.max(0, Math.round((NODE_W - 12) * (n.isk / maxIsk)));
                 const name = n.system.length > 14 ? `${n.system.slice(0, 13)}…` : n.system;
                 const pw = pillWidth(n.cls, n.tag);
+                const isQuiet = quiet.has(n.system) && !isF && !onR;
                 return (
-                  <g key={n.system} transform={`translate(${x},${y})`} style={{ cursor: 'pointer' }} opacity={detached ? 0.7 : focus && !isF && !onR ? 0.5 : 1}
+                  <g key={n.system} transform={`translate(${x},${y})`} style={{ cursor: 'pointer' }} className={isQuiet ? 'chain-quiet' : undefined}
+                    opacity={focus && !isF && !onR ? (isQuiet ? 0.3 : 0.5) : isQuiet ? (detached ? 0.32 : 0.42) : detached ? 0.7 : 1}
                     onClick={() => onFocus(isF ? null : n.system)}>
                     <title>{`${n.system}${n.cls ? ` · ${n.cls}${n.tag}` : ''}${n.shattered ? ' · shattered' : ''}${n.effect ? ` · ${n.effect}` : ''} · ${detached ? `on the map but no drawn link back to ${origin || 'the origin'} — no distance` : `${n.hop} jump${n.hop === 1 ? '' : 's'}`} · ${iskShort(n.isk)} on field over ${n.count} site${n.count === 1 ? '' : 's'}${n.unvalued ? ` (${n.unvalued} without an estimate)` : ''}${isStart ? ` · ${routeFrom} is here` : ''}`}</title>
                     {isF && <rect x={-3} y={-3} width={NODE_W + 6} height={NODE_H + 6} rx={9} fill="none" stroke="#ffffff" strokeWidth={5} opacity={0.55} filter="url(#chain-glow)" className="chain-selected-glow" />}
