@@ -152,6 +152,71 @@ check('V4 a two-word base survives inside a three-word variant', base('Onyx Dark
 check('V5 the longest known run wins over a shorter one', base('Ytirium, IV-Grade') === 'Ytirium IV-Grade');
 check('V6 a comma typo is healed', base('Ytirium, IV-Grade') !== null);
 check('V7 nothing known inside → null, never a wrong ore', base('Mercoxit') === null && base('Fullerite-C50') === null);
+// v0.202.11: the Ochre variants never contain "Dark Ochre" — the family fallback prices them
+check('V8 "Jet Ochre" and "Ochre III-Grade" floor to Dark Ochre', base('Jet Ochre') === 'Dark Ochre' && base('Ochre III-Grade') === 'Dark Ochre' && base('Obsidian Ochre') === 'Dark Ochre');
+check('V9 the family fallback never invents a price: an unknown family stays null', base('Prismatic Gneiss') === null && base('Talassonite Grade-II') === null);
+
+// R: the rock filter (v0.202.11) — "select gneiss and see a dashboard of
+// all the gneiss and where it is": families, not grades; ore sites only;
+// each passing site valued on the picked rocks alone.
+// families — every shape the tables use
+check('R1 rockFamily: plain, variant, graded, comma typo, Grade-II → the base ore', C.rockFamily('Gneiss') === 'Gneiss' && C.rockFamily('Prismatic Gneiss') === 'Gneiss' && C.rockFamily('Gneiss IV-Grade') === 'Gneiss' && C.rockFamily('Ytirium, IV-Grade') === 'Ytirium' && C.rockFamily('Bezdnacine Grade-II') === 'Bezdnacine');
+check('R2 rockFamily: every Ochre is Dark Ochre', C.rockFamily('Dark Ochre') === 'Dark Ochre' && C.rockFamily('Jet Ochre') === 'Dark Ochre' && C.rockFamily('Ochre III-Grade') === 'Dark Ochre' && C.rockFamily('Dark Ochre II-Grade') === 'Dark Ochre');
+// measured over the shipped tables: 126 distinct rock names fold into 28 families, none empty
+{
+  const names = new Set();
+  for (const k of Object.keys(T.ORE_SITES)) for (const r of T.ORE_SITES[k]) names.add(r.ore);
+  for (const k of Object.keys(T.KSPACE_ORE)) for (const r of T.KSPACE_ORE[k]) names.add(r.ore);
+  const fams = new Set([...names].map((n) => C.rockFamily(n)));
+  check('R3 the shipped tables: 126 rock names → 28 families, none blank, Dark Ochre one of them', names.size === 126 && fams.size === 28 && !fams.has('') && fams.has('Dark Ochre') && fams.has('Gneiss') && fams.has('Mercoxit'), `${names.size} names → ${fams.size} families`);
+}
+// a small chain of ore sites; prices floor variants to their base ore the way the tab does
+const rTables = { ...tables, kore: { 'Small Asteroid Cluster|HS': [{ ore: 'Kernite', units: 1_000 }],
+  'Bright Belt': [{ ore: 'Prismatic Gneiss', units: 5_000 }, { ore: 'Gneiss IV-Grade', units: 1_000 }, { ore: 'Jet Ochre', units: 700 }] } };
+const rBase = { 'Arkonor': 1000, 'Bistot': 900, 'Gneiss': 30, 'Kernite': 10, 'Omber': 8, 'Pyroxeres': 5, 'Dark Ochre': 50 };
+const priceR = (n) => { const b = C.basePriceName(n, (x) => x in rBase); return b ? rBase[b] : null; };
+const rSigs = [
+  { sig: 'R-1', group: 'Ore', system: 'Homebase', cls: 'C2', name: 'Common Perimeter Deposit', ageH: 1 },   // Gneiss 40,000 (+ Ark 20k, Bis 30k, Kern 300k, Omb 300k, Pyr 520k)
+  { sig: 'R-2', group: 'Ore', system: 'J120452', cls: 'C4', name: 'Ordinary Perimeter Deposit', ageH: 2 }, // Gneiss 20,000 (+ Ark 10k, Bis 20k, Kern 200k, Omb 200k, Pyr 1.62m)
+  { sig: 'R-3', group: 'Ore', system: 'J214440', cls: 'HS', name: 'Small Asteroid Cluster', ageH: 1 },     // Kernite 1,000 only — no gneiss
+  { sig: 'R-4', group: 'Ore', system: 'J145848', cls: 'C3', name: 'Mystery Rocks', ageH: 1 },              // not in any table
+  { sig: 'R-5', group: 'Combat', system: 'Homebase', cls: 'C2', name: 'Frontier Barracks', ageH: 1 },      // not ore
+  { sig: 'R-6', group: 'Ore', system: 'Chardalane', cls: 'LS', name: 'Bright Belt', ageH: 3 },             // 5,000 Prismatic Gneiss + 1,000 Gneiss IV-Grade + 700 Jet Ochre
+];
+const rF = (rocks, extra = {}) => ({ maxHops: null, classes: new Set(), groups: new Set(), maxAgeH: null, rocks: new Set(rocks), ...extra });
+const gne = C.summarize(rSigs, h, rF(['Gneiss']), priceR, rTables);
+const gRow = (sys) => gne.rows.find((r) => r.system === sys);
+check('R4 Gneiss: the three sites holding any gneiss stay; kernite-only, unknown and combat sites leave', gne.rows.length === 3 && gRow('Homebase') && gRow('J120452') && gRow('Chardalane') && !gRow('J214440') && !gRow('J145848'), gne.rows.map((r) => r.system).join(','));
+check('R5 each site is valued on its gneiss alone: 40,000×30 / 20,000×30 / (5,000+1,000)×30', gRow('Homebase').value.isk === 1_200_000 && gRow('J120452').value.isk === 600_000 && gRow('Chardalane').value.isk === 180_000, JSON.stringify(gne.rows.map((r) => r.value)));
+check('R6 the basis names the rocks counted and says "Gneiss only"; the other rocks are not listed', /^40,000 Gneiss · Jita sell · Gneiss only$/.test(gRow('Homebase').value.basis) && /5,000 Prismatic Gneiss \+ 1,000 Gneiss IV-Grade · Jita sell · Gneiss only/.test(gRow('Chardalane').value.basis) && !/Ochre|Arkonor/.test(gRow('Homebase').value.basis + gRow('Chardalane').value.basis), gRow('Chardalane').value.basis);
+check('R7 the Ore tile and total carry the gneiss share only: 1.98m over 3 sites; Combat reads 0', gne.byGroup.Ore.count === 3 && gne.byGroup.Ore.isk === 1_980_000 && gne.totalIsk === 1_980_000 && gne.byGroup.Combat.count === 0, JSON.stringify(gne.byGroup.Ore));
+check('R8 the unknown ore site is counted as hidden (contents unknown); the kernite-only and combat rows are not', gne.hiddenNoRock === 1);
+check('R9 rows keep the default order: nearest first', gne.rows.map((r) => r.hops).join(',') === '0,1,1', gne.rows.map((r) => `${r.system}:${r.hops}`).join(','));
+// two rocks together: the site's value is the sum of both shares, the basis names both
+const two = C.summarize(rSigs, h, rF(['Gneiss', 'Dark Ochre']), priceR, rTables);
+const tRow = two.rows.find((r) => r.system === 'Chardalane');
+check('R10 Gneiss + Dark Ochre: Bright Belt = 180,000 + 700×50 = 215,000, basis lists the Jet Ochre and says both', tRow.value.isk === 215_000 && /700 Jet Ochre/.test(tRow.value.basis) && /Gneiss \+ Dark Ochre only/.test(tRow.value.basis), JSON.stringify(tRow.value));
+check('R11 …and the two wormhole deposits (no ochre) keep their gneiss-only value', two.rows.find((r) => r.system === 'Homebase').value.isk === 1_200_000 && two.rows.length === 3);
+// a rock nobody carries → nothing, and the unknown site still counted
+const none = C.summarize(rSigs, h, rF(['Mercoxit']), priceR, rTables);
+check('R12 a rock no site in the chain carries: no rows, Ore 0, hidden-unknown still 1', none.rows.length === 0 && none.byGroup.Ore.count === 0 && none.hiddenNoRock === 1);
+// no rock filter → the old behaviour, untouched: every site valued whole, the unknown one "unknown ore site"
+const plain = C.summarize(rSigs, h, rF([]), priceR, rTables);
+check('R13 an empty rock set is no filter: 6 rows, the deposits valued on every rock, the unknown site says so, hiddenNoRock 0', plain.rows.length === 6 && plain.rows.find((r) => r.system === 'Homebase' && r.group === 'Ore').value.isk === 20_000 * 1000 + 30_000 * 900 + 40_000 * 30 + 300_000 * 10 + 300_000 * 8 + 520_000 * 5 && plain.rows.find((r) => r.system === 'J145848').value.basis === 'unknown ore site' && plain.hiddenNoRock === 0);
+// the rock filter stacks with the others
+const gneNear = C.summarize(rSigs, h, rF(['Gneiss'], { maxHops: 0 }), priceR, rTables);
+check('R14 Gneiss within 0 jumps: only the home deposit', gneNear.rows.length === 1 && gneNear.rows[0].system === 'Homebase');
+const gneC4 = C.summarize(rSigs, h, rF(['Gneiss'], { classes: new Set(['C4']) }), priceR, rTables);
+check('R15 Gneiss in C4 only: the one C4 deposit', gneC4.rows.length === 1 && gneC4.rows[0].system === 'J120452');
+const gneCombat = C.summarize(rSigs, h, rF(['Gneiss'], { groups: new Set(['Combat']) }), priceR, rTables);
+check('R16 a rock filter under an activity filter that leaves ore out shows nothing (the tab lifts that filter on the click)', gneCombat.rows.length === 0);
+// the chips: which families the reading carries, with site counts and units
+const fams = C.rockFamiliesIn(rSigs, rTables);
+const fam = (f) => fams.find((x) => x.family === f);
+check('R17 rockFamiliesIn: A→Z, Gneiss in 3 sites for 66,000 units, Kernite in 3 for 501,000, Dark Ochre in 1 for 700', fams.map((x) => x.family).join(',') === 'Arkonor,Bistot,Dark Ochre,Gneiss,Kernite,Omber,Pyroxeres' && fam('Gneiss').sites === 3 && fam('Gneiss').units === 66_000 && fam('Kernite').sites === 3 && fam('Kernite').units === 501_000 && fam('Dark Ochre').sites === 1 && fam('Dark Ochre').units === 700, JSON.stringify(fams));
+check('R18 rockFamiliesIn: the unknown site and the combat site add no family; Arkonor in the 2 deposits for 30,000', fam('Arkonor').sites === 2 && fam('Arkonor').units === 30_000 && fams.length === 7);
+check('R19 rockFamiliesIn over no ore sites is empty', C.rockFamiliesIn([rSigs[4]], rTables).length === 0);
+check('R20 siteRocks: wormhole table, k-space security entry, plain k-space entry, unknown → null', C.siteRocks({ name: 'Common Perimeter Deposit', cls: 'C2' }, rTables).length === 6 && C.siteRocks({ name: 'Small Asteroid Cluster', cls: 'HS' }, rTables)[0].ore === 'Kernite' && C.siteRocks({ name: 'Bright Belt', cls: 'LS' }, rTables).length === 3 && C.siteRocks({ name: 'Mystery Rocks', cls: 'C3' }, rTables) === null && C.siteRocks({ name: '', cls: 'C3' }, rTables) === null);
 
 // E: v0.200.1 — what the REAL map showed on the first press (2026-09-14):
 // innerText glued the class chip to the name; node text starts with a

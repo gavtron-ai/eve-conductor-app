@@ -28,6 +28,24 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.202.12', date: '2026-09-18', headline: 'Σ Summary: the filter row tidied into two lines', published: true,
+    changes: [
+      <>The filters now sit on two lines: <b>jumps</b>, <b>max age</b>, <b>class</b> and <b>linked only</b> on the first, <b>activity</b> and <b>ore</b> (the rock chips) on the second. <b>✕ clear filters</b> lives in the panel&apos;s top-right corner at all times, greyed when nothing is set. Every label is styled alike and every control is the same height, centred on its line — no more labels sitting high while their neighbours sit low.</>,
+    ],
+    why: <>"Let&apos;s make these filters look a bit better: jumps, max age, class on the top row in that order, then activity on the next row with ore next to it. Clear filters should be the very top-right corner. Make sure the text is all formatted the same — some are aligned top and others centre."</>,
+    policy: <>Nothing new.</>,
+  },
+  {
+    version: '0.202.11', date: '2026-09-18', headline: 'Σ Summary: a filter per rock — pick Gneiss and see every gneiss site and where it is',
+    changes: [
+      <>The filter row has a new <b>ore</b> line: one chip for every rock the chain&apos;s ore sites carry, with the number of sites holding it. Grades and variants are folded together — <b>Gneiss</b> covers Prismatic Gneiss and Gneiss IV-Grade as well. Pick a rock and only the ore sites holding it stay; each is <b>valued on that rock&apos;s share alone</b> (the Basis column lists the units counted and says “Gneiss only”), the Ore tile totals it, and every other system dims on the chain drawing. Pick several rocks to see them together. The chip&apos;s tooltip gives the total units across the chain. Measured over the shipped site tables: 126 rock names fold into 28 families.</>,
+      <>An ore site whose contents the tables do not know is counted apart (“hidden (contents unknown)”) rather than silently dropped. Picking a rock lifts an activity filter that would have left ore out.</>,
+      <>Dark Ochre&apos;s variants (Jet, Onyx, Obsidian Ochre, Ochre III-Grade) now take Dark Ochre&apos;s price as their floor — they were the one family whose variant names do not contain the base ore&apos;s name, so they had no estimate.</>,
+    ],
+    why: <>"I had a request to add more granularity for mining certain ores. Add a filter for just the rocks, one filter for each rock, and it shows all rocks that match that — not grade specific. I want to be able to select gneiss and see a dashboard of all the gneiss and where it is."</>,
+    policy: <>Nothing new — the rock lists are the same published site contents the estimates already use.</>,
+  },
+  {
     version: '0.202.10', date: '2026-09-16', headline: 'Chain drawing: filtered-out systems dim; lighter class and effect tags', published: true,
     changes: [
       <>Filter the summary — say C1 to C3 combat sites — and the chain drawing now <b>dims every card that has nothing in view</b> under those filters, and the links that only touch dimmed cards. The systems stay where they are so the chain remains readable; the ones that matter stand out at a glance, and the header counts the dimmed ones.</>,

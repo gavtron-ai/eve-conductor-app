@@ -12,10 +12,10 @@
 // asks the main window to read again. This window writes nothing to the
 // shared store (the setup-window lesson: a second store instance would
 // clobber the main one); its one preference lives under its own key.
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { ChainExtract } from '../lib/apertureExtract';
 import {
-  CHAIN_SORT_NATURAL, basePriceName, hopsFrom, parseSigSearch, resolveEdges, sortChainRows, summarize, systemOfNodeText, tagOfNodeText,
+  CHAIN_SORT_NATURAL, basePriceName, hopsFrom, parseSigSearch, resolveEdges, rockFamiliesIn, sortChainRows, summarize, systemOfNodeText, tagOfNodeText,
   type ChainFilters, type ChainSig, type ChainSort, type ChainSortKey, type SigGroup,
 } from '../lib/chain';
 
@@ -52,6 +52,22 @@ import { useZoom } from '../lib/zoom';
 const HOME_KEY = 'etc-chain-home';
 const GROUPS: SigGroup[] = ['Combat', 'Ore', 'Gas', 'Relic', 'Data'];
 const CLASSES = ['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'HS', 'LS', 'NS'];
+
+// ---- the filter row's furniture (v0.202.12): every filter is a dim label
+// followed by its control(s), all centred on one line, so "jumps ≤", "max
+// age", "class", "linked only", "activity" and "ore" read alike. A row
+// wraps when the window is narrow; the selects are trimmed to the mini
+// buttons' height so nothing sits taller than its neighbours.
+const FILTER_ROW: CSSProperties = { display: 'flex', alignItems: 'center', gap: 14, flexWrap: 'wrap', minHeight: 24 };
+const FILTER_SELECT: CSSProperties = { fontSize: 11, padding: '0 6px', height: 28, lineHeight: 1.4, boxSizing: 'border-box' };
+function FilterGroup({ label, title, children }: { label: string; title?: string; children: ReactNode }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, flexWrap: 'wrap' }}>
+      <span className="dim" title={title} style={{ whiteSpace: 'nowrap' }}>{label}</span>
+      <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3, flexWrap: 'wrap' }}>{children}</span>
+    </span>
+  );
+}
 const AUTO_MS = 5 * 60_000;
 
 type Extract = ChainExtract & { at?: number };
@@ -124,6 +140,9 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
   // to the origin — a view preference, remembered, not cleared with the filters
   const [linkedOnly, setLinkedOnly] = useState<boolean>(() => { try { return localStorage.getItem('etc-chain-linked-only') === '1'; } catch { return false; } });
   useEffect(() => { try { localStorage.setItem('etc-chain-linked-only', linkedOnly ? '1' : '0'); } catch { /* nicety */ } }, [linkedOnly]);
+  // rock filter (v0.202.11 — "select gneiss and see a dashboard of all the
+  // gneiss and where it is"): families, not grades; empty = no rock filter
+  const [rocks, setRocks] = useState<Set<string>>(() => new Set());
   // column sorting (v0.202.5): a heading click sorts its natural way, a
   // second reverses, a third returns to the default order; remembered
   const [sort, setSort] = useState<ChainSort | null>(readSort);
@@ -318,14 +337,30 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
   // in view" and stay clickable.
   const summary = useMemo(() => {
     if (!parsed) return null;
-    const filters: ChainFilters = { maxHops, classes, groups, maxAgeH, systems: focus ? new Set([focus]) : new Set(), linkedOnly };
+    const filters: ChainFilters = { maxHops, classes, groups, maxAgeH, systems: focus ? new Set([focus]) : new Set(), linkedOnly, rocks };
     const priceOf = (n: string) => prices?.get(n) ?? null;
     const t0 = performance.now();
     const out = summarize(parsed.sigs, hops, filters, priceOf, { gas: GAS_SITES, ore: ORE_SITES, kcombat: KSPACE_COMBAT, kgas: KSPACE_GAS, kore: KSPACE_ORE,
       hauls: (site, group) => { const a = haulAvg.lookup(site, group); return a ? { isk: a.mean, basis: haulBasis(a, site) } : null; } });
     timings.current.summarizeMs = Math.round(performance.now() - t0);
     return out;
-  }, [parsed, focus, hops, maxHops, classes, groups, maxAgeH, prices, haulAvg, linkedOnly]);
+  }, [parsed, focus, hops, maxHops, classes, groups, maxAgeH, prices, haulAvg, linkedOnly, rocks]);
+  /** the rock families the reading's ore sites carry — one chip each */
+  const rockChips = useMemo(() => (parsed ? rockFamiliesIn(parsed.sigs, { ore: ORE_SITES, kore: KSPACE_ORE }) : []), [parsed]);
+  // a chip whose rock left the reading (a new map read) must not keep
+  // filtering invisibly
+  useEffect(() => {
+    if (rocks.size === 0) return;
+    const present = new Set(rockChips.map((r) => r.family));
+    if ([...rocks].every((r) => present.has(r))) return;
+    setRocks(new Set([...rocks].filter((r) => present.has(r))));
+  }, [rockChips, rocks]);
+  const pickRock = (family: string) => {
+    toggle(rocks, family, setRocks);
+    // a rock filter means ore sites; an activity filter that leaves ore out
+    // would show nothing, so it is lifted
+    if (groups.size > 0 && !groups.has('Ore')) setGroups(new Set());
+  };
   /** every system on the map with no drawn link back to the origin */
   const unlinkedAll = useMemo(() => (parsed && hops ? [...parsed.systems].filter((s) => !hops.has(s)) : []), [parsed, hops]);
   /** the table's rows in the chosen column order (the summary's own order when none) */
@@ -353,8 +388,9 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
     logInfo('chain', 'summary computed', {
       ...timings.current, sigs: parsed?.sigs.length ?? 0, rows: summary.rows.length, systems: parsed?.systems.size ?? 0,
       // why rows may be missing (v0.202.9)
-      hiddenUnlinked: summary.hiddenUnlinked, hiddenNoHops: summary.hiddenNoHops, hiddenNoClass: summary.hiddenNoClass,
+      hiddenUnlinked: summary.hiddenUnlinked, hiddenNoHops: summary.hiddenNoHops, hiddenNoClass: summary.hiddenNoClass, hiddenNoRock: summary.hiddenNoRock,
       origin: originSystem, originOk, hops: hops?.size ?? null, edges: parsed?.edges.length ?? 0, drawnNodes: data.graph.nodes.length, linkedOnly, maxHops,
+      rocks: rocks.size > 0 ? [...rocks] : undefined, rockChips: rockChips.length,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data?.at]);
@@ -376,6 +412,8 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
   const routeNote = !focus ? '' : !activeId ? 'log a character in to see your own route' : !me.system ? (me.note || 'locating your character…') : !meLabel ? `${activeName} is in ${me.system}, which is not on this chain` : meLabel === originSystem ? `${activeName} is at ${originSystem}` : routeMe ? '' : `${meLabel} is not connected to ${focus} on this chain`;
 
   const toggle = <T,>(set: Set<T>, v: T, setter: (s: Set<T>) => void) => { const n = new Set(set); if (n.has(v)) n.delete(v); else n.add(v); setter(n); };
+  /** anything narrowing the view — the ✕ clear filters button is live only then */
+  const anyFilter = maxHops !== null || classes.size > 0 || groups.size > 0 || maxAgeH !== null || !!focus || rocks.size > 0;
   const originOk = !!originSystem && (!parsed || parsed.systems.has(originSystem) || (hops?.has(originSystem) ?? false));
   const graphReadable = !!parsed && parsed.edges.length > 0;
 
@@ -451,9 +489,9 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
               : origin === 'home' && !homeLabel ? '⚠ type your home system\'s label (as the map shows it) to count distances'
               : !originOk ? `⚠ "${originSystem ?? '?'}" is not on the map — distances unavailable`
                 : `${hops?.size ?? 0} systems linked to ${originSystem} over ${parsed.edges.length} links${unlinkedAll.length > 0 ? ` · ${unlinkedAll.length} on the map but not linked (${unlinkedAll.slice(0, 4).join(', ')}${unlinkedAll.length > 4 ? '…' : ''})${linkedOnly ? ' · hidden' : ''}` : ''}${summary && summary.unreachable > 0 ? ` · ${summary.unreachable} site(s) there carry no distance` : ''}`}
-            {summary && (summary.hiddenNoClass > 0 || summary.hiddenNoHops > 0 || summary.hiddenUnlinked > 0) && (
-              <> · <span title="rows the filters dropped only because the map showed no class, or no distance could be counted">
-                {[summary.hiddenNoClass > 0 ? `${summary.hiddenNoClass} hidden (no class)` : '', summary.hiddenNoHops > 0 ? `${summary.hiddenNoHops} hidden (no distance)` : '', summary.hiddenUnlinked > 0 ? `${summary.hiddenUnlinked} hidden (not linked)` : ''].filter(Boolean).join(' · ')}
+            {summary && (summary.hiddenNoClass > 0 || summary.hiddenNoHops > 0 || summary.hiddenUnlinked > 0 || summary.hiddenNoRock > 0) && (
+              <> · <span title="rows the filters dropped only because the map showed no class, no distance could be counted, or an ore site's contents are not in the tables">
+                {[summary.hiddenNoClass > 0 ? `${summary.hiddenNoClass} hidden (no class)` : '', summary.hiddenNoHops > 0 ? `${summary.hiddenNoHops} hidden (no distance)` : '', summary.hiddenUnlinked > 0 ? `${summary.hiddenUnlinked} hidden (not linked)` : '', summary.hiddenNoRock > 0 ? `${summary.hiddenNoRock} ore site${summary.hiddenNoRock === 1 ? '' : 's'} hidden (contents unknown)` : ''].filter(Boolean).join(' · ')}
               </span></>
             )}
           </span>
@@ -466,7 +504,7 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
           const t = summary?.byGroup[g];
           return (
             <div key={g} className="panel" style={{ flex: '1 1 150px', padding: '8px 10px', borderTop: `3px solid ${GROUP_COLOR[g]}` }}>
-              <div style={{ fontSize: 11, color: 'var(--ink-2)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{g}</div>
+              <div style={{ fontSize: 11, color: 'var(--ink-2)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{g === 'Ore' && rocks.size > 0 ? `Ore · ${[...rocks].join(' + ')}` : g}</div>
               <div style={{ fontSize: 20, fontWeight: 800, fontVariantNumeric: 'tabular-nums' }}>{t && t.isk > 0 ? iskShort(t.isk) : t && t.count > 0 ? '—' : '0'}</div>
               <div style={{ fontSize: 11, color: 'var(--ink-2)' }}>{t ? `${t.count} site${t.count === 1 ? '' : 's'}${t.unvalued > 0 ? ` · ${t.unvalued} without an estimate` : ''}` : ''}</div>
             </div>
@@ -481,44 +519,60 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
 
       {/* ---- filters (v0.202.2: between the tiles and the drawing, where the
            eye goes; every filter drives the tiles, the drawing and the table) ---- */}
-      <div className="panel chain-filters" style={{ padding: 10, marginBottom: 8, display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', fontSize: 12 }}>
-        <label style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          jumps ≤
-          <select value={maxHops ?? ''} onChange={(e) => setMaxHops(e.target.value === '' ? null : Number(e.target.value))} style={{ fontSize: 12 }}>
-            <option value="">any</option>
-            {[0, 1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}
-          </select>
-        </label>
-        <label style={{ display: 'flex', gap: 4, alignItems: 'center', cursor: 'pointer' }}
-          title={`Leave out the systems that are on the map but have no drawn link back to ${originSystem || 'the origin'} — they carry no distance. Their sites leave the tiles and the table and the dashed column leaves the drawing. Remembered.`}>
-          <input type="checkbox" checked={linkedOnly} onChange={(e) => setLinkedOnly(e.target.checked)} />
-          linked only{unlinkedAll.length > 0 ? <span className="dim"> ({unlinkedAll.length} unlinked)</span> : null}
-        </label>
-        <span style={{ display: 'flex', gap: 3 }}>
-          <span className="dim">class</span>
-          {CLASSES.map((c) => (
-            <button key={c} className={`btn mini${classes.has(c) ? ' on' : ''}`} onClick={() => toggle(classes, c, setClasses)}
-              style={{ color: classColor(c), borderColor: classes.has(c) ? classColor(c) : undefined, fontWeight: 700 }}
-              title={classes.size === 0 ? 'all classes shown — click to narrow' : undefined}>{c}</button>
-          ))}
-        </span>
-        <span style={{ display: 'flex', gap: 3 }}>
-          <span className="dim">activity</span>
-          {GROUPS.map((g) => (
-            <button key={g} className={`btn mini${groups.has(g) ? ' on' : ''}`} style={{ borderColor: groups.has(g) ? GROUP_COLOR[g] : undefined }}
-              onClick={() => toggle(groups, g, setGroups)}>{g}</button>
-          ))}
-        </span>
-        <label style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-          max age
-          <select value={maxAgeH ?? ''} onChange={(e) => setMaxAgeH(e.target.value === '' ? null : Number(e.target.value))} style={{ fontSize: 12 }}>
-            <option value="">any</option>
-            <option value="1">1 h</option><option value="3">3 h</option><option value="6">6 h</option><option value="12">12 h</option><option value="24">24 h</option>
-          </select>
-        </label>
-        {(maxHops !== null || classes.size > 0 || groups.size > 0 || maxAgeH !== null || focus) && (
-          <button className="btn mini" onClick={() => { setMaxHops(null); setClasses(new Set()); setGroups(new Set()); setMaxAgeH(null); setFocus(null); }}>✕ clear filters{focus ? ' & focus' : ''}</button>
-        )}
+      <div className="panel chain-filters" style={{ padding: '8px 10px', marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 6, fontSize: 12 }}>
+        {/* row 1 (v0.202.12 layout): jumps · max age · class · linked only,
+            with ✕ clear filters pinned to the top-right corner */}
+        <div style={FILTER_ROW}>
+          <FilterGroup label="jumps ≤">
+            <select value={maxHops ?? ''} onChange={(e) => setMaxHops(e.target.value === '' ? null : Number(e.target.value))} style={FILTER_SELECT}>
+              <option value="">any</option>
+              {[0, 1, 2, 3, 4, 5, 6].map((n) => <option key={n} value={n}>{n}</option>)}
+            </select>
+          </FilterGroup>
+          <FilterGroup label="max age">
+            <select value={maxAgeH ?? ''} onChange={(e) => setMaxAgeH(e.target.value === '' ? null : Number(e.target.value))} style={FILTER_SELECT}>
+              <option value="">any</option>
+              <option value="1">1 h</option><option value="3">3 h</option><option value="6">6 h</option><option value="12">12 h</option><option value="24">24 h</option>
+            </select>
+          </FilterGroup>
+          <FilterGroup label="class" title={classes.size === 0 ? 'all classes shown — click one to narrow' : undefined}>
+            {CLASSES.map((c) => (
+              <button key={c} className={`btn mini${classes.has(c) ? ' on' : ''}`} onClick={() => toggle(classes, c, setClasses)}
+                style={{ color: classColor(c), borderColor: classes.has(c) ? classColor(c) : undefined, fontWeight: 700 }}>{c}</button>
+            ))}
+          </FilterGroup>
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 5, cursor: 'pointer' }}
+            title={`Leave out the systems that are on the map but have no drawn link back to ${originSystem || 'the origin'} — they carry no distance. Their sites leave the tiles and the table and the dashed column leaves the drawing. Remembered.`}>
+            <input type="checkbox" checked={linkedOnly} onChange={(e) => setLinkedOnly(e.target.checked)} style={{ margin: 0 }} />
+            <span className="dim" style={{ whiteSpace: 'nowrap' }}>linked only{unlinkedAll.length > 0 ? ` (${unlinkedAll.length} unlinked)` : ''}</span>
+          </label>
+          <button className="btn mini" disabled={!anyFilter} style={{ marginLeft: 'auto', opacity: anyFilter ? 1 : 0.45, height: 28, boxSizing: 'border-box', lineHeight: 1 }}
+            title={anyFilter ? 'back to every site in the chain' : 'no filter set'}
+            onClick={() => { setMaxHops(null); setClasses(new Set()); setGroups(new Set()); setMaxAgeH(null); setFocus(null); setRocks(new Set()); }}>✕ clear filters{focus ? ' & focus' : ''}</button>
+        </div>
+        {/* row 2: activity · ore (v0.202.11: one chip per rock family the
+            reading's ore sites carry, grades and variants folded together; a
+            picked rock narrows the view to the ore sites holding it, valued
+            on that rock alone — the drawing dims every other system) */}
+        <div style={FILTER_ROW}>
+          <FilterGroup label="activity">
+            {GROUPS.map((g) => (
+              <button key={g} className={`btn mini${groups.has(g) ? ' on' : ''}`} style={{ borderColor: groups.has(g) ? GROUP_COLOR[g] : undefined }}
+                onClick={() => toggle(groups, g, setGroups)}>{g}</button>
+            ))}
+          </FilterGroup>
+          {rockChips.length > 0 && (
+            <FilterGroup label="ore" title="Only the ore sites that carry a picked rock stay in view — any grade or variant of it — and each site's value becomes that rock's share alone. Pick several to see them together.">
+              {rockChips.map((r) => (
+                <button key={r.family} className={`btn mini${rocks.has(r.family) ? ' on' : ''}`} style={{ borderColor: rocks.has(r.family) ? GROUP_COLOR.Ore : undefined }}
+                  onClick={() => pickRock(r.family)}
+                  title={`${r.family} · in ${r.sites} ore site${r.sites === 1 ? '' : 's'} · ${r.units.toLocaleString()} units in total, any grade`}>
+                  {r.family}<span className="dim" style={{ marginLeft: 3, fontWeight: 400 }}>{r.sites}</span>
+                </button>
+              ))}
+            </FilterGroup>
+          )}
+        </div>
       </div>
 
       {/* ---- the dashboard ---- */}
@@ -579,7 +633,7 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
             ))}
             {summary && summary.rows.length === 0 && (
               <tr><td colSpan={8} className="dim" style={{ padding: 12 }}>{healing ? `⟳ ${healing}` : parsed && parsed.sigs.length > 0
-                ? `nothing matches the filters${summary.hiddenNoClass > 0 ? ` — ${summary.hiddenNoClass} row(s) have no class on the map` : ''}${summary.hiddenNoHops > 0 ? ` — ${summary.hiddenNoHops} row(s) have no distance (chain links unread, or the system is not connected to the origin)` : ''}`
+                ? `nothing matches the filters${summary.hiddenNoClass > 0 ? ` — ${summary.hiddenNoClass} row(s) have no class on the map` : ''}${summary.hiddenNoHops > 0 ? ` — ${summary.hiddenNoHops} row(s) have no distance (chain links unread, or the system is not connected to the origin)` : ''}${rocks.size > 0 ? ` — no ore site in view carries ${[...rocks].join(' or ')}${summary.hiddenNoRock > 0 ? ` (${summary.hiddenNoRock} ore site(s) have contents the tables do not know)` : ''}` : ''}`
                 : 'no signatures read from the map — is the Signature Search panel showing all types and classes?'}</td></tr>
             )}
           </tbody>

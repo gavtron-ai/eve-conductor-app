@@ -337,15 +337,64 @@ export interface Valuation { isk: number | null; basis: string }
 /** a price getter: Jita sell per unit for a type name, or null */
 export type PriceOf = (typeName: string) => number | null;
 
+/** a site's published contents at live prices: rock by rock / cloud by cloud;
+ * "no prices" when nothing in it is priced, the unpriced items named otherwise */
+export function valueContents(specs: readonly { units: number; item: string }[], priceOf: PriceOf, strip = ''): Valuation {
+  let isk = 0; const missing: string[] = [];
+  for (const c of specs) { const p = priceOf(c.item); if (p === null) missing.push(c.item); else isk += p * c.units; }
+  return missing.length === specs.length ? { isk: null, basis: 'no prices' }
+    : { isk, basis: `${specs.map((c) => `${c.units.toLocaleString()} ${strip ? c.item.replace(strip, '') : c.item}`).join(' + ')} · Jita sell${missing.length ? ` (no price: ${missing.join(', ')})` : ''}` };
+}
+
+/** the rocks an ore site carries per the tables — the wormhole table by
+ * site name, else the k-space table's security-specific entry ("Name|HS"),
+ * else its plain entry; null when the site is not in any table */
+export function siteRocks(sig: Pick<ChainSig, 'name' | 'cls'>, tables: Pick<ValueTables, 'ore' | 'kore'>): RockSpec[] | null {
+  if (!sig.name) return null;
+  return tables.ore[sig.name] ?? tables.kore?.[`${sig.name}|${sig.cls}`] ?? tables.kore?.[sig.name] ?? null;
+}
+
+// ---- ROCK FAMILIES (v0.202.11): "a filter for just the rocks — one per
+// rock, not grade specific". The tables name 126 distinct rocks, every one
+// "<variant> <ore>" (Prismatic Gneiss), "<ore>", "<ore> IV-Grade",
+// "<ore> Grade-II" or a comma typo "<ore>, IV-Grade" — so the family is
+// the last word once grade words are dropped. Dark Ochre is the one
+// two-word ore ("Jet Ochre", "Ochre III-Grade" are both Dark Ochre).
+const GRADE_WORD = /^(?:(?:I{1,3}|IV)-Grade|Grade-(?:I{1,3}|IV))$/i;
+export function rockFamily(name: string): string {
+  const words = name.replace(/,/g, ' ').trim().split(/\s+/).filter((w) => w && !GRADE_WORD.test(w));
+  const last = words[words.length - 1] ?? '';
+  const cap = last ? last[0].toUpperCase() + last.slice(1).toLowerCase() : '';
+  return cap === 'Ochre' ? 'Dark Ochre' : cap;
+}
+
+export interface RockFamilyPresence { family: string; sites: number; units: number }
+/** the rock families the ore sites of a reading carry (any grade or
+ * variant), A→Z, with how many sites hold each and the units across them;
+ * sites the tables do not know contribute nothing */
+export function rockFamiliesIn(sigs: readonly ChainSig[], tables: Pick<ValueTables, 'ore' | 'kore'>): RockFamilyPresence[] {
+  const acc = new Map<string, RockFamilyPresence>();
+  for (const s of sigs) {
+    if (s.group !== 'Ore') continue;
+    const rocks = siteRocks(s, tables);
+    if (!rocks) continue;
+    const seen = new Set<string>();
+    for (const r of rocks) {
+      const f = rockFamily(r.ore);
+      if (!f) continue;
+      const e = acc.get(f) ?? { family: f, sites: 0, units: 0 };
+      if (!seen.has(f)) { e.sites++; seen.add(f); }
+      e.units += r.units;
+      acc.set(f, e);
+    }
+  }
+  return [...acc.values()].sort((a, b) => a.family.localeCompare(b.family));
+}
+
 export function valueSig(sig: ChainSig, priceOf: PriceOf, tables: ValueTables): Valuation {
   if (!sig.name) return { isk: null, basis: sig.group === 'Combat' ? 'unnamed' : 'unscanned' };
   const own = tables.hauls?.(sig.name, sig.group) ?? null;
-  const contents = (specs: { units: number; item: string }[], strip = ''): Valuation => {
-    let isk = 0; const missing: string[] = [];
-    for (const c of specs) { const p = priceOf(c.item); if (p === null) missing.push(c.item); else isk += p * c.units; }
-    return missing.length === specs.length ? { isk: null, basis: 'no prices' }
-      : { isk, basis: `${specs.map((c) => `${c.units.toLocaleString()} ${strip ? c.item.replace(strip, '') : c.item}`).join(' + ')} · Jita sell${missing.length ? ` (no price: ${missing.join(', ')})` : ''}` };
-  };
+  const contents = (specs: { units: number; item: string }[], strip = ''): Valuation => valueContents(specs, priceOf, strip);
   if (sig.group === 'Combat') {
     const c = COMBAT_BLUE_LOOT[sig.name];
     if (c) return { isk: c.isk, basis: `blue loot · C${c.cls} site` };
@@ -367,7 +416,7 @@ export function valueSig(sig: ChainSig, priceOf: PriceOf, tables: ValueTables): 
     return { isk: null, basis: 'unknown gas site' };
   }
   if (sig.group === 'Ore') {
-    const rocks = tables.ore[sig.name] ?? tables.kore?.[`${sig.name}|${sig.cls}`] ?? tables.kore?.[sig.name];
+    const rocks = siteRocks(sig, tables);
     if (rocks) return contents(rocks.map((r) => ({ units: r.units, item: r.ore })));
     if (own) return { isk: own.isk, basis: own.basis };
     return { isk: null, basis: 'unknown ore site' };
@@ -394,6 +443,10 @@ export interface ChainFilters {
   /** drop sites in systems with no drawn link back to the origin (v0.202.2
    * "linked only"); only meaningful when hops are known */
   linkedOnly?: boolean;
+  /** rock families (v0.202.11, `rockFamily`): when set, only ore sites that
+   * carry one of them pass — any grade or variant — and a passing site is
+   * valued on those rocks alone; every other activity is left out */
+  rocks?: Set<string>;
 }
 
 export interface ChainRow extends ChainSig {
@@ -412,6 +465,9 @@ export interface ChainSummary {
   hiddenNoHops: number;
   /** rows "linked only" dropped: their system has no drawn link to the origin */
   hiddenUnlinked: number;
+  /** ore sites a rock filter dropped only because their contents are not in
+   * the tables (a site the tables do know, holding other rocks, is simply out) */
+  hiddenNoRock: number;
 }
 
 export function summarize(
@@ -421,9 +477,20 @@ export function summarize(
   const byGroup = {} as ChainSummary['byGroup'];
   for (const g of ['Combat', 'Ore', 'Gas', 'Relic', 'Data', 'Wormhole', 'Other'] as SigGroup[]) byGroup[g] = { count: 0, isk: 0, unvalued: 0 };
   const rows: ChainRow[] = [];
-  let unreachable = 0, hiddenNoClass = 0, hiddenNoHops = 0, hiddenUnlinked = 0;
+  let unreachable = 0, hiddenNoClass = 0, hiddenNoHops = 0, hiddenUnlinked = 0, hiddenNoRock = 0;
+  const rockFilter = filters.rocks && filters.rocks.size > 0 ? filters.rocks : null;
   for (const s of sigs) {
     if (filters.groups.size > 0 ? !filters.groups.has(s.group) : s.group === 'Wormhole') continue;
+    // rock filter (v0.202.11): ore sites only, and only those carrying one
+    // of the picked families; the site is then valued on those rocks alone
+    let mine: RockSpec[] | null = null;
+    if (rockFilter) {
+      if (s.group !== 'Ore') continue;
+      const rocks = siteRocks(s, tables);
+      if (!rocks) { hiddenNoRock++; continue; }
+      mine = rocks.filter((r) => rockFilter.has(rockFamily(r.ore)));
+      if (mine.length === 0) continue;
+    }
     if (filters.systems && filters.systems.size > 0 && !filters.systems.has(s.system)) continue;
     if (filters.classes.size > 0 && !filters.classes.has(s.cls)) { if (!s.cls) hiddenNoClass++; continue; }
     if (filters.maxAgeH !== null && s.ageH !== null && s.ageH > filters.maxAgeH) continue;
@@ -433,7 +500,9 @@ export function summarize(
     // left out altogether — counted apart from a distance filter's drops
     if (filters.linkedOnly && hops && h === null) { hiddenUnlinked++; continue; }
     if (filters.maxHops !== null && (h === null || h > filters.maxHops)) { if (h === null) hiddenNoHops++; continue; }
-    const value = valueSig(s, priceOf, tables);
+    const value = mine
+      ? (() => { const v = valueContents(mine.map((r) => ({ units: r.units, item: r.ore })), priceOf); return v.isk === null ? v : { isk: v.isk, basis: `${v.basis} · ${[...rockFilter!].join(' + ')} only` }; })()
+      : valueSig(s, priceOf, tables);
     rows.push({ ...s, hops: h, value });
     const g = byGroup[s.group];
     g.count++;
@@ -441,7 +510,7 @@ export function summarize(
   }
   rows.sort((a, b) => (a.hops ?? 99) - (b.hops ?? 99) || (b.value.isk ?? -1) - (a.value.isk ?? -1) || a.system.localeCompare(b.system));
   const totalIsk = Object.values(byGroup).reduce((s, g) => s + g.isk, 0);
-  return { rows, byGroup, totalIsk, unreachable, hiddenNoClass, hiddenNoHops, hiddenUnlinked };
+  return { rows, byGroup, totalIsk, unreachable, hiddenNoClass, hiddenNoHops, hiddenUnlinked, hiddenNoRock };
 }
 
 // ---- ORE VARIANTS (v0.202.8): the site tables name rocks by their exact
@@ -462,6 +531,10 @@ export function basePriceName(name: string, known: (n: string) => boolean): stri
       if (known(cand)) return cand;
     }
   }
+  // v0.202.11: the one ore whose variants do not contain its name — "Jet
+  // Ochre", "Ochre III-Grade" are Dark Ochre; the family resolver knows
+  const fam = rockFamily(clean);
+  if (fam && fam !== clean && known(fam)) return fam;
   return null;
 }
 
