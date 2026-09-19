@@ -161,7 +161,12 @@ declare global {
           kills: { killmail_id: number; zkb: { hash: string; totalValue: number } }[];
           losses: { killmail_id: number; zkb: { hash: string; totalValue: number } }[];
         }>;
-        charKills: (charId: number) => Promise<{ killmail_id: number; hash: string; value: number }[]>;
+        /** time / victim ids are 0 when zKill's row did not carry them */
+        charKills: (charId: number) => Promise<{ killmail_id: number; hash: string; value: number; time?: number; victimCharId?: number; victimShipId?: number }[]>;
+        /** one killmail's list row by its id — null when zKill does not know it (v0.203.2) */
+        killRef?: (killId: number) => Promise<{ killmail_id: number; hash: string; value: number; time: number; victimCharId: number; victimShipId: number } | null>;
+        /** losses of ONE hull by a character, corporation or alliance (v0.203.1) */
+        shipLosses?: (kind: 'character' | 'corporation' | 'alliance', id: number, shipTypeId: number) => Promise<{ killmail_id: number; hash: string; value: number; time: number; victimCharId: number; victimShipId: number }[]>;
         systemKills: (systemId: number, pastSeconds?: number) => Promise<{ killmail_id: number; hash: string; value: number; locationId: number; npc: boolean }[]>;
       };
       /** the storm tracker page HTML ('' = unreachable) — main fetches it
@@ -204,14 +209,6 @@ declare global {
           mtimeMs?: number;
           lines: string[];
         }>;
-      };
-      /** AI fight write-ups — the Anthropic key never comes BACK to the
-       * renderer: setKey stores what the Settings field sends and answers
-       * with status only */
-      narrative?: {
-        status: () => Promise<{ configured: boolean; model: string | null }>;
-        write: (digest: unknown) => Promise<{ text?: string; model?: string; error?: string }>;
-        setKey: (apiKey: string) => Promise<{ configured: boolean; model: string | null }>;
       };
     };
   }

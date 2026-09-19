@@ -102,7 +102,7 @@ export const POLICY_ROWS: PolicyRow[] = [
   {
     rule: <>No malware, phishing, tracking players without consent, misappropriating items, or attacking the service.</>,
     source: 'Developer License Agreement §2.3',
-    how: <>The app stores its data on your machine only. Login tokens never leave it and are excluded from backups. Bug reports carry no character names. Nothing is sent to a third party except: public killmail data to the AI write-up when you configure your own key, and the API calls listed on this page.</>,
+    how: <>The app stores its data on your machine only. Login tokens never leave it and are excluded from backups. Bug reports carry no character names. Nothing is sent to a third party except the API calls listed on this page.</>,
     status: 'clean',
   },
   {
@@ -157,12 +157,6 @@ export const POLICY_THIRD_PARTY: { service: string; rules: ReactNode; how: React
     service: 'GitHub (updates and the public source)',
     rules: <>Standard release hosting.</>,
     how: <>The installed app checks the public release feed on start and every few hours, downloads updates in the background, and installs on quit or restart. No token is involved.</>,
-    status: 'clean',
-  },
-  {
-    service: 'Anthropic (optional AI fight write-ups)',
-    rules: <>Your own API key, your own account.</>,
-    how: <>Off unless you paste a key. When on, the app sends a computed digest of public killmail data for one fight and shows the prose back; no wallet, orders, assets or tokens are ever included.</>,
     status: 'clean',
   },
 ];

@@ -1819,3 +1819,36 @@ svg text.dim { fill: var(--muted); }
 .zoom-ctl .zoom-pct:disabled { cursor: default; }
 .zoom-ctl.compact .btn.icon { padding: 2px 6px; font-size: 13px; min-width: 22px; }
 .zoom-ctl.compact .zoom-pct { min-width: 40px; padding: 2px 4px; font-size: 11px; }
+
+/* ---------- pictures that are links (v0.204.2) ----------
+   The pilot panel's headshot opens the pilot on zKillboard, the ship up top
+   opens that kill, a fit's picture opens the killmail it was read from. They
+   say so: a ring on hover, a badge on the corner. */
+.zk-pic {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+  border-radius: 8px;
+  outline: 2px solid var(--border);
+  outline-offset: 1px;
+  cursor: pointer;
+  transition: outline-color 0.12s, transform 0.12s;
+}
+.zk-pic:hover, .zk-pic:focus-visible { outline-color: var(--accent, #6aa9ff); transform: translateY(-1px); }
+.zk-pic img { display: block; border-radius: 7px; }
+.zk-pic .zk-badge {
+  position: absolute;
+  right: -5px;
+  bottom: -5px;
+  padding: 3px 5px;
+  border-radius: 5px;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  background: var(--accent, #6aa9ff);
+  color: #0b0f14;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.zk-pic-small .zk-badge { font-size: 9px; padding: 2px 4px; right: -4px; bottom: -4px; }

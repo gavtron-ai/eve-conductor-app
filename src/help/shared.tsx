@@ -100,7 +100,6 @@ export const SHARED: HelpGroup[] = [
               <li><b>Transit ship name</b> — the hauler's ship. Cargo inside it counts as in transit in My Orders and the Dashboard, not as idle stock. Leave empty if you do not haul.</li>
               <li><b>Aperture URL</b> — your corp map's address, for the Aperture module and the Theft module's map import.</li>
             </ul>
-            <p><b>AI fight summaries</b> — paste an Anthropic key to enable the write-up button in Battle Reports. Stored locally only, never in backups. <b>remove key</b> deletes it.</p>
             <p><b>App window</b></p>
             <ul>
               <li><b>Always on top</b> — keep the window above the game.</li>

@@ -88,8 +88,34 @@ async function corpKillmails(corpId) {
  * caller classifies by whether the character is the victim */
 async function charKillmails(characterId) {
   if (!characterId) return [];
-  return (await getRows(`https://zkillboard.com/api/characterID/${characterId}/`)).slice(0, 200).map(row).filter(valid)
-    .map((r) => ({ killmail_id: r.killmail_id, hash: r.zkb.hash, value: r.zkb.totalValue }));
+  return (await getRows(`https://zkillboard.com/api/characterID/${characterId}/`)).slice(0, 200).map(lossRow).filter((r) => r.killmail_id && r.hash);
+}
+
+/** a list row with what picks a loss WITHOUT opening it: zKill's rows carry
+ * the kill time and the victim (measured 2026-09-19: 200 of 200 rows); a
+ * row that lacks them reports 0 and the caller asks ESI instead */
+const lossRow = (k) => ({
+  killmail_id: k.killmail_id,
+  hash: k.zkb && k.zkb.hash ? k.zkb.hash : null,
+  value: k.zkb && typeof k.zkb.totalValue === 'number' ? k.zkb.totalValue : 0,
+  time: Date.parse(k.killmail_time || '') || 0,
+  victimCharId: (k.victim && Number(k.victim.character_id)) || 0,
+  victimShipId: (k.victim && Number(k.victim.ship_type_id)) || 0,
+});
+
+const OWNER_SEGMENT = { character: 'characterID', corporation: 'corporationID', alliance: 'allianceID' };
+/**
+ * LOSSES OF ONE HULL by a character, a corporation or an alliance (v0.203.1)
+ * — the Log Visualizer's enemy-fit reader: the pilot's own losses of the hull
+ * you fought, and, when there are none, their corp mates' ("it is pretty
+ * common to share fits amongst corp mates"). One request, the same spacing
+ * and identification as every other call here; zKill caches it for an hour.
+ * Measured 2026-09-19 on all three owner kinds: the filter holds on every row.
+ */
+async function shipLosses(kind, id, shipTypeId) {
+  const seg = OWNER_SEGMENT[kind];
+  if (!seg || !id || !shipTypeId) return [];
+  return (await getRows(`https://zkillboard.com/api/losses/${seg}/${id}/shipTypeID/${shipTypeId}/`)).slice(0, 200).map(lossRow).filter((r) => r.killmail_id && r.hash);
 }
 
 /** a SYSTEM's recent killmails (default: the last hour) — the Theft
@@ -102,4 +128,16 @@ async function systemKills(systemId, pastSeconds) {
     .map((r) => ({ killmail_id: r.killmail_id, hash: r.zkb.hash, value: r.zkb.totalValue, locationId: r.zkb.locationID, npc: r.zkb.npc }));
 }
 
-module.exports = { corpKillmails, charKillmails, systemKills, USER_AGENT };
+/**
+ * ONE killmail's list row by its id (v0.203.2) — Battle Reports knows a
+ * loss's kill id but not always its hash, and CCP's public killmail route
+ * needs both. Measured 2026-09-19: /api/killID/<id>/ answers one row with
+ * the hash, cached for an hour. null when zKill does not know the kill.
+ */
+async function killRef(killId) {
+  if (!killId) return null;
+  const rows = (await getRows(`https://zkillboard.com/api/killID/${killId}/`)).map(lossRow).filter((r) => r.killmail_id && r.hash);
+  return rows[0] || null;
+}
+
+module.exports = { corpKillmails, charKillmails, systemKills, shipLosses, killRef, USER_AGENT };

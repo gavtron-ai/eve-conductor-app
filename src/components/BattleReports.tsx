@@ -5,17 +5,22 @@
 // visual report beside it. Multi-system fights get their SAVED evetools
 // report (the full-fight link) created on selection, the moment their
 // ingest has the data — never up front for the whole history, which would
-// spam their database. The AI write-up runs ONLY from its button at the
-// bottom of the panel.
+// spam their database. Cards are posters (ships, ISK, when, who, where —
+// v0.204.1); every pilot or ship picture opens the shared pilot panel. The
+// write-summary tool that used to sit at the bottom was removed in v0.204.1.
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import {
-  makeBattleReports, corporationOf, fetchFightData, fallbackFightData, createSavedBr,
+  makeBattleReports, corporationOf, fetchFightData, fallbackFightData, createSavedBr, POSTER_LOGOS,
 } from '../lib/battleReport';
 import type { BattleReportResult, FightData } from '../lib/battleReport';
-import { buildFightDigest, templateWriteup } from '../lib/battleNarrative';
+import { buildFightDigest } from '../lib/battleNarrative';
 import type { FightDigest, LossRow, DmgLeader, OrgGroup } from '../lib/battleNarrative';
 import { logUser } from '../lib/devlog';
+import { PilotFitPanel, PANEL_CARD, TypeIconId, useTypeIcons, type PilotKillmail } from './PilotFitPanel';
+import { fightWhen } from '../lib/fightSplit';
+import { FightRoster, FightTimeline } from './BattleExtras';
+import { iskShort } from '../lib/format';
 
 /** EVE's public image CDN — ship icons, portraits, group logos */
 const shipIcon = (typeId: number): string => `https://images.evetech.net/types/${typeId}/icon?size=64`;
@@ -25,7 +30,6 @@ const allyLogo = (allyId: number): string => `https://images.evetech.net/allianc
 
 /** every image opens its subject on zKillboard */
 const zkKill = (id: number): string => `https://zkillboard.com/kill/${id}/`;
-const zkChar = (id: number): string => `https://zkillboard.com/character/${id}/`;
 const zkCorp = (id: number): string => `https://zkillboard.com/corporation/${id}/`;
 const zkAlly = (id: number): string => `https://zkillboard.com/alliance/${id}/`;
 
@@ -38,12 +42,8 @@ interface Battle {
   /** filled lazily on first selection — the card only needs the report */
   fightData?: FightData;
   digest?: FightDigest;
-  template?: string;
   /** why there is no digest (analyze failed, no usable times, …) */
   digestNote?: string;
-  /** the write-up — AI prose, or the plain template when no key is set;
-   * EXISTS ONLY after the button at the panel's bottom was pressed */
-  writeup?: { text: string; note: string };
   /** the saved multi-system evetools BR was already created (or attempted
    * and found their ingest still empty — retried on next selection) */
   savedBrDone?: boolean;
@@ -80,7 +80,19 @@ const lostLine = (l: { ships: number; pods: number; isk: string }): string => {
   return bits.length > 0 ? `${bits.join(' and ')} (${l.isk})` : 'nothing';
 };
 
+/** the pilot panel opened from a ship picture (v0.203.2): a loss row's ship
+ * (killId = that killmail — the exact fit) or the hull a damage leader flew */
+export interface PilotView { pilotId: number; pilot: string; shipId: number; ship: string; killId: number | null }
+
 export default function BattleReports() {
+  useTypeIcons();
+  const [pilotView, setPilotView] = useState<PilotView | null>(null);
+  // the list's filters (v0.204.0): fights are split finely now, so a busy corp
+  // lists many — show only the ones your own characters were in, and/or fold
+  // away the single-killmail ones. Both remembered.
+  const [onlyMine, setOnlyMine] = useState<boolean>(() => { try { return localStorage.getItem('etc-br-only-mine') === '1'; } catch { return false; } });
+  const [hideSingles, setHideSingles] = useState<boolean>(() => { try { return localStorage.getItem('etc-br-hide-singles') === '1'; } catch { return false; } });
+  useEffect(() => { try { localStorage.setItem('etc-br-only-mine', onlyMine ? '1' : '0'); localStorage.setItem('etc-br-hide-singles', hideSingles ? '1' : '0'); } catch { /* nicety */ } }, [onlyMine, hideSingles]);
   const [battles, setBattles] = useState<Battle[] | null>(cachedBattles);
   const [selIdx, setSelIdx] = useState(cachedSel);
   const [busy, setBusy] = useState(false);
@@ -89,15 +101,10 @@ export default function BattleReports() {
   const [noLiveFeed, setNoLiveFeed] = useState(false);
   const [copied, setCopied] = useState(false);
   const [summaryBusy, setSummaryBusy] = useState(false);
-  const [aiBusy, setAiBusy] = useState(false);
-  const [aiStatus, setAiStatus] = useState<{ configured: boolean; model: string | null }>(
-    { configured: false, model: null },
-  );
   // a stale async result must never land on a newer load
   const runRef = useRef(0);
 
   useEffect(() => {
-    void window.appInfo?.narrative?.status().then(setAiStatus).catch(() => {});
     if (!cachedBattles) void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -133,13 +140,14 @@ export default function BattleReports() {
       const sources = chars
         .filter((c) => c.accessToken && c.expiresAt > Date.now())
         .map((c) => ({ characterId: c.characterId, token: c.accessToken! }));
-      let h = await makeBattleReports(corp, sources);
+      const myIds = chars.map((c) => c.characterId);
+      let h = await makeBattleReports(corp, sources, myIds);
       if (runRef.current !== run) return;
       // feed went backwards? one fresh retry usually lands on a caught-up
       // zkill node; if not, say so rather than presenting an old fight
       let staleNow = false;
       if (h.newestKillmailId < highWater()) {
-        const retry = await makeBattleReports(corp, sources);
+        const retry = await makeBattleReports(corp, sources, myIds);
         if (runRef.current !== run) return;
         if (retry.newestKillmailId >= h.newestKillmailId) h = retry;
         staleNow = h.newestKillmailId < highWater();
@@ -183,7 +191,7 @@ export default function BattleReports() {
     let out = b;
     if (!fd) {
       try {
-        fd = await fetchFightData(b.report.window);
+        fd = await fetchFightData(b.report.window, b.report.corpKms);
       } catch {
         // br.evetools does not have the fight (their feed can run HOURS
         // behind zkill — or, some days, be down entirely) — the corp's own
@@ -208,7 +216,7 @@ export default function BattleReports() {
       const digest = await buildFightDigest(fd, b.report.window.corpId, {
         startMs: b.report.window.startMs, endMs: b.report.window.endMs,
       });
-      return { ...out, fightData: fd, digest, template: templateWriteup(digest) };
+      return { ...out, fightData: fd, digest };
     } catch (e) {
       return { ...out, digestNote: `no summary: ${e instanceof Error ? e.message : String(e)}` };
     }
@@ -228,45 +236,6 @@ export default function BattleReports() {
       setSummaryBusy(true);
       const next = await ensureDigest(b);
       if (runRef.current === run) { putAt(idx, next); setSummaryBusy(false); }
-    }
-  }
-
-  /** THE WRITE-UP BUTTON at the panel's bottom — AI prose with a key, the
-   * plain template without one; nothing is written until this is pressed */
-  async function writeSummary(idx: number) {
-    if (!battles?.[idx] || aiBusy) return;
-    const run = runRef.current;
-    setAiBusy(true);
-    const t0 = performance.now();
-    try {
-      let b = await ensureDigest(battles[idx]);
-      if (runRef.current !== run) return;
-      putAt(idx, b);
-      if (!b.digest || !b.template) return; // digestNote explains
-      if (!aiStatus.configured) {
-        putAt(idx, {
-          ...b,
-          writeup: {
-            text: b.template,
-            note: 'plain summary — add an Anthropic API key in Settings (⚙) → AI fight summaries for AI prose',
-          },
-        });
-        return;
-      }
-      const ai = await window.appInfo!.narrative!.write(b.digest);
-      if (runRef.current !== run) return;
-      if (ai.text) {
-        putAt(idx, { ...b, writeup: { text: ai.text, note: `written by ${ai.model ?? aiStatus.model}` } });
-        logUser('battle ai summary made', { ms: Math.round(performance.now() - t0) });
-      } else {
-        putAt(idx, {
-          ...b,
-          writeup: { text: b.template, note: `plain summary — AI failed: ${ai.error ?? 'unknown'}` },
-        });
-        logUser('battle ai summary failed', { error: ai.error ?? 'unknown' });
-      }
-    } finally {
-      if (runRef.current === run) setAiBusy(false);
     }
   }
 
@@ -298,9 +267,28 @@ export default function BattleReports() {
             ⚠ no live source answered — this list is zKill's, cached by them for up to an hour; your own characters' kills arrive live from CCP once they are logged in
           </div>
         )}
-        <div style={{ maxHeight: 'calc(100vh - 190px)', overflowY: 'auto' }}>
-          {battles?.map((b, i) => (
-            <div key={b.report.window.startMs} className="sim-card" role="button" tabIndex={0}
+        {battles && battles.length > 0 && (() => {
+          const mineN = battles.filter((b) => b.report.mine).length;
+          const singlesN = battles.filter((b) => b.report.kills === 1).length;
+          return (
+            <div className="dim" style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap', fontSize: 12, margin: '6px 0' }}>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+                title="Only the fights one of YOUR logged-in characters is on a killmail of. The list is the whole corporation's.">
+                <input type="checkbox" checked={onlyMine} onChange={(e) => setOnlyMine(e.target.checked)} style={{ margin: 0 }} />
+                my fights ({mineN})
+              </label>
+              <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, cursor: 'pointer' }}
+                title="Fold away the fights that are a single killmail — a lone gank, a pilot lost to rats.">
+                <input type="checkbox" checked={hideSingles} onChange={(e) => setHideSingles(e.target.checked)} style={{ margin: 0 }} />
+                hide single kills ({singlesN})
+              </label>
+              <span>{n(battles.length, 'fight')}</span>
+            </div>
+          );
+        })()}
+        <div style={{ maxHeight: 'calc(100vh - 220px)', overflowY: 'auto' }}>
+          {battles?.map((b, i) => ((onlyMine && !b.report.mine) || (hideSingles && b.report.kills === 1) ? null : (
+            <div key={`${b.report.window.startMs}-${b.report.systemId}-${b.report.kills}`} className="sim-card" role="button" tabIndex={0}
               onClick={() => void openBattle(i)}
               onKeyDown={(e) => { if (e.key === 'Enter') void openBattle(i); }}
               style={{
@@ -308,13 +296,12 @@ export default function BattleReports() {
                 borderColor: i === selIdx ? 'var(--accent, #6aa9ff)' : undefined,
               }}
               title="copy this fight's link and open its report">
-              <div className="sim-card-title" style={{ whiteSpace: 'normal', lineHeight: 1.4, fontSize: 14 }}>
-                {b.report.systemName ?? b.report.systemId}
-              </div>
-              <div className="dim" style={{ fontSize: 12, marginTop: 4 }}>
-                {day(b.report.startedAt)} · {hm(b.report.startedAt)}–{hm(b.report.endedAt)} EVE
-                {' '}· {n(b.report.kills, 'corp killmail')}
-              </div>
+              <FightPosterCard report={b.report} />
+              {i === selIdx && b.report.why && (
+                <div className="dim" style={{ fontSize: 11.5, marginTop: 4, lineHeight: 1.45 }} title="how this fight was told apart from the corp's other killmails">
+                  {b.report.why}
+                </div>
+              )}
               {b.digest && (
                 <div className="dim" style={{ fontSize: 12, marginTop: 4 }}>
                   {b.digest.caveat
@@ -327,12 +314,13 @@ export default function BattleReports() {
                 <div className="dim" style={{ fontSize: 12, marginTop: 4 }}>link copied ✓</div>
               )}
             </div>
-          ))}
+          )))}
         </div>
         {!busy && battles && (
           <div className="hint" style={{ marginTop: 8 }}>
-            every fight on the corp killboard in the last 3 days — click one to
-            copy its link and open the report.
+            every fight on the corp killboard in the last 3 days, told apart by who
+            fought whom, where, and at what tempo — click one to copy its link and
+            open the report; the selected fight says how it was grouped.
           </div>
         )}
       </div>
@@ -413,13 +401,19 @@ export default function BattleReports() {
                 <div style={{
                   display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginTop: 12,
                 }}>
-                  <TeamPanel colour={TEAM_A} title="Team A — ours" side={d.ours}
+                  <TeamPanel colour={TEAM_A} title="Team A — ours" side={d.ours} onPilot={setPilotView}
                     extra={d.ours.myCorp
                       ? `${d.ours.myCorp.pilotCount} from ${d.ours.myCorp.name}` : undefined} />
-                  <TeamPanel colour={TEAM_B} title="Team B" side={d.theirs} />
+                  <TeamPanel colour={TEAM_B} title="Team B" side={d.theirs} onPilot={setPilotView} />
                 </div>
 
+                {/* ---- the fight over time: every killmail, four modes, hover for the kill (v0.204.2) ---- */}
                 <div className="sim-card-title" style={{ marginTop: 14 }}>Timeline</div>
+                {d.timeline && d.timeline.length > 0 && (
+                  <div style={{ marginTop: 6, marginBottom: 8 }}>
+                    <FightTimeline points={d.timeline} onPilot={setPilotView} />
+                  </div>
+                )}
                 {d.phases.map((ph, i) => (
                   <div key={i} className="dim" style={{ fontSize: 13, lineHeight: 1.7 }}>
                     <b>{ph.start === ph.end ? ph.start : `${ph.start}–${ph.end}`}</b>
@@ -436,36 +430,139 @@ export default function BattleReports() {
                   </div>
                 ))}
 
-                {/* ---- the write-up, ONLY on demand ---- */}
-                <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 14 }}>
-                  <button className="btn mini" disabled={aiBusy}
-                    title={aiStatus.configured
-                      ? `summarise this fight with ${aiStatus.model}`
-                      : 'writes the plain summary — add an Anthropic API key in Settings for AI prose'}
-                    onClick={() => void writeSummary(selIdx)}>
-                    {aiBusy ? 'writing…' : '✨ write summary'}
-                  </button>
-                  {cur.writeup && (
-                    <>
-                      <span className="dim" style={{ fontSize: 12 }}>{cur.writeup.note}</span>
-                      <button className="btn mini"
-                        onClick={() => { void navigator.clipboard.writeText(cur.writeup!.text); }}>
-                        copy
-                      </button>
-                    </>
-                  )}
+                {/* ---- everyone involved (v0.204.2): both sides, what they flew / did / lost ---- */}
+                <div className="sim-card-title" style={{ marginTop: 16 }}>Everyone involved</div>
+                <div style={{ marginTop: 6 }}>
+                  <FightRoster d={d} onPilot={setPilotView} />
                 </div>
-                {cur.writeup && (
-                  <div style={{ whiteSpace: 'pre-wrap', fontSize: 13, lineHeight: 1.55, opacity: 0.92, marginTop: 6 }}>
-                    {cur.writeup.text}
-                  </div>
-                )}
+
               </>
             )}
           </div>
         )}
       </div>
+      {pilotView && d && <BattlePilot view={pilotView} d={d} onView={setPilotView} onClose={() => setPilotView(null)} />}
     </div>
+  );
+}
+
+/**
+ * The pilot panel for a ship picture in a battle report (v0.203.2): what the
+ * pilot did in this battle, every ship they lost in it (click one to switch
+ * to its fit), then the shared panel — the exact fit when the hull on screen
+ * died in this battle, else their own nearest loss of it, else corp mates'.
+ */
+export function BattlePilot({ view, d, onView, onClose }: { view: PilotView; d: FightDigest; onView: (v: PilotView) => void; onClose: () => void }) {
+  const allLosses = [...d.ours.losses, ...d.theirs.losses];
+  const theirLosses = allLosses.filter((l) => l.pilotId === view.pilotId).sort((a, b) => (a.t ?? 0) - (b.t ?? 0));
+  // what they did, from the FULL roster (v0.204.2) — the top-damage list holds eight per side
+  const me = [...(d.roster?.ours ?? []), ...(d.roster?.theirs ?? [])].find((r) => r.pilotId === view.pilotId);
+  const times = allLosses.map((l) => l.t ?? 0).filter((t) => t > 0);
+  const win = times.length > 0 ? { t0: Math.min(...times), t1: Math.max(...times) } : { t0: 0, t1: 0 };
+  // a loss row was clicked → THAT killmail is the evidence; a leader's hull →
+  // whichever of their losses in this battle were that hull
+  const focus = view.killId !== null ? theirLosses.filter((l) => l.killmailId === view.killId) : theirLosses.filter((l) => l.shipId === view.shipId);
+  const killmails: PilotKillmail[] = focus.map((l) => ({ id: l.killmailId, value: l.iskNum, t: l.t ?? 0, shipTypeId: l.shipId }));
+  const row = view.killId !== null ? focus[0] : undefined;
+  const others = theirLosses.filter((l) => l.killmailId !== view.killId);
+  return (
+    <PilotFitPanel pilot={view.pilot} pilotId={view.pilotId} shipName={view.ship} shipTypeId={view.shipId} win={win}
+      killmails={killmails} words={{ onMail: 'a killmail of this battle' }} onClose={onClose}>
+      <div style={PANEL_CARD}>
+        <div className="dim" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+          in this battle — {view.pilot}
+        </div>
+        <div style={{ fontSize: 13, lineHeight: 1.7 }}>
+          {row && (
+            <div>
+              lost a <b>{row.ship}</b> at {row.time} in {row.system} · <b>{row.isk}</b>
+              {row.topDmg && <span className="dim"> · top damage {row.topDmg.name} ({row.topDmg.dmg.toLocaleString()})</span>}
+              {row.finalBlow && row.finalBlow.pilotId !== row.topDmg?.pilotId && <span className="dim"> · final blow {row.finalBlow.name}</span>}
+            </div>
+          )}
+          {me && me.kills > 0
+            ? <div>dealt <b>{me.dmg.toLocaleString()}</b> damage on {n(me.kills, 'killmail')}{me.ships[0] ? <> in a {me.ships.map((s) => s.name).join(' / ')}</> : null}{me.finalBlows > 0 ? <> · {n(me.finalBlows, 'final blow')}</> : null}</div>
+            : <div className="dim">on no killmail of this battle as an attacker</div>}
+          {!row && theirLosses.length === 0 && <div className="dim">did not lose a ship in this battle</div>}
+        </div>
+        {others.length > 0 && (
+          <div style={{ marginTop: 8 }}>
+            <div className="dim" style={{ fontSize: 11, textTransform: 'uppercase', marginBottom: 4 }}>{row ? 'also lost in this battle' : 'lost in this battle'} — click one for its fit</div>
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              {others.map((l) => (
+                <div key={l.killmailId} style={{ display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer', fontSize: 12.5 }}
+                  title={'open the fit of this ' + l.ship + ' — ' + l.isk}
+                  onClick={() => onView({ pilotId: view.pilotId, pilot: view.pilot, shipId: l.shipId, ship: l.ship, killId: l.killmailId })}>
+                  <TypeIconId id={l.shipId} size={30} />
+                  <span>{l.ship} <span className="dim">· {l.time} · {l.isk}</span></span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    </PilotFitPanel>
+  );
+}
+/**
+ * A FIGHT'S CARD, POSTER-STYLE (v0.204.1) — the owner's order of importance,
+ * biggest first: ships on each side, ISK destroyed vs lost, when (in words),
+ * who it was against, where. All from the corp's own killmails, so it is
+ * there the moment the list is.
+ */
+function FightPosterCard({ report }: { report: BattleReportResult }) {
+  const p = report.poster;
+  const w = fightWhen(report.window.startMs, report.window.endMs, Date.now());
+  const floor = p.unpriced > 0 ? '≥' : '';
+  const isk = (v: number): string => (v > 0 ? iskShort(v) : '0');
+  return (
+    <>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 8 }}
+        title={`${p.ours} of ours and ${p.theirs} of theirs seen on the corp's ${report.kills} killmail${report.kills === 1 ? '' : 's'} of this fight — an enemy who got away without a killmail either way was never seen`}>
+        <span style={{ fontSize: 26, fontWeight: 800, lineHeight: 1, color: TEAM_A, fontVariantNumeric: 'tabular-nums' }}>{p.ours}</span>
+        <span className="dim" style={{ fontSize: 13 }}>v</span>
+        <span style={{ fontSize: 26, fontWeight: 800, lineHeight: 1, color: TEAM_B, fontVariantNumeric: 'tabular-nums' }}>{p.theirs}</span>
+        <span className="dim" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 }}>ships</span>
+        {report.mine && <span title="one of your logged-in characters is on a killmail of this fight" style={{ marginLeft: 'auto', fontSize: 11, color: '#f0c674', whiteSpace: 'nowrap' }}>★ yours</span>}
+      </div>
+      <div style={{ display: 'flex', alignItems: 'baseline', gap: 10, marginTop: 6, flexWrap: 'wrap' }}
+        title={`destroyed ${Math.round(p.destroyed).toLocaleString()} ISK over ${p.kills} kill${p.kills === 1 ? '' : 's'} · lost ${Math.round(p.lost).toLocaleString()} ISK over ${p.losses} loss${p.losses === 1 ? '' : 'es'}${p.unpriced > 0 ? ` · ${p.unpriced} killmail${p.unpriced === 1 ? ' has' : 's have'} no price yet, so these are floors` : ''}`}>
+        <span style={{ fontSize: 18, fontWeight: 800, color: '#5fd08a', fontVariantNumeric: 'tabular-nums' }}>{p.destroyed > 0 ? floor : ''}{isk(p.destroyed)}</span>
+        <span className="dim" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 }}>destroyed</span>
+        <span style={{ fontSize: 18, fontWeight: 800, color: p.lost > 0 ? TEAM_B : 'var(--muted)', fontVariantNumeric: 'tabular-nums' }}>{isk(p.lost)}</span>
+        <span className="dim" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: 0.4 }}>lost</span>
+      </div>
+      <div style={{ fontSize: 14, fontWeight: 600, marginTop: 6 }} title={`${day(report.startedAt)} · ${hm(report.startedAt)}–${hm(report.endedAt)} EVE time`}>
+        {w.day} {w.clock} <span className="dim" style={{ fontWeight: 400 }}>· {w.length} · {w.ago}</span>
+      </div>
+      {/* the two sides as corporation logos, not names (v0.204.2): ours left, theirs right */}
+      {(p.corps.ours.length > 0 || p.corps.theirs.length > 0) && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 6 }}>
+          <LogoRow corps={p.corps.ours} />
+          <span className="dim" style={{ fontSize: 12 }}>v</span>
+          <LogoRow corps={p.corps.theirs} />
+        </div>
+      )}
+      <div className="dim" style={{ fontSize: 12, marginTop: 3, whiteSpace: 'normal', lineHeight: 1.35 }}>
+        {report.systemName ?? report.systemId} · {n(report.kills, 'killmail')}
+      </div>
+    </>
+  );
+}
+
+/** a side of a fight as its corporations' logos, most pilots first; the name and the pilot count are the tooltip */
+function LogoRow({ corps }: { corps: { id: number; name: string; pilots: number }[] }) {
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}>
+      {corps.slice(0, POSTER_LOGOS).map((c) => (
+        <img key={c.id} src={corpLogo(c.id)} alt="" width={24} height={24} title={`${c.name || `corporation ${c.id}`} — ${n(c.pilots, 'pilot')}`}
+          style={{ borderRadius: 4, background: 'rgba(128,128,128,.1)' }}
+          onError={(e) => { (e.target as HTMLImageElement).style.visibility = 'hidden'; }} />
+      ))}
+      {corps.length > POSTER_LOGOS && (
+        <span className="dim" style={{ fontSize: 11.5 }} title={corps.slice(POSTER_LOGOS).map((c) => `${c.name || c.id} (${c.pilots})`).join(', ')}>+{corps.length - POSTER_LOGOS}</span>
+      )}
+    </span>
   );
 }
 
@@ -488,8 +585,8 @@ type SideDigest = FightDigest['ours'] | FightDigest['theirs'];
  * (with logos linking to zKillboard), ISK lost + efficiency bar, every
  * loss with ship icon / pilot / credits, and the damage leaderboard.
  */
-function TeamPanel({ colour, title, side, extra }: {
-  colour: string; title: string; side: SideDigest; extra?: string;
+export function TeamPanel({ colour, title, side, extra, onPilot }: {
+  colour: string; title: string; side: SideDigest; extra?: string; onPilot: (v: PilotView) => void;
 }) {
   return (
     <div style={{
@@ -548,7 +645,7 @@ function TeamPanel({ colour, title, side, extra }: {
             losses
           </div>
           <div style={{ maxHeight: 300, overflowY: 'auto', marginTop: 4 }}>
-            {side.losses.map((row, i) => <Loss key={i} row={row} />)}
+            {side.losses.map((row, i) => <Loss key={i} row={row} onPilot={onPilot} />)}
           </div>
         </>
       )}
@@ -558,7 +655,7 @@ function TeamPanel({ colour, title, side, extra }: {
           <div className="dim" style={{ fontSize: 11, textTransform: 'uppercase', marginTop: 10 }}>
             top damage
           </div>
-          {side.dmgLeaders.slice(0, 5).map((l) => <Leader key={l.pilotId} row={l} colour={colour} max={side.dmgLeaders[0].dmg} />)}
+          {side.dmgLeaders.slice(0, 5).map((l) => <Leader key={l.pilotId} row={l} colour={colour} max={side.dmgLeaders[0].dmg} onPilot={onPilot} />)}
         </>
       )}
     </div>
@@ -607,13 +704,21 @@ function Org({ org }: { org: OrgGroup }) {
 }
 
 /** one loss row: ship icon, who died in what, what it cost, who gets credit */
-function Loss({ row }: { row: LossRow }) {
+function Loss({ row, onPilot }: { row: LossRow; onPilot: (v: PilotView) => void }) {
+  // a loss with a pilot opens the pilot panel: the exact fit from THIS
+  // killmail, a copy for the game, and the zKillboard link inside. A loss
+  // with no pilot (a structure, an NPC) has no one to open — straight to zKill.
+  const open = () => (row.pilotId > 0
+    ? onPilot({ pilotId: row.pilotId, pilot: row.pilot, shipId: row.shipId, ship: row.ship, killId: row.killmailId })
+    : void window.open(zkKill(row.killmailId), '_blank'));
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '4px 0', minWidth: 0 }}>
       <img src={shipIcon(row.shipId)} alt="" width={40} height={40}
         style={{ borderRadius: 4, flexShrink: 0, cursor: 'pointer' }}
-        title={`open this kill on zKillboard — ${row.ship}, ${row.isk}`}
-        onClick={() => window.open(zkKill(row.killmailId), '_blank')}
+        title={row.pilotId > 0
+          ? `${row.pilot}'s ${row.ship} — open the exact fit from this killmail (copy it for the game; the zKillboard link is inside) · ${row.isk}`
+          : `open this kill on zKillboard — ${row.ship}, ${row.isk}`}
+        onClick={open}
         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
       <div style={{ minWidth: 0, flex: 1 }}>
         <div style={{ fontSize: 14, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -633,17 +738,24 @@ function Loss({ row }: { row: LossRow }) {
 }
 
 /** one leaderboard row: portrait, name, damage bar scaled to the side's top */
-function Leader({ row, colour, max }: { row: DmgLeader; colour: string; max: number }) {
+function Leader({ row, colour, max, onPilot }: { row: DmgLeader; colour: string; max: number; onPilot: (v: PilotView) => void }) {
   return (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center', padding: '3px 0' }}>
       <img src={portrait(row.pilotId)} alt="" width={30} height={30}
         style={{ borderRadius: 4, flexShrink: 0, cursor: 'pointer' }}
-        title={`open ${row.name} on zKillboard`}
-        onClick={() => window.open(zkChar(row.pilotId), '_blank')}
+        title={`${row.name} — open the pilot panel (their part in this battle, their fit, the zKillboard links inside)`}
+        onClick={() => onPilot({ pilotId: row.pilotId, pilot: row.name, shipId: row.shipId ?? 0, ship: row.ship ?? '', killId: null })}
         onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+      {(row.shipId ?? 0) > 0 && (
+        <img src={shipIcon(row.shipId)} alt="" width={30} height={30}
+          style={{ borderRadius: 4, flexShrink: 0, cursor: 'pointer' }}
+          title={`${row.name} flew a ${row.ship} — open their fit: exact if they lost it in this battle, else their own nearest loss of that hull, else their corp mates' fits`}
+          onClick={() => onPilot({ pilotId: row.pilotId, pilot: row.name, shipId: row.shipId, ship: row.ship, killId: null })}
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
+      )}
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-          {row.name}
+          {row.name}{row.ship ? <span className="dim"> · {row.ship}</span> : null}
           {row.finalBlows > 0 && (
             <span className="dim"> · {n(row.finalBlows, 'final blow')}</span>
           )}

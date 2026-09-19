@@ -52,6 +52,9 @@ function ShatteredMark({ x, y, r = 5 }: { x: number; y: number; r?: number }) {
 const SHATTERED_GLYPH = '◌';
 
 const NODE_W = 190, NODE_H = 60;
+/** how far the drawing may spread to fill a bigger panel (v0.205.1): rows up to this many times
+ * their natural spacing, columns a little — beyond that it would read as a different chart */
+const MAX_STRETCH_X = 1.6, MAX_STRETCH_Y = 3;
 const DIM = 'var(--ink-2, #9aa0aa)';
 const LINE = 'var(--border, #3a3f4a)';
 const ACCENT = 'var(--accent, #7fc8ff)';
@@ -116,8 +119,21 @@ function RouteLine({ label, colour, route, clsOf, tagOf, effectOf, palette, shat
 function ChainMap({ origin, layout, focus, onFocus, offChain, note, routeHome, routeMe, routeNote, routeFrom, originLabel, effectOf, tagOf, clsOf, palette, shattered, unlinkedHidden = 0 }: { unlinkedHidden?: number } & Pick<ChainDashboardProps, 'origin' | 'layout' | 'focus' | 'onFocus' | 'offChain' | 'note' | 'routeHome' | 'routeMe' | 'routeNote' | 'routeFrom' | 'originLabel' | 'effectOf' | 'tagOf' | 'clsOf' | 'palette' | 'shattered'>) {
   const pad = 12;
   const maxIsk = layout.nodes.reduce((m, n) => Math.max(m, n.isk), 0) || 1;
-  const pos = new Map(layout.nodes.map((n) => [n.system, n]));
-  const w = layout.width + pad * 2, h = Math.max(layout.height, NODE_H + 8) + pad * 2;
+  // THE DRAWING FILLS ITS PANEL (v0.205.1 — "when I drag it down the bottom half is just
+  // empty"). The cards keep their size; the rows spread over the height there is and the
+  // columns over the width, so a taller or wider panel is a roomier chain, never a blank
+  // half. It only ever stretches: a panel smaller than the drawing scrolls, as before.
+  // The drawing sits in an absolutely placed box, so its size never feeds back into the
+  // panel's own height (the ratchet the right-hand charts had in v0.202.4).
+  const w0 = layout.width + pad * 2, h0 = Math.max(layout.height, NODE_H + 8) + pad * 2;
+  const [boxRef, box] = useBoxSize<HTMLDivElement>();
+  const SCROLLBAR = 14;
+  const kx = box.w > w0 + 8 ? Math.min(MAX_STRETCH_X, box.w / w0) : 1;
+  const ky = box.h - SCROLLBAR > h0 + 8 ? Math.min(MAX_STRETCH_Y, (box.h - (kx === 1 && box.w < w0 ? SCROLLBAR : 0)) / h0) : 1;
+  const colW = layout.colW * kx;
+  const nodes = layout.nodes.map((n) => ({ ...n, x: n.x * kx, y: n.y * ky }));
+  const pos = new Map(nodes.map((n) => [n.system, n]));
+  const w = Math.floor(w0 * kx), h = Math.floor(h0 * ky);
   // QUIET cards (v0.202.10): a system with nothing in view under the current
   // filters stays on the drawing (the chain must stay navigable) but dims,
   // and so do the links that only touch quiet systems — so a class or
@@ -137,7 +153,7 @@ function ChainMap({ origin, layout, focus, onFocus, offChain, note, routeHome, r
     setTip({ left: r.right - w.left + wrap.scrollLeft - 8, top: r.bottom - w.top + wrap.scrollTop + 4, system, effect, cls });
   };
   return (
-    <div className="panel" style={{ padding: 10, flex: '1 1 560px', minWidth: 0 }}>
+    <div className="panel" style={{ padding: 10, flex: '1 1 560px', minWidth: 0, display: 'flex', flexDirection: 'column' }}>
       <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 4 }}>
         <b style={{ fontSize: 12.5 }}>The chain from {origin || '?'}</b>
         <span className="dim" style={{ fontSize: 11 }}
@@ -167,7 +183,8 @@ function ChainMap({ origin, layout, focus, onFocus, offChain, note, routeHome, r
       {layout.nodes.length === 0 ? (
         <div className="dim" style={{ fontSize: 12, padding: 12 }}>{note || 'no distances yet — the chain links could not be read, or the origin is not on the map'}</div>
       ) : (
-        <div ref={wrapRef} style={{ overflowX: 'auto', overflowY: 'hidden', position: 'relative' }}>
+        <div ref={boxRef} style={{ flex: '1 1 auto', minHeight: h0 + SCROLLBAR, position: 'relative' }}>
+        <div ref={wrapRef} style={{ position: 'absolute', inset: 0, overflowX: 'auto', overflowY: 'hidden' }}>
           {tip && (
             <div className="chain-tip panel" style={{ position: 'absolute', left: tip.left, top: tip.top, transform: 'translateX(-100%)', zIndex: 5, padding: '6px 9px', fontSize: 11.5, pointerEvents: 'none', minWidth: 200, boxShadow: '0 4px 14px rgba(0,0,0,0.35)', border: `1px solid ${isDarkColor(effectColor(tip.effect, palette)) ? 'rgba(255,255,255,0.35)' : effectColor(tip.effect, palette)}` }}>
               <div style={{ fontWeight: 800, marginBottom: 3 }}>{tip.effect} <span className="dim" style={{ fontWeight: 500 }}>in {tip.cls || '?'} · {tip.system}</span></div>
@@ -196,9 +213,9 @@ function ChainMap({ origin, layout, focus, onFocus, offChain, note, routeHome, r
                 const detached = i > layout.maxHop;
                 return (
                   <g key={`col-${i}`}>
-                    <rect x={i * layout.colW} y={-pad + 2} width={layout.colW} height={h - 4} fill={detached ? 'rgba(255,90,90,0.05)' : i % 2 ? 'rgba(127,127,127,0.05)' : 'transparent'} />
-                    {detached && <line x1={i * layout.colW} y1={-pad + 2} x2={i * layout.colW} y2={h - 2} stroke={LINE} strokeDasharray="3 3" />}
-                    <text x={i * layout.colW + layout.colW / 2} y={-2} textAnchor="middle" fontSize={10} fill={DIM}>{detached ? `on the map, not linked to ${origin || 'the origin'}` : i === 0 ? 'origin' : `${i} jump${i === 1 ? '' : 's'}`}</text>
+                    <rect x={i * colW} y={-pad + 2} width={colW} height={h - 4} fill={detached ? 'rgba(255,90,90,0.05)' : i % 2 ? 'rgba(127,127,127,0.05)' : 'transparent'} />
+                    {detached && <line x1={i * colW} y1={-pad + 2} x2={i * colW} y2={h - 2} stroke={LINE} strokeDasharray="3 3" />}
+                    <text x={i * colW + colW / 2} y={-2} textAnchor="middle" fontSize={10} fill={DIM}>{detached ? `on the map, not linked to ${origin || 'the origin'}` : i === 0 ? 'origin' : `${i} jump${i === 1 ? '' : 's'}`}</text>
                   </g>
                 );
               })}
@@ -219,7 +236,7 @@ function ChainMap({ origin, layout, focus, onFocus, offChain, note, routeHome, r
                 return <path key={key} d={d} fill="none" stroke={onHome ? ACCENT : onMe ? ME : lit ? ACCENT : LINE} strokeWidth={onHome || onMe ? 3 : lit ? 2 : 1.2} opacity={focus && !lit ? 0.35 : dimEdge ? 0.3 : 1} />;
               })}
               {/* systems */}
-              {layout.nodes.map((n) => {
+              {nodes.map((n) => {
                 const x = n.x - NODE_W / 2, y = n.y - NODE_H / 2;
                 const isF = focus === n.system;
                 const onHome = homeSet.has(n.system), onMe = meSet.has(n.system);
@@ -254,6 +271,7 @@ function ChainMap({ origin, layout, focus, onFocus, offChain, note, routeHome, r
               })}
             </g>
           </svg>
+        </div>
         </div>
       )}
     </div>

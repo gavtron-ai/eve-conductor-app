@@ -15,7 +15,7 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { ChainExtract } from '../lib/apertureExtract';
 import {
-  CHAIN_SORT_NATURAL, basePriceName, hopsFrom, parseSigSearch, resolveEdges, rockFamiliesIn, sortChainRows, summarize, systemOfNodeText, tagOfNodeText,
+  CHAIN_SORT_NATURAL, basePriceName, chainBranches, hopsFrom, onBranch, parseSigSearch, resolveEdges, rockFamiliesIn, sortChainRows, summarize, systemOfNodeText, tagOfNodeText,
   type ChainFilters, type ChainSig, type ChainSort, type ChainSortKey, type SigGroup,
 } from '../lib/chain';
 
@@ -143,6 +143,9 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
   // rock filter (v0.202.11 — "select gneiss and see a dashboard of all the
   // gneiss and where it is"): families, not grades; empty = no rock filter
   const [rocks, setRocks] = useState<Set<string>>(() => new Set());
+  // chain filter (v0.205.0 — "which part of the chain you are interested in roaming
+  // through"): the picked systems directly off the origin; empty = the whole chain
+  const [branchPick, setBranchPick] = useState<Set<string>>(() => new Set());
   // column sorting (v0.202.5): a heading click sorts its natural way, a
   // second reverses, a third returns to the default order; remembered
   const [sort, setSort] = useState<ChainSort | null>(readSort);
@@ -330,6 +333,16 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
   }, [parsed, origin, homeLabel, feedHome, me.system]);
 
   const hops = useMemo(() => (parsed && originSystem && parsed.edges.length > 0 ? hopsFrom(originSystem, parsed.edges) : null), [parsed, originSystem]);
+  /** the parts of the chain: one branch per system directly off the origin */
+  const branchInfo = useMemo(() => (parsed && originSystem && parsed.edges.length > 0 ? chainBranches(originSystem, parsed.edges) : null), [parsed, originSystem]);
+  // a picked branch that is no longer off the origin (a new reading, a hole that
+  // closed, the origin switched to "me") must not keep filtering invisibly
+  useEffect(() => {
+    if (branchPick.size === 0) return;
+    const present = new Set((branchInfo?.branches ?? []).map((b) => b.first));
+    if ([...branchPick].every((b) => present.has(b))) return;
+    setBranchPick(new Set([...branchPick].filter((b) => present.has(b))));
+  }, [branchInfo, branchPick]);
   // ONE view under EVERY filter, the clicked system included (v0.200.11 —
   // "all filters should change the dashboard"): tiles, the cards' numbers,
   // the charts and the table all read this. The drawing keeps every system
@@ -337,14 +350,15 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
   // in view" and stay clickable.
   const summary = useMemo(() => {
     if (!parsed) return null;
-    const filters: ChainFilters = { maxHops, classes, groups, maxAgeH, systems: focus ? new Set([focus]) : new Set(), linkedOnly, rocks };
+    const filters: ChainFilters = { maxHops, classes, groups, maxAgeH, systems: focus ? new Set([focus]) : new Set(), linkedOnly, rocks,
+      branches: branchInfo && branchPick.size > 0 ? { picked: branchPick, via: branchInfo.via } : undefined };
     const priceOf = (n: string) => prices?.get(n) ?? null;
     const t0 = performance.now();
     const out = summarize(parsed.sigs, hops, filters, priceOf, { gas: GAS_SITES, ore: ORE_SITES, kcombat: KSPACE_COMBAT, kgas: KSPACE_GAS, kore: KSPACE_ORE,
       hauls: (site, group) => { const a = haulAvg.lookup(site, group); return a ? { isk: a.mean, basis: haulBasis(a, site) } : null; } });
     timings.current.summarizeMs = Math.round(performance.now() - t0);
     return out;
-  }, [parsed, focus, hops, maxHops, classes, groups, maxAgeH, prices, haulAvg, linkedOnly, rocks]);
+  }, [parsed, focus, hops, maxHops, classes, groups, maxAgeH, prices, haulAvg, linkedOnly, rocks, branchInfo, branchPick]);
   /** the rock families the reading's ore sites carry — one chip each */
   const rockChips = useMemo(() => (parsed ? rockFamiliesIn(parsed.sigs, { ore: ORE_SITES, kore: KSPACE_ORE }) : []), [parsed]);
   // a chip whose rock left the reading (a new map read) must not keep
@@ -369,6 +383,9 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
     if (!parsed || !summary) return null;
     const rows = summary.rows.map((r) => ({ system: r.system, cls: r.cls, group: r.group, hops: r.hops, isk: r.value.isk, ageH: r.ageH }));
     // "linked only" drops the unlinked systems from the drawing too
+    // the chain filter does NOT take systems off the drawing (v0.205.1, the owner: "it should
+    // not hide things it should dim them like we do for other filters"): a system off the
+    // picked branch has nothing in view, so the drawing dims it like any other filter does
     const drawn = linkedOnly && hops ? [...parsed.systems].filter((s) => hops.has(s)) : [...parsed.systems];
     const systems = drawn.map((s) => ({ system: s, cls: parsed.clsOf.get(s) ?? '', tag: parsed.tagOf.get(s) ?? '', effect: parsed.effectOf.get(s) ?? '', shattered: parsed.shattered.has(s) }));
     const t0 = performance.now();
@@ -381,7 +398,7 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
     };
     timings.current.vizMs = Math.round(performance.now() - t0);
     return out;
-  }, [parsed, summary, hops, linkedOnly]);
+  }, [parsed, summary, hops, linkedOnly, branchInfo, branchPick, originSystem]);
   // one line per NEW reading with where this window's time went
   useEffect(() => {
     if (!data || !summary) return;
@@ -391,6 +408,7 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
       hiddenUnlinked: summary.hiddenUnlinked, hiddenNoHops: summary.hiddenNoHops, hiddenNoClass: summary.hiddenNoClass, hiddenNoRock: summary.hiddenNoRock,
       origin: originSystem, originOk, hops: hops?.size ?? null, edges: parsed?.edges.length ?? 0, drawnNodes: data.graph.nodes.length, linkedOnly, maxHops,
       rocks: rocks.size > 0 ? [...rocks] : undefined, rockChips: rockChips.length,
+      branches: branchInfo?.branches.length ?? 0, branchesPicked: branchPick.size, hiddenOffBranch: summary.hiddenOffBranch,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [data?.at]);
@@ -413,7 +431,7 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
 
   const toggle = <T,>(set: Set<T>, v: T, setter: (s: Set<T>) => void) => { const n = new Set(set); if (n.has(v)) n.delete(v); else n.add(v); setter(n); };
   /** anything narrowing the view — the ✕ clear filters button is live only then */
-  const anyFilter = maxHops !== null || classes.size > 0 || groups.size > 0 || maxAgeH !== null || !!focus || rocks.size > 0;
+  const anyFilter = maxHops !== null || classes.size > 0 || groups.size > 0 || maxAgeH !== null || !!focus || rocks.size > 0 || branchPick.size > 0;
   const originOk = !!originSystem && (!parsed || parsed.systems.has(originSystem) || (hops?.has(originSystem) ?? false));
   const graphReadable = !!parsed && parsed.edges.length > 0;
 
@@ -548,8 +566,35 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
           </label>
           <button className="btn mini" disabled={!anyFilter} style={{ marginLeft: 'auto', opacity: anyFilter ? 1 : 0.45, height: 28, boxSizing: 'border-box', lineHeight: 1 }}
             title={anyFilter ? 'back to every site in the chain' : 'no filter set'}
-            onClick={() => { setMaxHops(null); setClasses(new Set()); setGroups(new Set()); setMaxAgeH(null); setFocus(null); setRocks(new Set()); }}>✕ clear filters{focus ? ' & focus' : ''}</button>
+            onClick={() => { setMaxHops(null); setClasses(new Set()); setGroups(new Set()); setMaxAgeH(null); setFocus(null); setRocks(new Set()); setBranchPick(new Set()); }}>✕ clear filters{focus ? ' & focus' : ''}</button>
         </div>
+        {/* the chain row (v0.205.0): one chip per system directly off the origin — pick one
+            or several and only what lies down those parts of the chain stays: tiles, table,
+            charts, and the drawing itself. A system two branches reach equally fast is on both. */}
+        {branchInfo && branchInfo.branches.length > 0 && (
+          <div style={FILTER_ROW}>
+            <FilterGroup label="chain" title={`Which part of the chain to look at: each chip is a system directly off ${originSystem || 'the origin'}, and stands for it and everything beyond it. Pick one or several; the rest of the chain leaves the view. ${originSystem || 'The origin'}'s own sites are down no branch.`}>
+              {branchInfo.branches.map((b) => {
+                const cls = parsed?.clsOf.get(b.first) ?? '';
+                // the map's per-system letter rides with the class, as on the cards: "C4B", not "C4"
+                const tag = parsed?.tagOf.get(b.first) ?? '';
+                const badge = cls ? `${cls}${/^[A-Za-z0-9]$/.test(tag) ? tag : ''}` : '';
+                const on = branchPick.has(b.first);
+                const sites = parsed ? parsed.sigs.filter((s) => s.group !== 'Wormhole' && onBranch(s.system, new Set([b.first]), branchInfo.via)).length : 0;
+                return (
+                  <button key={b.first} className={`btn mini${on ? ' on' : ''}`} onClick={() => toggle(branchPick, b.first, setBranchPick)}
+                    style={{ borderColor: on ? classColor(cls) : undefined }}
+                    title={`${b.first}${badge ? ` (${badge})` : ''} and what lies beyond it: ${b.systems.length} system${b.systems.length === 1 ? '' : 's'}, ${sites} site${sites === 1 ? '' : 's'} — ${b.systems.slice(0, 8).join(' · ')}${b.systems.length > 8 ? ' …' : ''}`}>
+                    {badge && <b style={{ color: classColor(cls), marginRight: 4 }}>{badge}</b>}{b.first}<span className="dim" style={{ marginLeft: 4, fontWeight: 400 }}>{b.systems.length}</span>
+                  </button>
+                );
+              })}
+            </FilterGroup>
+            {summary && branchPick.size > 0 && summary.hiddenOffBranch > 0 && (
+              <span className="dim" style={{ fontSize: 11.5 }}>{summary.hiddenOffBranch} site{summary.hiddenOffBranch === 1 ? '' : 's'} elsewhere in the chain left out</span>
+            )}
+          </div>
+        )}
         {/* row 2: activity · ore (v0.202.11: one chip per rock family the
             reading's ore sites carry, grades and variants folded together; a
             picked rock narrows the view to the ore sites holding it, valued

@@ -1,13 +1,12 @@
-// FIGHT WRITE-UPS — every fact computed here, prose optionally by Claude.
+// THE FIGHT DIGEST — every fact of a battle report, computed here.
 //
 // The rule that governs this file is the app's oldest one: every number must
 // trace to ground truth — here, the killmails br.evetools returned for the
 // fight window. This module reduces them to a DIGEST (sides, losses, a
 // timeline of phases, notable kills) that is fully deterministic and
-// hand-checkable. The digest is then either rendered through a plain
-// template, or handed to a Claude call (main process, narrative.cjs) that is
-// forbidden to add anything the digest does not contain. AI never touches
-// the numbers — it only phrases them.
+// hand-checkable; the Battle Reports tab draws it. (It once also fed a prose
+// write-up — a plain template or an AI call. Removed in v0.204.1, the
+// owner's call: "it is no good and should just be removed completely".)
 import { ESI_BASE } from './constants';
 import type { BrKm, BrParticipant, FightData } from './battleReport';
 import { entityOf } from './battleReport';
@@ -41,6 +40,8 @@ export interface LossRow {
   /** the killmail id — the ship icon links to this kill on zKillboard */
   killmailId: number;
   time: string;
+  /** the killmail's time, ms epoch (v0.203.2 — the pilot panel's window) */
+  t: number;
   shipId: number;
   ship: string;
   pilotId: number;
@@ -69,6 +70,45 @@ export interface DmgLeader {
   name: string;
   dmg: number;
   finalBlows: number;
+  /** the hull they did the most of that damage in (v0.203.2); 0 = none named */
+  shipId: number;
+  ship: string;
+}
+
+/** EVERYONE INVOLVED (v0.204.2) — one row per pilot seen on the fight's
+ * killmails, either side: what they flew, what they did, what they lost */
+export interface RosterRow {
+  pilotId: number;
+  name: string;
+  corpId: number;
+  corp: string;
+  allyId: number;
+  /** hulls seen for them on the killmails (as attacker or victim), most-seen first; pods left out */
+  ships: { id: number; name: string }[];
+  /** damage dealt to the OTHER side's losses */
+  dmg: number;
+  finalBlows: number;
+  /** killmails of the other side they are on */
+  kills: number;
+  losses: { killmailId: number; shipId: number; ship: string; isk: string; iskNum: number; pod: boolean }[];
+}
+
+/** ONE KILLMAIL ON THE TIMELINE (v0.204.2), with the running totals at that
+ * moment — every number is a sum over killmails up to and including this one */
+export interface TimelinePoint {
+  t: number;
+  killmailId: number;
+  /** the side that LOST this ship */
+  side: 'ours' | 'theirs';
+  shipId: number; ship: string;
+  pilotId: number; pilot: string;
+  iskNum: number; isk: string;
+  /** damage the victim took (the killmail's own figure) and how many were on it */
+  dmgTaken: number; attackers: number;
+  pod: boolean;
+  /** running totals per side: ships lost (pods apart), ISK lost, damage taken,
+   * and distinct pilots seen on a killmail so far */
+  cum: Record<'ours' | 'theirs', { ships: number; pods: number; isk: number; dmg: number; seen: number }>;
 }
 
 export interface FightDigest {
@@ -108,6 +148,10 @@ export interface FightDigest {
     orgs: OrgGroup[];
   };
   phases: PhaseDigest[];
+  /** everyone seen on the fight's killmails, per side, most damage first */
+  roster: { ours: RosterRow[]; theirs: RosterRow[] };
+  /** every killmail in time order with running totals — the chart's data */
+  timeline: TimelinePoint[];
 }
 
 /** ISK, in the units a killboard uses. The tier is chosen AFTER rounding:
@@ -334,6 +378,8 @@ export async function buildFightDigest(
   const leaderMap: Record<'ours' | 'theirs', Map<number, DmgLeader>> = {
     ours: new Map(), theirs: new Map(),
   };
+  /** per pilot: damage by hull — the leaderboard shows the one they hurt most in */
+  const hullDmg = new Map<number, Map<number, number>>();
   for (const km of kms) {
     const victimSide = sideOf(entityOf(km.victim));
     for (const a of km.attackers) {
@@ -341,14 +387,22 @@ export async function buildFightDigest(
       const aSide = sideOf(entityOf(a));
       if (aSide === victimSide) continue;
       const m = leaderMap[aSide];
-      const row = m.get(a.char) ?? { pilotId: a.char, name: '', dmg: 0, finalBlows: 0 };
+      const row = m.get(a.char) ?? { pilotId: a.char, name: '', dmg: 0, finalBlows: 0, shipId: 0, ship: '' };
       row.dmg += a.dmg ?? 0;
+      if (a.ship) {
+        const hulls = hullDmg.get(a.char) ?? new Map<number, number>();
+        hulls.set(a.ship, (hulls.get(a.ship) ?? 0) + (a.dmg ?? 0));
+        hullDmg.set(a.char, hulls);
+      }
       if (a.fb === true) row.finalBlows += 1;
       m.set(a.char, row);
     }
   }
   const leadersOf = (side: 'ours' | 'theirs'): DmgLeader[] =>
-    [...leaderMap[side].values()].sort((a, b) => b.dmg - a.dmg).slice(0, 8);
+    [...leaderMap[side].values()].sort((a, b) => b.dmg - a.dmg).slice(0, 8).map((l) => {
+      const hulls = [...(hullDmg.get(l.pilotId) ?? new Map<number, number>()).entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0]);
+      return { ...l, shipId: hulls[0]?.[0] ?? 0 };
+    });
   const oursLeaders = leadersOf('ours');
   const theirsLeaders = leadersOf('theirs');
 
@@ -405,12 +459,15 @@ export async function buildFightDigest(
     ...kms.map((k) => finalBlowOf(k)?.char ?? 0),
     ...oursLeaders.map((l) => l.pilotId),
     ...theirsLeaders.map((l) => l.pilotId),
+    ...oursLeaders.map((l) => l.shipId), ...theirsLeaders.map((l) => l.shipId),
     ...corpPilots.keys(),
     ...corpAlly.values(),
     ...corpChars, corpId,
+    // the roster names everyone: every pilot, every hull, every corporation
+    ...kms.flatMap((k) => [k.victim, ...k.attackers]).flatMap((p) => (p.char ? [p.char, p.ship, p.corp] : [])),
   ]);
   const nameOf = (id: number): string => names.get(id) ?? String(id);
-  for (const l of [...oursLeaders, ...theirsLeaders]) l.name = nameOf(l.pilotId);
+  for (const l of [...oursLeaders, ...theirsLeaders]) { l.name = nameOf(l.pilotId); l.ship = l.shipId ? nameOf(l.shipId) : ''; }
 
   const lossRowsOf = (side: 'ours' | 'theirs'): LossRow[] => kms
     .filter((k) => sideOf(entityOf(k.victim)) === side)
@@ -420,6 +477,7 @@ export async function buildFightDigest(
       return {
         killmailId: k.id,
         time: hm(k.time),
+        t: k.time,
         shipId: k.victim.ship,
         ship: nameOf(k.victim.ship),
         pilotId: k.victim.char,
@@ -467,6 +525,53 @@ export async function buildFightDigest(
   /** ISK efficiency the way killboards show it: destroyed/(destroyed+lost) */
   const eff = (destroyed: number, lost: number): number =>
     (destroyed + lost > 0 ? Math.round((destroyed / (destroyed + lost)) * 100) : 0);
+  // EVERYONE INVOLVED: one row per pilot seen on a killmail, either side
+  const rosterMap: Record<'ours' | 'theirs', Map<number, RosterRow & { hullSeen: Map<number, number> }>> = { ours: new Map(), theirs: new Map() };
+  const rowOf = (p: BrParticipant): (RosterRow & { hullSeen: Map<number, number> }) | null => {
+    const e = entityOf(p);
+    if (!p.char || !e) return null;
+    const m = rosterMap[sideOf(e)];
+    let r = m.get(p.char);
+    if (!r) { r = { pilotId: p.char, name: nameOf(p.char), corpId: p.corp, corp: p.corp ? nameOf(p.corp) : '', allyId: p.ally, ships: [], dmg: 0, finalBlows: 0, kills: 0, losses: [], hullSeen: new Map() }; m.set(p.char, r); }
+    if (p.ship && !POD_TYPE_IDS.has(p.ship)) r.hullSeen.set(p.ship, (r.hullSeen.get(p.ship) ?? 0) + 1);
+    return r;
+  };
+  for (const km of kms) {
+    const victimSide = sideOf(entityOf(km.victim));
+    const v = rowOf(km.victim);
+    if (v) v.losses.push({ killmailId: km.id, shipId: km.victim.ship, ship: nameOf(km.victim.ship), isk: fmtIsk(km.victim.lossValue || 0), iskNum: km.victim.lossValue || 0, pod: POD_TYPE_IDS.has(km.victim.ship) });
+    for (const a of km.attackers) {
+      const r = rowOf(a);
+      if (!r || sideOf(entityOf(a)) === victimSide) continue; // friendly fire scores nothing
+      r.dmg += a.dmg ?? 0;
+      r.kills += 1;
+      if (a.fb === true) r.finalBlows += 1;
+    }
+  }
+  const rosterOf = (side: 'ours' | 'theirs'): RosterRow[] => [...rosterMap[side].values()].map(({ hullSeen, ...r }) => ({
+    ...r,
+    ships: [...hullSeen.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0]).map(([id]) => ({ id, name: nameOf(id) })),
+  })).sort((a, b) => b.dmg - a.dmg || b.kills - a.kills || a.name.localeCompare(b.name));
+
+  // THE TIMELINE: every killmail in order, with the running totals at that moment
+  const seen: Record<'ours' | 'theirs', Set<number>> = { ours: new Set(), theirs: new Set() };
+  const run: Record<'ours' | 'theirs', { ships: number; pods: number; isk: number; dmg: number }> = { ours: { ships: 0, pods: 0, isk: 0, dmg: 0 }, theirs: { ships: 0, pods: 0, isk: 0, dmg: 0 } };
+  const timeline: TimelinePoint[] = kms.map((km) => {
+    const side = sideOf(entityOf(km.victim));
+    const pod = POD_TYPE_IDS.has(km.victim.ship);
+    for (const p of [km.victim, ...km.attackers]) { const e = entityOf(p); if (p.char && e) seen[sideOf(e)].add(p.char); }
+    if (pod) run[side].pods += 1; else run[side].ships += 1;
+    run[side].isk += km.victim.lossValue || 0;
+    run[side].dmg += km.victim.dmg ?? 0;
+    return {
+      t: km.time, killmailId: km.id, side, shipId: km.victim.ship, ship: nameOf(km.victim.ship),
+      pilotId: km.victim.char, pilot: km.victim.char ? nameOf(km.victim.char) : '—',
+      iskNum: km.victim.lossValue || 0, isk: fmtIsk(km.victim.lossValue || 0),
+      dmgTaken: km.victim.dmg ?? 0, attackers: km.attackers.length, pod,
+      cum: { ours: { ...run.ours, seen: seen.ours.size }, theirs: { ...run.theirs, seen: seen.theirs.size } },
+    };
+  });
+
   return {
     caveat: fd.partial
       ? `counted from ${nameOf(corpId)}'s own killmails only — br.evetools has not`
@@ -520,53 +625,7 @@ export async function buildFightDigest(
       orgs: orgsOf('theirs', nameOf),
     },
     phases,
+    roster: { ours: rosterOf('ours'), theirs: rosterOf('theirs') },
+    timeline,
   };
 }
-
-/** the deterministic fallback: the same digest, plainly worded — what the
- * user gets when no AI key is configured or the call fails */
-export function templateWriteup(d: FightDigest): string {
-  const n = (c: number, word: string): string => `${c} ${word}${c === 1 ? '' : 's'}`;
-  const lost = (l: { ships: number; pods: number; isk: string }): string => {
-    const bits: string[] = [];
-    if (l.ships) bits.push(n(l.ships, 'ship'));
-    if (l.pods) bits.push(n(l.pods, 'pod'));
-    return bits.length > 0 ? `${bits.join(' and ')} (${l.isk})` : 'nothing';
-  };
-  const roam = d.fight.systems.length > 1;
-  const sysArc = roam
-    ? `${d.fight.systems.length} systems (${d.fight.systems.join(' → ')})`
-    : d.fight.systems[0];
-  const corpBit = (c: NonNullable<FightDigest['ours']['myCorp']>): string => (
-    c.pilotCount <= 3
-      ? `${c.pilots.join(', ')} flying for ${c.name}`
-      : `${c.pilotCount} ${c.name} pilots in fleet`);
-  const us = d.ours.myCorp
-    ? `${d.ours.leadGroups.join(', ')} (${n(d.ours.pilots, 'pilot')} in ${n(d.ours.groups, 'group')}, ` +
-      `${corpBit(d.ours.myCorp)})`
-    : `${d.ours.leadGroups.join(', ')} (${n(d.ours.pilots, 'pilot')})`;
-  const them = `${d.theirs.leadGroups.join(', ')} (${n(d.theirs.pilots, 'pilot')})`;
-  const p1 = `${d.fight.date}, ${d.fight.start}–${d.fight.end} EVE — a ${d.fight.durationMin}-minute fight `
-    + `through ${sysArc}: ${us} against ${them}. ${n(d.fight.totalKills, 'killmail')}, ${d.fight.totalLost} lost — `
-    + `they lost ${lost({ ships: d.theirs.shipsLost, pods: d.theirs.podsLost, isk: d.theirs.iskLost })}, `
-    + `we lost ${lost({ ships: d.ours.shipsLost, pods: d.ours.podsLost, isk: d.ours.iskLost })}.`;
-
-  const parts = d.phases.map((ph) => {
-    const bits: string[] = [];
-    if (ph.theirsLost.ships + ph.theirsLost.pods > 0) bits.push(`they lost ${lost(ph.theirsLost)}`);
-    if (ph.oursLost.ships + ph.oursLost.pods > 0) bits.push(`we lost ${lost(ph.oursLost)}`);
-    const where = ph.systems.join('/');
-    const notable = ph.notable.length > 0
-      ? ` — biggest: ${ph.notable[0].ship} (${ph.notable[0].value}, ${ph.notable[0].time})`
-      : '';
-    const span = ph.start === ph.end ? ph.start : `${ph.start}–${ph.end}`;
-    return `${span} in ${where}: ${bits.join(', ') || 'no losses recorded'}${notable}`;
-  });
-  const tail = d.caveat ? `\n\n(${d.caveat})` : '';
-  return `${p1}\n\n${parts.join('. ')}.${tail}`;
-}
-
-// (the fightWriteup orchestrator that auto-ran AI after every report was
-// removed in v0.101.0 — the Battle Reports tab builds the digest itself and
-// spends the AI key only when its button is clicked; every network leg it
-// uses is individually bounded: names 10s, killboard 15s, AI call 30s)

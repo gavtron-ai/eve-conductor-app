@@ -22,14 +22,25 @@
 // ids (or corporation ids for unallied entities) as strings; create-new
 // answers {"_id":"..."} and the report lives at br.evetools.org/br/{_id}.
 import { ESI_BASE } from './constants';
+import { fightPoster, fightWhy, homeAlliance, relevantKms, splitFights, type FightPoster, type SplitFight } from './fightSplit';
 
-/** chunks separated by more than this are DIFFERENT fights — declared from
- * the owner's own description ("chunks of time ... with space in between") */
+/** THE OLD RULE (kept for its fixtures; no longer decides anything): chunks of
+ * corp killmails separated by more than this were different fights. Measured
+ * 2026-09-19: with 31 pilots active the corp is never quiet for 40 minutes —
+ * a whole night chained into one battle. fightSplit.ts reads the killmails
+ * instead (who, where, against whom, at what tempo). */
 export const FIGHT_GAP_MINUTES = 40;
 
-/** how many recent killmails to hydrate from ESI — a fight bigger than this
- * still resolves (the walk only needs to reach the fight's first kill) */
-const HYDRATE_LIMIT = 60;
+/** how many recent killmails to hydrate from ESI. Was 60 — measured 2026-09-19:
+ * at this corp's pace 60 mails reach back ~4 hours, so the "3 days" list held
+ * one night. zKill lists 200 kills + 200 losses; all of them are read, in
+ * batches, and kept (a killmail never changes) so a refresh fetches only the
+ * new ones. */
+const HYDRATE_LIMIT = 400;
+const HYDRATE_BATCH = 25;
+/** how many corporation logos a card shows per side */
+export const POSTER_LOGOS = 5;
+const mailCache = new Map<number, FeedMail>();
 
 interface ZkbEntry {
   killmail_id: number;
@@ -58,6 +69,18 @@ export interface BattleReportResult {
   endedAt: string;
   /** corp kills + losses inside the fight window (of those hydrated) */
   kills: number;
+  /** corp / alliance pilots on those killmails */
+  corpPilots: number;
+  /** one of the user's own logged-in characters is on one of them */
+  mine: boolean;
+  /** how the fight was put together and why it ended (fightSplit.ts), for the tab */
+  why: string;
+  /** the card's headline numbers, from the corp's own killmails (v0.204.1):
+   * pilots seen on each side, ISK destroyed vs lost, the enemy groups by name */
+  poster: Omit<FightPoster, 'enemies' | 'corps'> & {
+    enemies: { id: number; name: string; pilots: number }[];
+    corps: Record<'ours' | 'theirs', { id: number; name: string; pilots: number }[]>;
+  };
   /** set when the honest link could not cover the whole fight */
   caveat?: string;
   /** what to hand fetchFightData when the write-up is wanted */
@@ -110,10 +133,10 @@ async function postJson<T>(url: string, body: unknown): Promise<T> {
   return r.json() as Promise<T>;
 }
 
-/** window padding around the fight when asking br.evetools for its kills —
- * must stay under half of FIGHT_GAP_MINUTES so a neighbouring fight in the
- * same system cannot bleed in */
-const BR_WINDOW_PAD_MINUTES = 15;
+/** window padding around each system's part of the fight when asking
+ * br.evetools for its kills. Whatever the pad lets in that shares no pilot
+ * with the fight is dropped again (relevantKms). */
+const BR_WINDOW_PAD_MINUTES = 10;
 
 export interface BrParticipant {
   ally: number; corp: number; char: number; ship: number;
@@ -184,12 +207,22 @@ export const esiKmToBr = (id: number, km: EsiKillmail, totalValue: number): BrKm
   };
 };
 
-const fightTimings = (systems: number[], startMs: number, endMs: number): BrTiming[] => {
+/** EACH SYSTEM ITS OWN WINDOW (v0.204.0): from that system's first killmail of
+ * the fight to its last, padded. It used to be every system over the WHOLE
+ * fight — measured on a 10-system, 282-minute battle: 73 killmails came back,
+ * 8 with no corp member on them, 7 of those from a system where the corp had
+ * one kill. Exported pure for fixtures. */
+export const fightTimings = (mails: readonly { system: number; t: number }[]): BrTiming[] => {
   const padMs = BR_WINDOW_PAD_MINUTES * 60_000;
-  return systems.map((s) => ({
-    systemID: String(s),
-    start: Math.floor((startMs - padMs) / 1000),
-    end: Math.floor((endMs + padMs) / 1000),
+  const span = new Map<number, { lo: number; hi: number }>();
+  for (const m of [...mails].sort((a, b) => a.t - b.t)) {
+    const s = span.get(m.system);
+    if (s) { s.lo = Math.min(s.lo, m.t); s.hi = Math.max(s.hi, m.t); } else span.set(m.system, { lo: m.t, hi: m.t });
+  }
+  return [...span.entries()].map(([sys, s]) => ({
+    systemID: String(sys),
+    start: Math.floor((s.lo - padMs) / 1000),
+    end: Math.floor((s.hi + padMs) / 1000),
   }));
 };
 
@@ -421,7 +454,7 @@ export interface BattleHistory {
 export const HISTORY_DAYS = 3;
 
 export async function makeBattleReports(
-  corpId: number, sources: LiveSource[] = [],
+  corpId: number, sources: LiveSource[] = [], myCharIds: readonly number[] = sources.map((s) => s.characterId),
 ): Promise<BattleHistory> {
   // kills AND losses — a fight the corp lost still deserves its report —
   // PLUS every logged-in character's own mails live from ESI, PLUS the
@@ -448,12 +481,14 @@ export async function makeBattleReports(
   if (entries.length === 0) {
     throw new Error('zKillboard lists no recent kills or losses for this corporation');
   }
-  const detail: FeedMail[] = (await Promise.all(entries.map(async (e) => {
+  const hydrate = async (e: ZkbEntry): Promise<FeedMail | null> => {
+    const hit = mailCache.get(e.killmail_id);
+    if (hit) return hit;
     try {
       const km = await getJson<EsiKillmail>(
         `${ESI_BASE}/killmails/${e.killmail_id}/${e.zkb.hash}/`,
       );
-      return {
+      const fm: FeedMail = {
         id: e.killmail_id,
         t: new Date(km.killmail_time).getTime(),
         system: km.solar_system_id,
@@ -461,27 +496,56 @@ export async function makeBattleReports(
         // the FULL killmail, in br shape — the summary's fallback source
         br: esiKmToBr(e.killmail_id, km, e.zkb.totalValue ?? 0),
       };
+      mailCache.set(fm.id, fm);
+      return fm;
     } catch {
       return null; // one unfetchable killmail must not kill the report
     }
-  }))).filter((x): x is FeedMail => x !== null)
-    .sort((a, b) => b.t - a.t);
+  };
+  const detail: FeedMail[] = [];
+  for (let i = 0; i < entries.length; i += HYDRATE_BATCH) {
+    const got = await Promise.all(entries.slice(i, i + HYDRATE_BATCH).map(hydrate));
+    for (const g of got) if (g) detail.push(g);
+  }
+  detail.sort((a, b) => b.t - a.t);
   if (detail.length === 0) {
     throw new Error('ESI returned no killmail details');
   }
 
-  // EVERY fight in the window, newest first — same gap rule that used to
-  // find only the newest one
-  const gapMs = FIGHT_GAP_MINUTES * 60_000;
+  // EVERY fight in the window, newest first — split by who fought whom,
+  // where, and at what tempo (fightSplit.ts), not by corp-wide silence
   const cutoff = Date.now() - HISTORY_DAYS * 86_400_000;
-  const clusters = clusterFights(detail, gapMs)
-    .filter((f) => f[0].t >= cutoff);
+  const split: SplitFight<FeedMail & { victim: BrParticipant; attackers: BrParticipant[] }>[] = splitFights(
+    detail.map((m) => ({ ...m, victim: m.br.victim, attackers: m.br.attackers })), { corpId },
+  ).filter((f) => f.mails[0].t >= cutoff);
+  const whyOf = new Map(split.map((f) => [f.mails[0].id, f] as const));
+  const clusters: FeedMail[][] = split.map((f) => f.mails);
+  const mine = new Set(myCharIds);
   if (clusters.length === 0) {
     throw new Error(`no corp fights in the last ${HISTORY_DAYS} days`);
   }
 
-  // one names lookup for every system the history touched
+  // the cards' headline numbers, from the corp's own killmails
+  const homeAlly = homeAlliance(detail.map((m) => ({ ...m, victim: m.br.victim, attackers: m.br.attackers })), corpId);
+  const posters = new Map(clusters.map((fight) => [fight[0].id,
+    fightPoster(fight.map((m) => ({ ...m, victim: m.br.victim, attackers: m.br.attackers })), corpId, homeAlly)] as const));
+  // one names lookup for every system the history touched — and the two
+  // biggest enemy groups of every fight (the card says who it was against)
   const allSystems = [...new Set(detail.map((k) => k.system))];
+  // the corporations whose logos the cards show (their names are the tooltips) — a
+  // SEPARATE lookup: /universe/names/ is all-or-nothing, and a corp that no longer
+  // resolves must not take the system names down with it
+  const groupIds = [...new Set([...posters.values()].flatMap((p) => [...p.corps.ours.slice(0, POSTER_LOGOS), ...p.corps.theirs.slice(0, POSTER_LOGOS)].map((e) => e.id)))];
+  const groupNames = new Map<number, string>();
+  try {
+    for (let i = 0; i < groupIds.length; i += 500) {
+      const r = await fetch(`${ESI_BASE}/universe/names/`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(groupIds.slice(i, i + 500)), signal: AbortSignal.timeout(NET_TIMEOUT_MS),
+      });
+      if (r.ok) for (const row of await r.json() as { id: number; name: string }[]) groupNames.set(row.id, row.name);
+    }
+  } catch { /* logos still draw; the tooltip falls back to the id */ }
   const sysNames = new Map<number, string>();
   try {
     const r = await fetch(`${ESI_BASE}/universe/names/`, {
@@ -514,8 +578,16 @@ export async function makeBattleReports(
       endedAt: fight[0].time,
       kills: fight.length,
       caveat,
+      corpPilots: new Set(fight.flatMap((k) => [k.br.victim, ...k.br.attackers]).filter((p) => p.corp === corpId && p.char).map((p) => p.char)).size,
+      mine: fight.some((k) => [k.br.victim, ...k.br.attackers].some((p) => p.char !== 0 && mine.has(p.char))),
+      why: fightWhy(whyOf.get(fight[0].id)!),
+      poster: (() => {
+        const p = posters.get(fight[0].id)!;
+        const named = (xs: { id: number; pilots: number }[]) => xs.map((e) => ({ ...e, name: groupNames.get(e.id) ?? '' }));
+        return { ...p, enemies: named(p.enemies), corps: { ours: named(p.corps.ours), theirs: named(p.corps.theirs) } };
+      })(),
       window: {
-        timings: fightTimings(systems, first.t, fight[0].t),
+        timings: fightTimings(fight),
         corpId,
         startMs: first.t,
         endMs: fight[0].t,
@@ -551,8 +623,10 @@ export async function createSavedBr(timings: BrTiming[], fd: FightData): Promise
 }
 
 /** the write-up's data, fetched on its own time — never in front of the link */
-export async function fetchFightData(w: FightWindow): Promise<FightData> {
-  return deriveTeams(await analyzeFight(w.timings), w.corpId);
+export async function fetchFightData(w: FightWindow, seed: readonly BrKm[] = []): Promise<FightData> {
+  // only what shares a pilot with the corp's own killmails of this fight —
+  // a system window also catches strangers shooting strangers (v0.204.0)
+  return deriveTeams(relevantKms(await analyzeFight(w.timings), seed), w.corpId);
 }
 
 /** the summary built from the corp's OWN killmails — already in hand from

@@ -328,73 +328,6 @@ function YourSetupSection() {
   );
 }
 
-/**
- * AI FIGHT SUMMARIES — the Anthropic key, write-only. The field sends the
- * key to the MAIN process, which stores it in Documents/EVE Conductor/
- * anthropic.json (a secret file, deliberately NOT config.json — that one
- * promises to be safe to copy). Nothing here ever reads the key back:
- * the only answer is whether one is configured and which model it uses.
- */
-function AiSummarySection() {
-  const [st, setSt] = useState<{ configured: boolean; model: string | null } | null>(null);
-  const [draft, setDraft] = useState('');
-  const [note, setNote] = useState<string | null>(null);
-  useEffect(() => {
-    void window.appInfo?.narrative?.status().then(setSt).catch(() => {});
-  }, []);
-  if (!isElectron || !window.appInfo?.narrative) return null;
-  const apply = async (key: string) => {
-    const r = await window.appInfo!.narrative!.setKey(key);
-    setSt(r);
-    setDraft('');
-    setNote(r.configured
-      ? `saved — fight summaries will be written by ${r.model}`
-      : (key === '' ? 'key cleared — the plain summary still works' : 'could not save the key'));
-  };
-  return (
-    <div className="sso-section">
-      <h3 className="section-title">AI fight summaries</h3>
-      <p className="hint">
-        Battle Reports can turn a fight&apos;s computed numbers into short prose with a Claude call.
-        The numbers are always computed by the app — the AI only phrases them, and without a key
-        the plain summary works exactly the same.
-        {' '}Status: {st === null ? '…' : st.configured
-          ? <b style={{ color: 'var(--good)' }}>configured — {st.model}</b>
-          : <b>not set</b>}
-      </p>
-      <div className="field-grid">
-        <label>Anthropic API key</label>
-        <input
-          type="password"
-          style={{ width: '100%' }}
-          value={draft}
-          placeholder={st?.configured ? 'a key is stored — paste a new one to replace it' : 'sk-ant-…'}
-          onChange={(e) => setDraft(e.target.value)}
-          spellCheck={false}
-        />
-      </div>
-      <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-        <button className="btn mini" disabled={draft.trim() === ''}
-          onClick={() => { void apply(draft); }}>
-          save key
-        </button>
-        {st?.configured && (
-          <button className="btn mini" onClick={() => { void apply(''); }}>
-            remove key
-          </button>
-        )}
-      </div>
-      <p className="hint" style={{ marginTop: 6 }}>
-        Stored in <code style={{ fontSize: 11 }}>Documents/EVE Conductor/anthropic.json</code> and
-        read only by the app&apos;s background process — it is a <b>secret</b>: unlike the rest of
-        your setup it is never included in backups and must not be copied to anyone. Keys come from{' '}
-        <b>console.anthropic.com</b>; a fight summary costs well under a cent.
-      </p>
-      {note && <div className="hint" style={{ color: 'var(--good)' }}>{note}</div>}
-    </div>
-  );
-}
-
 function AppWindowSection() {
   const settings = useApp((s) => s.settings);
   const setSettings = useApp((s) => s.setSettings);
@@ -752,7 +685,6 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
 
         <EveLoginSection />
       <YourSetupSection />
-      <AiSummarySection />
       <AppWindowSection />
         <AlertsSection />
         <BackupSection />

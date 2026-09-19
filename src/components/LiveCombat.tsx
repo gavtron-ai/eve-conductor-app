@@ -24,13 +24,12 @@ import {
   parseGameLogLine, engagements, miningStats,
   type GameLogEvent, type Engagement, type MiningStats,
 } from '../lib/gamelogParse';
-import { ensureDogma } from '../lib/dogmaStats';
 import { useElementWidth } from '../lib/useElementWidth';
 import { InfoDot } from './Help';
 import { useAuth } from '../lib/auth';
-import { characterKillMarks, type KillMark } from '../lib/killIntel';
+import { characterKillMarks, mergeKillMarks, type KillMark } from '../lib/killIntel';
 import { shipSegmentsSync, primeShipHistory, type ShipSegment } from '../lib/shipHistory';
-import { resolveCharIds, charAffiliation, likelyFit, slotOf, type CharAffiliation, type LikelyFit, type FitModule } from '../lib/entityIntel';
+import { PilotFitPanel, TypeIcon, TypeIconId, ZkPic, typeByName, typeName, typesLoaded, useTypeIcons } from './PilotFitPanel';
 import { getSystem } from '../lib/mapdata';
 import { logInfo } from '../lib/devlog';
 import { fetchAggregates } from '../lib/market';
@@ -75,69 +74,14 @@ const durLabel = (ms: number): string => {
   return `${Math.floor(s / 3600)}h ${String(Math.floor((s % 3600) / 60)).padStart(2, '0')}m`;
 };
 
+// TYPE ICONS live in PilotFitPanel.tsx (v0.203.2) — names, icons and categories
+// from the dogma bundle, shared with Battle Reports.
 // ---------------------------------------------------------------------------
-// TYPE ICONS — name → typeId via the dogma bundle (built once, lazily)
-// ---------------------------------------------------------------------------
-
-const ICON_CATS = new Set([4, 6, 7, 8, 11, 18, 25]); // material/ship/module/charge/NPC/drone/asteroid
-/** huffable GAS lives in group 711 "Harvestable Cloud", category 2
- * (Celestial) — measured: Fullerite-C320 id 30377 cat 2 — so the category
- * filter alone dropped it and gas showed unpriced with no icon */
-const GAS_GROUP = 711;
-let typeIdByName: Map<string, { id: number; cat: number }> | null = null;
-let typeNameById: Map<number, string> | null = null;
-let typeMapLoading = false;
-
-function useTypeIcons(): number {
-  const [rev, setRev] = useState(0);
-  useEffect(() => {
-    if (typeIdByName !== null || typeMapLoading) return;
-    typeMapLoading = true;
-    void ensureDogma().then((data) => {
-      const m = new Map<string, { id: number; cat: number }>();
-      const byId = new Map<number, string>();
-      for (const [id, t] of Object.entries(data.types as Record<string, { name: string; categoryID: number; groupID?: number }>)) {
-        if (t && (ICON_CATS.has(t.categoryID) || t.groupID === GAS_GROUP)) m.set(t.name, { id: Number(id), cat: t.categoryID });
-        if (t) byId.set(Number(id), t.name);
-      }
-      typeIdByName = m;
-      typeNameById = byId;
-      setRev((r) => r + 1);
-    }).catch(() => { typeMapLoading = false; });
-  }, []);
-  return rev;
-}
 
 function parseEntity(raw: string): { pilot: string; corp: string | null; ship: string } {
   const m = /^(.*?)\[(.*?)\]\((.*?)\)$/.exec(raw);
   if (m) return { pilot: m[1], corp: m[2], ship: m[3] };
   return { pilot: raw, corp: null, ship: raw };
-}
-
-function TypeIcon({ name, size = 32, title }: { name: string; size?: number; title?: string }) {
-  const t = typeIdByName?.get(name);
-  if (!t) return <span style={{ width: size, height: size, flex: 'none' }} />;
-  const kind = t.cat === 6 || t.cat === 11 ? 'render' : 'icon';
-  return (
-    <img src={`https://images.evetech.net/types/${t.id}/${kind}?size=64`}
-      width={size} height={size} alt="" title={title ?? name}
-      style={{ borderRadius: 5, flex: 'none', background: 'rgba(128,128,128,.08)' }}
-      onError={(e) => { (e.target as HTMLImageElement).style.visibility = 'hidden'; }} />
-  );
-}
-
-/** hull/type name from an id (ship history + killmails give ids) */
-function typeName(id: number): string { return typeNameById?.get(id) ?? `#${id}`; }
-
-/** icon straight from a type ID (killmails give ship type ids, not names) */
-function TypeIconId({ id, size = 32 }: { id: number; size?: number }) {
-  if (!id) return <span style={{ width: size, height: size, flex: 'none' }} />;
-  return (
-    <img src={`https://images.evetech.net/types/${id}/render?size=64`}
-      width={size} height={size} alt=""
-      style={{ borderRadius: 5, flex: 'none', background: 'rgba(128,128,128,.08)' }}
-      onError={(e) => { (e.target as HTMLImageElement).style.visibility = 'hidden'; }} />
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -841,9 +785,6 @@ function RateChart({ events, logins, domain, width, valueOf, color, fmtY, ariaLa
 // exchange, the kills/losses you shared, and a zKill-inferred likely fit.
 // ---------------------------------------------------------------------------
 
-const SLOT_LABEL: Record<'high' | 'mid' | 'low' | 'rig', string> = {
-  high: 'high slots', mid: 'mid slots', low: 'low slots', rig: 'rigs',
-};
 
 function ExchangeCol({ title, agg, color }: { title: string; agg?: AppAgg; color: string }) {
   if (!agg) return (
@@ -866,146 +807,64 @@ function ExchangeCol({ title, agg, color }: { title: string; agg?: AppAgg; color
   );
 }
 
-function EntityPanel({ raw, stats, killMarks, onClose }: {
-  raw: string; stats: WindowStats; killMarks: KillMark[]; onClose: () => void;
+/**
+ * THE pilot panel of this tab — opened from a pilot in the log (Top targets /
+ * Top attackers: `raw`) or from a kill / loss card (`mark`). Either way it is
+ * the same shared panel Battle Reports opens from a ship picture
+ * (PilotFitPanel.tsx): what passed between you, the killmails, their fit, the
+ * zKillboard links inside. Exported for the browser rig.
+ *  - from the log: every killmail your characters share with that pilot is evidence;
+ *  - from a card: THAT killmail is the evidence, so its ship is the fit shown —
+ *    a pilot who died twice gets the one you clicked. A LOSS card is your own pilot.
+ */
+export function EntityPanel({ raw, mark, stats, killMarks, onClose }: {
+  raw?: string; mark?: KillMark; stats: WindowStats; killMarks: KillMark[]; onClose: () => void;
 }) {
-  const ent = parseEntity(raw);
-  const [charId, setCharId] = useState<number | null>(null);
-  const [aff, setAff] = useState<CharAffiliation | null>(null);
-  const [fit, setFit] = useState<LikelyFit | null>(null);
-  const [fitState, setFitState] = useState<'idle' | 'loading' | 'done' | 'none'>('idle');
-
-  useEffect(() => {
-    let alive = true;
-    setCharId(null); setAff(null); setFit(null); setFitState('idle');
-    void resolveCharIds([ent.pilot]).then((m) => {
-      const id = m.get(ent.pilot);
-      if (!alive || !id) return;
-      setCharId(id);
-      void charAffiliation(id).then((a) => { if (alive) setAff(a); });
-    });
-    return () => { alive = false; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [raw]);
-
-  const iDealt = stats.byTarget.find(([n]) => n === raw)?.[1]
-    ?? stats.byTarget.find(([n]) => parseEntity(n).pilot === ent.pilot)?.[1];
-  const theyDealt = stats.byAttacker.find(([n]) => n === raw)?.[1]
-    ?? stats.byAttacker.find(([n]) => parseEntity(n).pilot === ent.pilot)?.[1];
-  const shared = killMarks.filter((k) => k.victimName && k.victimName === ent.pilot);
-  const shipId = typeIdByName?.get(ent.ship)?.id ?? 0;
-
-  const loadFit = () => {
-    if (charId == null || fitState !== 'idle') return;
-    setFitState('loading');
-    void likelyFit(charId, shipId || undefined).then((f) => {
-      setFit(f); setFitState(f ? 'done' : 'none');
-    });
-  };
-
-  const groups: Record<'high' | 'mid' | 'low' | 'rig', FitModule[]> = { high: [], mid: [], low: [], rig: [] };
-  if (fit) for (const m of fit.modules) { const sl = slotOf(m.flag); if (sl !== 'other') groups[sl].push(m); }
-
+  const ent = raw !== undefined ? parseEntity(raw) : { pilot: mark?.victimName || `pilot #${mark?.victimCharId ?? 0}`, corp: null, ship: '' };
+  const samePilot = (n: string) => parseEntity(n).pilot === ent.pilot;
+  const iDealt = (raw !== undefined ? stats.byTarget.find(([n]) => n === raw)?.[1] : undefined) ?? stats.byTarget.find(([n]) => samePilot(n))?.[1];
+  const theyDealt = (raw !== undefined ? stats.byAttacker.find(([n]) => n === raw)?.[1] : undefined) ?? stats.byAttacker.find(([n]) => samePilot(n))?.[1];
+  const asKillmail = (k: KillMark) => ({ id: k.id, hash: k.hash, value: k.value, t: k.t, shipTypeId: k.victimShipId });
+  const killmails = mark ? [asKillmail(mark)] : killMarks.filter((k) => k.victimName && k.victimName === ent.pilot).map(asKillmail);
+  const isOwnLoss = mark?.kind === 'loss';
   return (
-    <div className="overlay" onClick={onClose}>
-      <div className="modal modal-wide" style={{ maxWidth: 720, maxHeight: '86vh', overflowY: 'auto' }}
-        onClick={(e) => e.stopPropagation()}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
-          {charId != null
-            ? <img src={`https://images.evetech.net/characters/${charId}/portrait?size=128`} width={64} height={64} alt="" style={{ borderRadius: 8 }} />
-            : <span style={{ width: 64, height: 64, borderRadius: 8, background: 'rgba(128,128,128,.12)', flex: 'none' }} />}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ fontSize: 19, fontWeight: 800 }}>{ent.pilot}</div>
-            <div className="dim" style={{ fontSize: 13, display: 'flex', alignItems: 'center', gap: 6 }}>
-              {aff?.allianceId ? <img src={`https://images.evetech.net/alliances/${aff.allianceId}/logo?size=32`} width={18} height={18} alt="" /> : null}
-              {aff?.corpId ? <img src={`https://images.evetech.net/corporations/${aff.corpId}/logo?size=32`} width={18} height={18} alt="" /> : null}
-              {aff ? `${aff.corpName}${aff.allianceName ? ` · ${aff.allianceName}` : ''}` : (ent.corp ?? '')}
-            </div>
-          </div>
-          {ent.ship !== ent.pilot && (
-            <div style={{ textAlign: 'center' }}>
-              <TypeIcon name={ent.ship} size={48} />
-              <div className="dim" style={{ fontSize: 12, marginTop: 2 }}>{ent.ship}</div>
-            </div>
-          )}
-          {charId != null && (
-            <button className="btn mini" title="open this pilot on zKillboard"
-              onClick={() => window.open(`https://zkillboard.com/character/${charId}/`, '_blank')}>zKill ↗</button>
-          )}
+    <PilotFitPanel pilot={ent.pilot} pilotId={mark?.victimCharId} corpHint={ent.corp}
+      shipName={raw !== undefined && ent.ship !== ent.pilot ? ent.ship : ''} shipTypeId={mark?.victimShipId}
+      win={{ t0: stats.t0, t1: stats.t1 }} killmails={killmails}
+      words={{ onMail: isOwnLoss ? 'your own loss' : 'a kill you are on' }}
+      onClose={onClose}>
+      <div style={CARD}>
+        <div className="dim" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
+          {isOwnLoss ? `your pilot — ${ent.pilot}` : `what happened between you — ${ent.pilot}`}
         </div>
-
-        <div style={CARD}>
-          <div className="dim" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 8 }}>
-            what happened between you — {ent.pilot}
+        {isOwnLoss
+          ? <div className="dim" style={{ fontSize: 13 }}>one of your own characters lost this ship — the fit below is exactly what died.</div>
+          : (
+            <div style={{ display: 'flex', gap: 20 }}>
+              <ExchangeCol title="you dealt to them" agg={iDealt} color={OUT_COLOR} />
+              <ExchangeCol title="they dealt to you" agg={theyDealt} color={IN_COLOR} />
+            </div>
+          )}
+        {killmails.length === 1 && (
+          <div style={{ fontSize: 13, marginTop: 10 }}>
+            {isOwnLoss ? 'lost' : 'killed'} in a <b>{typeName(killmails[0].shipTypeId)}</b> at {hhmm(killmails[0].t)} · <b>{fmtN(killmails[0].value / 1e6)}M ISK</b>
+            {(mark?.pilots ?? 1) > 1 ? <span className="dim"> · {mark!.pilots} of your pilots on the killmail</span> : null}
           </div>
-          <div style={{ display: 'flex', gap: 20 }}>
-            <ExchangeCol title="you dealt to them" agg={iDealt} color={OUT_COLOR} />
-            <ExchangeCol title="they dealt to you" agg={theyDealt} color={IN_COLOR} />
-          </div>
-          {shared.length > 0 && (
-            <div style={{ marginTop: 10, fontSize: 13 }}>
-              <span className="dim">killmails you shared: </span>
-              {shared.map((k) => (
-                <a key={k.id} href="#" onClick={(e) => { e.preventDefault(); window.open(`https://zkillboard.com/kill/${k.id}/`, '_blank'); }}
-                  style={{ marginRight: 10 }}>
-                  <b style={{ color: '#5fd08a' }}>⚔ {k.kind === 'loss' ? 'their loss' : 'kill'}</b> {fmtN(k.value / 1e6)}M ISK
-                </a>
+        )}
+        {killmails.length > 1 && (
+          <div style={{ marginTop: 10 }}>
+            <div className="dim" style={{ fontSize: 11, textTransform: 'uppercase', marginBottom: 6 }}>you killed them {killmails.length} times here — each picture opens that kill</div>
+            <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+              {killmails.map((k) => (
+                <ZkPic key={k.id} small url={`https://zkillboard.com/kill/${k.id}/`} caption={`${typeName(k.shipTypeId)} · ${hhmm(k.t)} · ${fmtN(k.value / 1e6)}M`}>
+                  <TypeIconId id={k.shipTypeId} size={40} />
+                </ZkPic>
               ))}
             </div>
-          )}
-        </div>
-
-        <div style={{ ...CARD, marginTop: 10 }}>
-          <div style={{ display: 'flex', alignItems: 'baseline', gap: 8, marginBottom: 8 }}>
-            <span className="dim" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em' }}>likely fit</span>
-            <span className="dim" style={{ fontSize: 12 }}>inferred from their own recent loss on zKillboard — a strong guess for a doctrine ship, a guess all the same</span>
           </div>
-          {fitState === 'idle' && (
-            <button className="btn" onClick={loadFit} disabled={charId == null}
-              style={{ fontSize: 13 }}>
-              {charId == null ? 'resolving pilot…' : `guess ${ent.ship !== ent.pilot ? ent.ship : 'their'} fit from zKill`}
-            </button>
-          )}
-          {fitState === 'loading' && <div className="dim" style={{ fontSize: 13 }}>reading their killboard…</div>}
-          {fitState === 'none' && <div className="dim" style={{ fontSize: 13 }}>no loss on zKillboard to infer a fit from.</div>}
-          {fitState === 'done' && fit && (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <TypeIconId id={fit.shipTypeId} size={36} />
-                <div style={{ fontSize: 14, fontWeight: 700 }}>{typeName(fit.shipTypeId)}</div>
-                <a href="#" className="dim" style={{ fontSize: 12.5 }}
-                  onClick={(e) => { e.preventDefault(); window.open(`https://zkillboard.com/kill/${fit.killId}/`, '_blank'); }}>
-                  lost {hhmm(fit.lossTime)} · {fmtN(fit.lossValue / 1e6)}M ISK ↗
-                </a>
-                {shipId !== 0 && fit.shipTypeId !== shipId && (
-                  <span className="flag warn" style={{ fontSize: 11 }}>different hull than you saw ({ent.ship})</span>
-                )}
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 10 }}>
-                {(['high', 'mid', 'low', 'rig'] as const).map((slot) => (groups[slot].length > 0 ? (
-                  <div key={slot}>
-                    <div className="dim" style={{ fontSize: 11, textTransform: 'uppercase', marginBottom: 4 }}>{SLOT_LABEL[slot]}</div>
-                    {groups[slot].map((m, i) => (
-                      <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 3, fontSize: 12.5 }}
-                        title={typeName(m.typeId)}>
-                        <TypeIconId id={m.typeId} size={22} />
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {m.qty > 1 ? `${m.qty}× ` : ''}{typeName(m.typeId)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : null))}
-              </div>
-            </>
-          )}
-        </div>
-
-        <div style={{ marginTop: 12, textAlign: 'right' }}>
-          <button className="btn mini" onClick={onClose}>close</button>
-        </div>
+        )}
       </div>
-    </div>
+    </PilotFitPanel>
   );
 }
 
@@ -1051,6 +910,8 @@ export default function LiveCombat() {
   const [killMarks, setKillMarks] = useState<KillMark[]>([]);
   const [shipRev, setShipRev] = useState(0);
   const [entityRaw, setEntityRaw] = useState<string | null>(null);
+  // a kill / loss card opens the SAME pilot panel, with that killmail as the evidence (v0.204.1)
+  const [entityMark, setEntityMark] = useState<KillMark | null>(null);
   const typeRev = useTypeIcons();
 
   // ---- ORE PRICES (Jita) for the mining ISK layer. The app's ONE
@@ -1066,9 +927,9 @@ export default function LiveCombat() {
   useEffect(() => {
     let alive = true;
     const names = oreNamesKey === '' ? [] : oreNamesKey.split('|');
-    if (names.length === 0 || typeIdByName === null) { setOrePrices(new Map()); return undefined; }
+    if (names.length === 0 || !typesLoaded()) { setOrePrices(new Map()); return undefined; }
     const withIds = names
-      .map((n) => [n, typeIdByName?.get(n)?.id] as const)
+      .map((n) => [n, typeByName(n)?.id] as const)
       .filter((x): x is readonly [string, number] => x[1] !== undefined);
     if (withIds.length === 0) { setOrePrices(new Map()); return undefined; }
     void fetchAggregates(BUILTIN_HUBS[0], withIds.map(([, id]) => id)).then((aggs) => {
@@ -1101,7 +962,7 @@ export default function LiveCombat() {
     if (ids.length === 0) return undefined;
     const load = () => {
       void Promise.all(ids.map((id) => characterKillMarks(id).catch(() => [] as KillMark[])))
-        .then((lists) => { if (alive) setKillMarks(lists.flat().sort((a, b) => a.t - b.t)); });
+        .then((lists) => { if (alive) setKillMarks(mergeKillMarks(lists)); });
     };
     load();
     const t = setInterval(load, 60_000);
@@ -1655,16 +1516,18 @@ export default function LiveCombat() {
                     } />
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 8 }}>
                       {[...scopedKills].reverse().slice(0, 24).map((k) => (
-                        <a key={k.id} href="#" onClick={(ev) => { ev.preventDefault(); window.open(`https://zkillboard.com/kill/${k.id}/`, '_blank'); }}
+                        <a key={k.id} href="#" onClick={(ev) => { ev.preventDefault(); if (k.victimCharId > 0) setEntityMark(k); else window.open(`https://zkillboard.com/kill/${k.id}/`, '_blank'); }}
                           style={{ display: 'flex', alignItems: 'center', gap: 8, textDecoration: 'none', color: 'inherit',
                             border: '1px solid var(--grid)', borderRadius: 6, padding: '5px 8px' }}
-                          title={`${k.kind === 'loss' ? 'LOSS' : 'kill' + (k.finalBlow ? ' (final blow)' : '')} · ${hhmmss(k.t)} EVE · ${fmtN(k.value)} ISK · open on zKillboard`}>
+                          title={`${k.kind === 'loss' ? 'LOSS' : 'kill' + (k.finalBlow ? ' (final blow)' : '')} · ${k.victimName || 'a ship'} · ${hhmmss(k.t)} EVE · ${fmtN(k.value)} ISK${(k.pilots ?? 1) > 1 ? ` · ${k.pilots} of your pilots on it` : ''} · ${k.victimCharId > 0 ? 'click for the pilot, the exact fit from this killmail and the zKillboard link' : 'open on zKillboard'}`}>
                           <TypeIconId id={k.victimShipId} size={30} />
                           <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ fontSize: 13, fontWeight: 700, color: k.kind === 'loss' ? IN_COLOR : '#5fd08a' }}>
                               {k.kind === 'loss' ? '☠ loss' : (k.finalBlow ? '⚔ kill · final blow' : '⚔ kill')}
                             </div>
-                            <div className="dim" style={{ fontSize: 12 }}>{hhmm(k.t)} · {fmtN(k.value / 1e6)}M ISK</div>
+                            <div className="dim" style={{ fontSize: 12, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {k.victimName ? `${k.victimName} · ` : ''}{hhmm(k.t)} · {fmtN(k.value / 1e6)}M ISK{(k.pilots ?? 1) > 1 ? ` · ×${k.pilots} pilots` : ''}
+                            </div>
                           </div>
                         </a>
                       ))}
@@ -1926,7 +1789,7 @@ export default function LiveCombat() {
                         </div>
                         {(() => {
                           const volOf = (ore?: string): number => {
-                            const id = ore !== undefined ? typeIdByName?.get(ore)?.id : undefined;
+                            const id = ore !== undefined ? typeByName(ore)?.id : undefined;
                             return id !== undefined ? getType(id)?.volume ?? 0 : 0;
                           };
                           return (
@@ -2061,6 +1924,9 @@ export default function LiveCombat() {
 
         {entityRaw !== null && stats !== null && (
           <EntityPanel raw={entityRaw} stats={stats} killMarks={killMarks} onClose={() => setEntityRaw(null)} />
+        )}
+        {entityRaw === null && entityMark !== null && stats !== null && (
+          <EntityPanel mark={entityMark} stats={stats} killMarks={killMarks} onClose={() => setEntityMark(null)} />
         )}
         <div className="hint">
           Read straight from the client's log files in {dir || 'Documents\\EVE\\logs\\Gamelogs'} — the

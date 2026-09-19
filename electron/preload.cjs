@@ -60,6 +60,10 @@ contextBridge.exposeInMainWorld('appInfo', {
     /** the corp's recent kills + losses from zKill's API (cached by zKill for up to an hour) */
     corpKills: (corpId) => ipcRenderer.invoke('zkill-corp-kills', corpId),
     charKills: (charId) => ipcRenderer.invoke('zkill-char-kills', charId),
+    /** one killmail's id + hash by its id (v0.203.2) — for a battle that only knows the id */
+    killRef: (killId) => ipcRenderer.invoke('zkill-kill-ref', killId),
+    /** losses of ONE hull by a 'character' | 'corporation' | 'alliance' (v0.203.1) */
+    shipLosses: (kind, id, shipTypeId) => ipcRenderer.invoke('zkill-ship-losses', { kind, id, shipTypeId }),
     /** a system's recent killmails (window in seconds) for the gatecamp check */
     systemKills: (systemId, pastSeconds) => ipcRenderer.invoke('zkill-system-kills', { systemId, pastSeconds }),
   },
@@ -97,15 +101,6 @@ contextBridge.exposeInMainWorld('appInfo', {
     read: (file) => ipcRenderer.invoke('gamelog-read', file),
     /** the bytes appended since offset — the mining watch's tail follow */
     readFrom: (file, offset) => ipcRenderer.invoke('gamelog-read-from', file, offset),
-  },
-  /** AI fight write-ups. The Anthropic key lives in Documents/EVE Conductor/
-   * anthropic.json and is read by the MAIN process only — the renderer sends
-   * a digest of computed facts and gets prose (or an error) back. */
-  narrative: {
-    status: () => ipcRenderer.invoke('narrative-status'),
-    write: (digest) => ipcRenderer.invoke('narrative-write', digest),
-    /** write-only: stores (or clears, with '') the key; answers status only */
-    setKey: (apiKey) => ipcRenderer.invoke('narrative-set-key', apiKey),
   },
   /** bulk fit import path: write a file the EVE client can import directly */
   fittings: {

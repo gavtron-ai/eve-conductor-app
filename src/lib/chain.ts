@@ -244,6 +244,60 @@ export function hopsFrom(origin: string, edges: readonly [string, string][]): Ma
   return hops;
 }
 
+// ---- BRANCHES (v0.205.0): "which part of the chain are you roaming through".
+// A branch is one system directly off the origin plus everything whose way
+// home runs through it. Same walk as hopsFrom (breadth first over the drawn
+// links), remembering for every system WHICH first hop(s) its shortest paths
+// use. A system two branches reach equally fast belongs to BOTH — a loop in
+// the chain — so picking either branch shows it. The origin belongs to none;
+// a system with no drawn link to the origin belongs to none either.
+export interface ChainBranch {
+  /** the system directly off the origin that names the branch */
+  first: string;
+  /** every system down it, the first hop included, nearest first then A→Z */
+  systems: string[];
+}
+export interface ChainBranches {
+  /** A→Z by their first system */
+  branches: ChainBranch[];
+  /** system → the first hop(s) its shortest paths from the origin go through */
+  via: Map<string, Set<string>>;
+}
+export function chainBranches(origin: string, edges: readonly [string, string][]): ChainBranches {
+  const adj = new Map<string, Set<string>>();
+  const add = (a: string, b: string) => { if (a === b) return; if (!adj.has(a)) adj.set(a, new Set()); adj.get(a)!.add(b); };
+  for (const [a, b] of edges) { add(a, b); add(b, a); }
+  const hops = new Map<string, number>([[origin, 0]]);
+  const via = new Map<string, Set<string>>();
+  const q = [origin];
+  while (q.length > 0) {
+    const cur = q.shift()!;
+    const d = hops.get(cur)!;
+    for (const n of adj.get(cur) ?? []) {
+      if (!hops.has(n)) { hops.set(n, d + 1); q.push(n); }
+      if (hops.get(n) !== d + 1) continue; // not a shortest-path step
+      const mine = via.get(n) ?? new Set<string>();
+      if (cur === origin) mine.add(n); else for (const f of via.get(cur) ?? []) mine.add(f);
+      via.set(n, mine);
+    }
+  }
+  const firsts = [...(adj.get(origin) ?? [])].sort((a, b) => a.localeCompare(b));
+  const branches = firsts.map((first) => ({
+    first,
+    systems: [...via.entries()].filter(([, f]) => f.has(first)).map(([s]) => s)
+      .sort((a, b) => (hops.get(a)! - hops.get(b)!) || a.localeCompare(b)),
+  }));
+  return { branches, via };
+}
+
+/** is this system down one of the picked branches? (the origin never is) */
+export function onBranch(system: string, picked: ReadonlySet<string>, via: ReadonlyMap<string, ReadonlySet<string>>): boolean {
+  const f = via.get(system);
+  if (!f) return false;
+  for (const x of f) if (picked.has(x)) return true;
+  return false;
+}
+
 // ---------------------------------------------------------------------------
 // VALUATION TABLES
 // ---------------------------------------------------------------------------
@@ -447,6 +501,10 @@ export interface ChainFilters {
    * carry one of them pass — any grade or variant — and a passing site is
    * valued on those rocks alone; every other activity is left out */
   rocks?: Set<string>;
+  /** the part(s) of the chain being roamed (v0.205.0, `chainBranches`): when
+   * any first hop is picked, only sites in systems down those branches pass —
+   * the origin's own sites and unlinked systems are not down any branch */
+  branches?: { picked: ReadonlySet<string>; via: ReadonlyMap<string, ReadonlySet<string>> };
 }
 
 export interface ChainRow extends ChainSig {
@@ -468,6 +526,8 @@ export interface ChainSummary {
   /** ore sites a rock filter dropped only because their contents are not in
    * the tables (a site the tables do know, holding other rocks, is simply out) */
   hiddenNoRock: number;
+  /** sites the chain filter left out: elsewhere in the chain (or at the origin) */
+  hiddenOffBranch: number;
 }
 
 export function summarize(
@@ -477,7 +537,8 @@ export function summarize(
   const byGroup = {} as ChainSummary['byGroup'];
   for (const g of ['Combat', 'Ore', 'Gas', 'Relic', 'Data', 'Wormhole', 'Other'] as SigGroup[]) byGroup[g] = { count: 0, isk: 0, unvalued: 0 };
   const rows: ChainRow[] = [];
-  let unreachable = 0, hiddenNoClass = 0, hiddenNoHops = 0, hiddenUnlinked = 0, hiddenNoRock = 0;
+  let unreachable = 0, hiddenNoClass = 0, hiddenNoHops = 0, hiddenUnlinked = 0, hiddenNoRock = 0, hiddenOffBranch = 0;
+  const branchFilter = filters.branches && filters.branches.picked.size > 0 ? filters.branches : null;
   const rockFilter = filters.rocks && filters.rocks.size > 0 ? filters.rocks : null;
   for (const s of sigs) {
     if (filters.groups.size > 0 ? !filters.groups.has(s.group) : s.group === 'Wormhole') continue;
@@ -492,6 +553,8 @@ export function summarize(
       if (mine.length === 0) continue;
     }
     if (filters.systems && filters.systems.size > 0 && !filters.systems.has(s.system)) continue;
+    // the chain filter (v0.205.0): only what lies down the picked branch(es)
+    if (branchFilter && !onBranch(s.system, branchFilter.picked, branchFilter.via)) { hiddenOffBranch++; continue; }
     if (filters.classes.size > 0 && !filters.classes.has(s.cls)) { if (!s.cls) hiddenNoClass++; continue; }
     if (filters.maxAgeH !== null && s.ageH !== null && s.ageH > filters.maxAgeH) continue;
     const h = hops ? (hops.get(s.system) ?? null) : null;
@@ -510,7 +573,7 @@ export function summarize(
   }
   rows.sort((a, b) => (a.hops ?? 99) - (b.hops ?? 99) || (b.value.isk ?? -1) - (a.value.isk ?? -1) || a.system.localeCompare(b.system));
   const totalIsk = Object.values(byGroup).reduce((s, g) => s + g.isk, 0);
-  return { rows, byGroup, totalIsk, unreachable, hiddenNoClass, hiddenNoHops, hiddenUnlinked, hiddenNoRock };
+  return { rows, byGroup, totalIsk, unreachable, hiddenNoClass, hiddenNoHops, hiddenUnlinked, hiddenNoRock, hiddenOffBranch };
 }
 
 // ---- ORE VARIANTS (v0.202.8): the site tables name rocks by their exact

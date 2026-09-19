@@ -317,5 +317,28 @@ const nB = C.systemOfNodeText('4h 5 C6 A J100501 C4', []);
 const nC = C.systemOfNodeText('7h C3 A J131304 L', []);
 check('H6 …and for the class and name', nB.system === 'J100501' && nB.cls === 'C6' && nC.system === 'J131304' && nC.cls === 'C3', JSON.stringify([nB, nC]));
 
+// ---- BR: the chain filter (v0.205.0) — "which part of the chain are you roaming through"
+// Homebase — J120452 — J214440 — J145555, J120452 — J145848, Homebase — Chardalane (the D chain)
+const brs = C.chainBranches('Homebase', chainEdges);
+check('BR1 two systems sit directly off home, so two branches, A→Z', brs.branches.map((b) => b.first).join(',') === 'Chardalane,J120452');
+check('BR2 the J120452 branch is everything whose way home runs through it, nearest first then A→Z; Chardalane is a dead end', brs.branches[1].systems.join(',') === 'J120452,J145848,J214440,J145555' && brs.branches[0].systems.join(',') === 'Chardalane');
+check('BR3 home itself is down no branch, nor is a system with no drawn link', !brs.via.has('Homebase') && !brs.via.has('Nowhere') && C.onBranch('Homebase', new Set(['J120452']), brs.via) === false);
+// a loop: home — X — Z and home — Y — Z: Z is two jumps out either way, so it belongs to BOTH; W hangs off Z
+const loop = C.chainBranches('H', [['H', 'X'], ['H', 'Y'], ['X', 'Z'], ['Y', 'Z'], ['Z', 'W'], ['X', 'X']]);
+check('BR4 a system two branches reach equally fast is on both, and so is everything beyond it; a self-link is ignored', [...loop.via.get('Z')].sort().join(',') === 'X,Y' && [...loop.via.get('W')].sort().join(',') === 'X,Y' && loop.branches.map((b) => `${b.first}:${b.systems.join('+')}`).join(' ') === 'X:X+Z+W Y:Y+Z+W');
+// …but a LONGER way round does not count: home — A — B and home — C — D — B: B is A's (2 jumps), not C's (3)
+const longWay = C.chainBranches('H', [['H', 'A'], ['A', 'B'], ['H', 'C'], ['C', 'D'], ['D', 'B']]);
+check('BR5 only shortest paths decide: B is down A, not down C', [...longWay.via.get('B')].join(',') === 'A' && longWay.branches.find((b) => b.first === 'C').systems.join(',') === 'C,D');
+check('BR6 an origin that is not on the map has no branches', C.chainBranches('Elsewhere', chainEdges).branches.length === 0);
+// the filter: one site each at home, J120452, J214440 (two out, down J120452), Chardalane and an unlinked system
+const bSig = (sig, group, system, cls, name) => ({ sig, group, system, cls, name, ageH: 1 });
+const bSigs = [bSig('B-001', 'Combat', 'Homebase', 'C2', 'Frontier Barracks'), bSig('B-002', 'Gas', 'J120452', 'C4', 'Barren Perimeter Reservoir'), bSig('B-003', 'Ore', 'J214440', 'C3', 'Common Perimeter Deposit'), bSig('B-004', 'Combat', 'Chardalane', 'LS', ''), bSig('B-005', 'Relic', 'Nowhere', 'C5', '')];
+const bF = (picked, extra = {}) => ({ maxHops: null, classes: new Set(), groups: new Set(), maxAgeH: null, branches: { picked: new Set(picked), via: brs.via }, ...extra });
+const downJ = C.summarize(bSigs, h, bF(['J120452']), price, tables);
+check('BR7 picking J120452 keeps the two sites down it and leaves out home, Chardalane and the unlinked system — three, counted', downJ.rows.map((r) => r.system).join(',') === 'J120452,J214440' && downJ.hiddenOffBranch === 3);
+check('BR8 the tiles follow: gas 2.4m + the deposit rock by rock, combat 0', downJ.byGroup.Gas.isk === 2_400_000 && downJ.byGroup.Ore.isk === expect3 && downJ.byGroup.Combat.count === 0 && downJ.totalIsk === 2_400_000 + expect3);
+const bothBr = C.summarize(bSigs, h, bF(['J120452', 'Chardalane']), price, tables);
+check('BR9 picking both branches shows everything that is down a branch — still not home, still not the unlinked one', bothBr.rows.length === 3 && !bothBr.rows.some((r) => r.system === 'Homebase' || r.system === 'Nowhere') && bothBr.hiddenOffBranch === 2);
+check('BR10 it stacks with the others: down J120452 within 1 jump is the gas site alone; an empty pick is no filter at all', C.summarize(bSigs, h, bF(['J120452'], { maxHops: 1 }), price, tables).rows.map((r) => r.sig).join(',') === 'B-002' && C.summarize(bSigs, h, bF([]), price, tables).rows.length === 5 && C.summarize(bSigs, h, bF([]), price, tables).hiddenOffBranch === 0);
 console.log(`chain.test: ${pass} passed, ${fail} failed`);
 process.exit(fail > 0 ? 1 : 0);

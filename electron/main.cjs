@@ -8,7 +8,6 @@ const devlog = require('./devlog.cjs');
 const appConfig = require('./appConfig.cjs');
 const overlay = require('./overlay.cjs');
 const cloneStore = require('./cloneStore.cjs');
-const narrative = require('./narrative.cjs');
 const zkill = require('./zkill.cjs');
 const storms = require('./storms.cjs');
 const gamelog = require('./gamelog.cjs');
@@ -237,14 +236,14 @@ ipcMain.handle('config-path', () => appConfig.configPath(app.getPath('documents'
 ipcMain.handle('hauls-read', () => appConfig.readHauls(app.getPath('documents')));
 ipcMain.handle('hauls-write', (_e, file) => appConfig.writeHauls(app.getPath('documents'), file));
 
-// ---- AI fight write-ups: the key stays in the main process (narrative.cjs) ----
-ipcMain.handle('narrative-status', () => narrative.status(app.getPath('documents')));
-ipcMain.handle('narrative-write', (_e, digest) => narrative.narrate(app.getPath('documents'), digest));
-ipcMain.handle('narrative-set-key', (_e, apiKey) => narrative.setKey(app.getPath('documents'), apiKey));
 
 // ---- the corp killboard read as a PAGE (live) rather than the cached API ----
 ipcMain.handle('zkill-corp-kills', (_e, corpId) => zkill.corpKillmails(Number(corpId) || 0));
 ipcMain.handle('zkill-char-kills', (_e, charId) => zkill.charKillmails(Number(charId) || 0));
+// losses of one hull by a character / corporation / alliance (v0.203.1);
+// the owner kind is whitelisted inside the module, the ids are forced numeric
+ipcMain.handle('zkill-kill-ref', (_e, killId) => zkill.killRef(Number(killId) || 0));
+ipcMain.handle('zkill-ship-losses', (_e, arg) => zkill.shipLosses(String((arg && arg.kind) || ''), Number(arg && arg.id) || 0, Number(arg && arg.shipTypeId) || 0));
 ipcMain.handle('zkill-system-kills', (_e, arg) => {
   const systemId = Number(arg && arg.systemId) || 0;
   const pastSeconds = arg && arg.pastSeconds;

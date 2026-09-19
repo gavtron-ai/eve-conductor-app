@@ -104,14 +104,10 @@ const digest = (kms) => nar.buildFightDigest(fd(kms), 55);
   // notable: the 10k pod is under the 100m floor; sorted by value desc
   eq('N4 notables', d.phases[0].notable.map((x) => [x.ship, x.value, x.side]),
     [['E24692', '1.87b', 'theirs'], ['E605', '570m', 'ours']]);
-  const t = nar.templateWriteup(d);
-  ok('N4 template names the loss trade', t.includes('they lost 1 ship and 1 pod (1.87b)')
-    && t.includes('we lost 1 ship (570m)'));
 
   // ---- N5: the corp pilot list caps at 4 names but keeps the count ----
   d = await digest([11, 12, 13, 14, 15].map((c, i) => km(min(i), 'T', { att: c })));
   eq('N5 cap', [d.ours.myCorp.pilotCount, d.ours.myCorp.pilots.length], [5, 4]);
-  ok('N5 template says count not names', nar.templateWriteup(d).includes('5 E55 pilots in fleet'));
 
   // ===================================================================
   // v0.100.0 review fixes — each pins a defect an adversarial reviewer
@@ -191,12 +187,6 @@ const digest = (kms) => nar.buildFightDigest(fd(kms), 55);
   d = await digest([km(min(0), 'T', { isk: 999499999 })]);
   eq('N9 just below stays m', d.fight.totalLost, '999m');
 
-  // ---- N10: singular grammar on a one-of-everything fight ----
-  d = await digest([km(min(0), 'T')]);
-  const t1 = nar.templateWriteup(d);
-  ok('N10 "1 killmail" not "1 killmails"', /\b1 killmail,/.test(t1) && !/1 killmails/.test(t1));
-  ok('N10 "1 pilot" not "1 pilots"', /\(1 pilot\)/.test(t1) && !/1 pilots/.test(t1));
-
   // ---- N11: unpriced mails make ISK totals a FLOOR, marked '≥' ----
   // A mail arriving via a character's live ESI feed has no zkb price yet
   // (lossValue 0). Presenting the sum without a marker would undercount
@@ -232,6 +222,42 @@ const digest = (kms) => nar.buildFightDigest(fd(kms), 55);
     [['E11', 4200, 0], ['E13', 800, 1]]);
   eq('N12 their leaderboard', d.theirs.dmgLeaders.map((l) => [l.name, l.dmg, l.finalBlows]),
     [['E21', 2000, 1]]);
+  // v0.203.2 — the pilot panel opens from Battle Reports: each leader carries the hull
+  // they did the most damage in, each loss its killmail time in ms
+  eq('N12b our leaders carry their hull', d.ours.dmgLeaders.map((l) => [l.shipId, l.ship]), [[17715, 'E17715'], [602, 'E602']]);
+  eq('N12b their leader carries theirs', d.theirs.dmgLeaders.map((l) => [l.shipId, l.ship]), [[17738, 'E17738']]);
+  eq('N12b loss rows carry the killmail time', [d.theirs.losses[0].t, d.ours.losses[0].t], [min(0), min(1)]);
+  // a pilot who reshipped: 100 damage from a Gila (17715), then 900 from a Rifter-class hull (602) → the 602
+  {
+    const two = await nar.buildFightDigest(fd([
+      { id: 5, time: min(0), system: 900, victim: { ally: 200, corp: 201, char: 21, ship: 24692, dmg: 100, lossValue: 10e6 },
+        attackers: [{ ally: 100, corp: 55, char: 11, ship: 17715, dmg: 100, fb: true }] },
+      { id: 6, time: min(2), system: 900, victim: { ally: 200, corp: 201, char: 22, ship: 24692, dmg: 900, lossValue: 10e6 },
+        attackers: [{ ally: 100, corp: 55, char: 11, ship: 602, dmg: 900, fb: true }] },
+    ]), 55);
+    eq('N12c a leader who reshipped shows the hull that did most of the damage', two.ours.dmgLeaders.map((l) => [l.name, l.dmg, l.shipId]), [['E11', 1000, 602]]);
+  }
+  // v0.204.2 — EVERYONE INVOLVED and the TIMELINE, on the same two killmails (kmsN12):
+  // mail 1 (t0): their pilot 21 lost hull 24692 (200m, took 5000) to our 11 (4200, Gila 17715) and 13 (800, hull 602, final blow);
+  // mail 2 (t+1): our pilot 12 lost hull 605 (50m, took 2000) to their 21 (hull 17738, final blow).
+  {
+    const r = await nar.buildFightDigest(fd(kmsN12), 55);
+    eq('N14 our roster, most damage first — the pilot who only died is on it too', r.roster.ours.map((p) => [p.name, p.dmg, p.kills, p.finalBlows, p.ships.map((s) => s.id), p.losses.map((l) => [l.shipId, l.iskNum])]),
+      [['E11', 4200, 1, 0, [17715], []], ['E13', 800, 1, 1, [602], []], ['E12', 0, 0, 0, [605], [[605, 50e6]]]]);
+    eq('N14 their roster: one pilot, both hulls seen (attacker hull and the one he lost; a tie → lower id first)', r.roster.theirs.map((p) => [p.name, p.corp, p.dmg, p.kills, p.finalBlows, p.ships.map((s) => s.id), p.losses.map((l) => l.killmailId)]),
+      [['E21', 'E201', 2000, 1, 1, [17738, 24692], [1]]]);
+    eq('N15 timeline point 1: THEIR loss, with the running totals at that moment', [r.timeline[0].side, r.timeline[0].shipId, r.timeline[0].iskNum, r.timeline[0].dmgTaken, r.timeline[0].attackers, r.timeline[0].cum],
+      ['theirs', 24692, 200e6, 5000, 2, { ours: { ships: 0, pods: 0, isk: 0, dmg: 0, seen: 2 }, theirs: { ships: 1, pods: 0, isk: 200e6, dmg: 5000, seen: 1 } }]);
+    eq('N15 timeline point 2: OUR loss; their totals stand still, our pilot 12 is now seen', [r.timeline[1].side, r.timeline[1].pilot, r.timeline[1].t - r.timeline[0].t, r.timeline[1].cum],
+      ['ours', 'E12', 60_000, { ours: { ships: 1, pods: 0, isk: 50e6, dmg: 2000, seen: 3 }, theirs: { ships: 1, pods: 0, isk: 200e6, dmg: 5000, seen: 1 } }]);
+    // a pod is counted apart from ships, and is not a hull anyone 'flew'
+    const podFight = await nar.buildFightDigest(fd([
+      { id: 7, time: min(0), system: 900, victim: { ally: 200, corp: 201, char: 21, ship: 24692, dmg: 900, lossValue: 90e6 }, attackers: [{ ally: 100, corp: 55, char: 11, ship: 17715, dmg: 900, fb: true }] },
+      { id: 8, time: min(1), system: 900, victim: { ally: 200, corp: 201, char: 21, ship: 670, dmg: 400, lossValue: 10e6 }, attackers: [{ ally: 100, corp: 55, char: 11, ship: 17715, dmg: 400, fb: true }] },
+    ]), 55);
+    eq('N16 ship then pod: ships 1 + pods 1, ISK 100m, the pod flagged; the roster shows one hull and two losses', [podFight.timeline[1].pod, podFight.timeline[1].cum.theirs, podFight.roster.theirs[0].ships.map((s) => s.id), podFight.roster.theirs[0].losses.map((l) => l.pod)],
+      [true, { ships: 1, pods: 1, isk: 100e6, dmg: 1300, seen: 1 }, [24692], [false, true]]);
+  }
   eq('N12 their loss row credits', [
     d.theirs.losses[0].ship, d.theirs.losses[0].pilot, d.theirs.losses[0].isk,
     d.theirs.losses[0].topDmg.name, d.theirs.losses[0].finalBlow.name,
