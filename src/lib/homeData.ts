@@ -3,7 +3,7 @@
 // memory, the stats folder, or the last map reading main keeps. Two dashlets of the same kind
 // share one read (`useResource`).
 import { useEffect, useMemo, useState } from 'react';
-import { APERTURE_READS_ENABLED } from './apertureAccess';
+import { APERTURE_FEATURES_AVAILABLE } from './apertureAccess';
 import type { ChainExtract } from './apertureExtract';
 import { parseReading, homeOrigin } from './chainReading';
 import { digestChain, sanitizeDigest, type ChainDigest } from './chainDigest';
@@ -104,9 +104,13 @@ async function pullChain(): Promise<void> {
   } finally { pulling = false; }
 }
 
+const NO_FEED: ChainFeed = { digest: null, fromDisk: false, note: '' };
 export function useChainFeed(): ChainFeed {
   const [, bump] = useState(0);
   useEffect(() => {
+    // v0.215.0: the chain dashlets are unavailable (lib/apertureAccess.ts): nothing is pulled, and a
+    // chain kept from days ago is not shown as if it were the chain
+    if (!APERTURE_FEATURES_AVAILABLE) return undefined;
     const sub = () => bump((x) => x + 1);
     feedSubs.add(sub);
     if (feedUsers++ === 0) {
@@ -115,11 +119,11 @@ export function useChainFeed(): ChainFeed {
       }
       void pullChain();
       // v0.214.0: nothing asks the map for a new reading any more (apertureAccess.ts)
-      feedTimers = [setInterval(() => void pullChain(), POLL_MS), ...(APERTURE_READS_ENABLED ? [setInterval(() => window.appInfo?.chain?.refresh(), REFRESH_MS)] : [])];
+      feedTimers = [setInterval(() => void pullChain(), POLL_MS), ...(APERTURE_FEATURES_AVAILABLE ? [setInterval(() => window.appInfo?.chain?.refresh(), REFRESH_MS)] : [])];
     }
     return () => { feedSubs.delete(sub); if (--feedUsers === 0) { feedTimers.forEach(clearInterval); feedTimers = []; } };
   }, []);
-  return feed;
+  return APERTURE_FEATURES_AVAILABLE ? feed : NO_FEED;
 }
 
 /** for the rig: forget what this session has seen */

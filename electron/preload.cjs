@@ -89,10 +89,8 @@ contextBridge.exposeInMainWorld('appInfo', {
     refresh: () => ipcRenderer.send('chain-refresh'),
     onRefreshRequest: (cb) => ipcRenderer.on('chain-refresh-request', () => cb()),
   },
-  /** the owner's Aperture map, read from his own logged-in session in a hidden
-   * window — returns the Systems-table text (or '' if it couldn't be read) */
+  /** the corp map is a plain embedded browser tab; nothing is read from it (v0.215.0) */
   aperture: {
-    systems: (url) => ipcRenderer.invoke('aperture-systems', url),
     /** open a popup window for the map (guest-side shim relays here) */
     openPopup: (url) => ipcRenderer.invoke('aperture-open-popup', url),
   },
@@ -121,6 +119,10 @@ contextBridge.exposeInMainWorld('appInfo', {
     openModule: (moduleId) => ipcRenderer.invoke('open-module-window', moduleId),
     /** a pop-out reports its CURRENT module so the saved layout stays accurate */
     reportModule: (moduleId) => ipcRenderer.send('module-window-module', moduleId),
+    /** v0.215.0: is this window on screen? Background throttling is off, so the page itself never
+     * learns it was minimised or sent to the tray — main says so, and the map page is unloaded */
+    isShown: () => ipcRenderer.invoke('win-is-shown'),
+    onShown: (cb) => { const f = (_e, v) => cb(!!v); ipcRenderer.on('window-shown', f); return () => ipcRenderer.removeListener('window-shown', f); },
   },
   overlay: {
     set: (on) => ipcRenderer.invoke('overlay-set', on),

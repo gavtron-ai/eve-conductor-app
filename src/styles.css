@@ -2241,3 +2241,13 @@ button.lb-pilot { background: none; border: none; padding: 0; font: inherit; cur
 .lb-link { background: none; border: none; padding: 0 2px; color: var(--accent); cursor: pointer; font-size: inherit; text-decoration: underline; }
 .lb-note .ok, .lb-cover .ok { color: var(--good); }
 .lb-cover .warn { color: #e0a13a; }
+
+/* ---------- the Aperture blocker (v0.215.0): a feature that is not there, saying why ---------- */
+.aperture-blocker { flex: 1; min-height: 360px; display: flex; align-items: center; justify-content: center; padding: 24px; background: repeating-linear-gradient(135deg, rgba(224, 161, 58, .05) 0 14px, transparent 14px 28px), rgba(0, 0, 0, .35); }
+.aperture-blocker-card { max-width: 640px; padding: 26px 30px; background: var(--surface); border: 1px solid #e0a13a; border-radius: 14px; box-shadow: 0 18px 60px rgba(0, 0, 0, .55); text-align: center; }
+.aperture-blocker-icon { font-size: 40px; line-height: 1; margin-bottom: 8px; }
+.aperture-blocker-card h2 { margin: 0 0 4px; font-size: 15px; color: var(--ink-2); font-weight: 600; }
+.aperture-blocker-card h3 { margin: 0 0 14px; font-size: 19px; color: #e0a13a; }
+.aperture-blocker-card p { margin: 0 0 12px; font-size: 13.5px; line-height: 1.55; color: var(--ink); text-align: left; }
+.aperture-blocker-card p.dim { color: var(--ink-2); font-size: 12.5px; }
+.aperture-blocker-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; margin-top: 16px; }

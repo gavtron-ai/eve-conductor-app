@@ -2,8 +2,8 @@
 //   · Skyhooks: CCP's own public raidable feed (theft windows are FACTS)
 //   · ESS: no ESI route exists, so this lists WHERE one is (sov nullsec in
 //     range) and never pretends to know what's in the bank.
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { APERTURE_READS_ENABLED, APERTURE_PAUSED_WHY } from '../lib/apertureAccess';
+import { useEffect, useMemo, useState } from 'react';
+import { APERTURE_BLOCK_SHORT } from '../lib/apertureAccess';
 import { useApp } from '../lib/store';
 import { suggestSystems, regionName, reachFrom, getSystem, findSystem, systemsWithin, pathTo } from '../lib/mapdata';
 import { setWaypoint } from '../lib/esiChar';
@@ -450,7 +450,6 @@ export default function TheftConductor({ view = 'skyhooks' }: { view?: 'skyhooks
   const mapped = useApp((s) => s.theftMapSystems);
   const setMapped = useApp((s) => s.setTheftMapSystems);
   const mapImportedAt = useApp((s) => s.theftMapImportedAt);
-  const apertureUrl = (useApp((s) => s.settings.apertureUrl) ?? '').trim();
   const ignoreRadius = useApp((s) => s.theftIgnoreRadius);
   const setIgnoreRadius = useApp((s) => s.setTheftIgnoreRadius);
   const openNow = useApp((s) => s.theftOpenNow);
@@ -690,43 +689,15 @@ export default function TheftConductor({ view = 'skyhooks' }: { view?: 'skyhooks
     return true;
   }
 
-  const [pulling, setPulling] = useState(false);
-  /** the whole flow, done for you: load YOUR logged-in Aperture map in a hidden
-   * window, read its Systems table, import — no opening Aperture, no copy/paste.
-   * `silent` (the auto-refresh on tab open) keeps quiet unless it actually
-   * imports, so a not-logged-in session doesn't nag on every open. */
-  async function pullFromAperture(silent = false): Promise<void> {
-    if (!APERTURE_READS_ENABLED) { if (!silent) setImportMsg(APERTURE_PAUSED_WHY); return; }
-    const fn = window.appInfo?.aperture?.systems;
-    if (!fn) { if (!silent) setImportMsg('this needs the desktop app'); return; }
-    if (!apertureUrl) { if (!silent) setImportMsg('set your Aperture map URL in Settings → Your setup first'); return; }
-    setPulling(true);
-    if (!silent) setImportMsg('reading your Aperture map in the background…');
-    try {
-      const text = await fn(apertureUrl);
-      if (!text || !text.trim()) {
-        if (!silent) setImportMsg('couldn’t read the map — open Aperture once to sign in, then try again');
-        return;
-      }
-      applySystemList(text, false);
-    } catch {
-      if (!silent) setImportMsg('couldn’t read the map — open Aperture once to sign in, then try again');
-    } finally {
-      setPulling(false);
-    }
+  // v0.215.0: "refresh from Aperture" (a hidden window loading the map and reading its Systems
+  // table) is DELETED — lib/apertureAccess.ts. The map comes from the clipboard: the user copies his
+  // own list on the Corp Map tab and pastes it here.
+  async function importFromClipboard(): Promise<void> {
+    let text = '';
+    try { text = (await window.appInfo?.clipboard?.read?.()) ?? ''; } catch { text = ''; }
+    if (!text) { try { text = await navigator.clipboard.readText(); } catch { /* not focused, or no permission */ } }
+    applySystemList(text, false);
   }
-
-  // AUTO-REFRESH FROM APERTURE on opening the Raid Targets tab: the map is the
-  // distance origin, and a stale one means stale jumps. Fires once when the URL
-  // is known; silent so a not-logged-in session doesn't nag on every open.
-  const autoPulledRef = useRef(false);
-  useEffect(() => {
-    if (autoPulledRef.current || !APERTURE_READS_ENABLED) return;
-    if (!window.appInfo?.aperture?.systems || !apertureUrl) return;
-    autoPulledRef.current = true;
-    void pullFromAperture(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [apertureUrl]);
 
   const mapAge = (() => {
     if (!mapImportedAt) return null;
@@ -803,16 +774,15 @@ export default function TheftConductor({ view = 'skyhooks' }: { view?: 'skyhooks
               onChange={() => setOpenNow(!openNow)} />
             <span>open now only</span>
           </label>
-          {APERTURE_READS_ENABLED && window.appInfo?.aperture?.systems && (
-            <button className="btn" onClick={() => void pullFromAperture()} disabled={pulling}
-              title="Refresh the distance origin from YOUR logged-in Aperture map: loads it in a hidden background window (the same session the Aperture module uses), opens Map info → Systems, and imports the list — no opening Aperture, no copy, no paste. Runs automatically when you open this tab; click to refresh again. Needs you signed in to Aperture once (open the Aperture module and log in). Wormhole systems are skipped.">
-              {pulling ? <span className="spin">⟳</span> : '⤓'} refresh from Aperture
-            </button>
-          )}
+          <button className="btn" onClick={() => void importFromClipboard()}
+            title="Set the distance origin from a system list YOU copied: on the Corp Map tab open Map info → Systems, select the list, copy it, then press this. The app reads your clipboard once, when you press — it reads nothing from the map itself.">
+            📋 import map from clipboard
+          </button>
+          <span className="dim" style={{ fontSize: 12, cursor: 'help' }} title={`“Refresh from Aperture” — ${APERTURE_BLOCK_SHORT} Copy your system list on the Corp Map tab and use “import map from clipboard”.`}>🚧 refresh from Aperture: unavailable</span>
           {mapped.length > 0 && (
             <>
               <span className="dim" style={{ fontSize: 12, cursor: 'help' }}
-                title={`Distance origin: the ${mapped.length} k-space system(s) below (imported ${mapAge ?? 'earlier'} — refreshed from Aperture when you open this tab):\n\n${mappedNames.join(', ')}`}>
+                title={`Distance origin: the ${mapped.length} k-space system(s) below (imported ${mapAge ?? 'earlier'} from your clipboard):\n\n${mappedNames.join(', ')}`}>
                 🗺 {mapped.length} systems · {mapAge ?? 'imported earlier'} (hover)
               </span>
               <button className="btn" title="Forget the imported map systems"

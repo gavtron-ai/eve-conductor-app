@@ -11,7 +11,6 @@ const cloneStore = require('./cloneStore.cjs');
 const zkill = require('./zkill.cjs');
 const storms = require('./storms.cjs');
 const gamelog = require('./gamelog.cjs');
-const aperturePage = require('./aperturePage.cjs');
 
 // The app is meant to run 24/7 (collectors). A second launch while the window
 // is hidden in the tray must surface the existing instance, not start a rival
@@ -265,14 +264,16 @@ ipcMain.handle('zkill-system-kills', (_e, arg) => {
 // ---- the storm tracker page (no CORS header — main must fetch it) ----
 ipcMain.handle('storms-page', () => storms.stormPage());
 
-// ---- Aperture systems, pulled from the owner's own logged-in map in a hidden
-// background window (same persist:aperture session as the visible webview) so
-// the Theft Conductor can import without him opening Aperture at all ----
-// v0.214.0: PAUSED. Aperture's developer asked for the automated reading to stop (it cost their
-// server thousands of requests a day per user — see src/lib/apertureAccess.ts). The route answers
-// nothing and no hidden window is opened until they offer a path they designed for this.
-const APERTURE_READS_ENABLED = false;
-ipcMain.handle('aperture-systems', (_e, url) => (APERTURE_READS_ENABLED ? aperturePage.fetchSystems(String(url || '')) : ''));
+// ---- v0.215.0: the hidden-window map reader (aperturePage.cjs) and its route are DELETED. Aperture's
+// developer asked for the automated reading to stop (src/lib/apertureAccess.ts); the corp map is a
+// plain embedded browser tab now, and it must not run when nobody can see it. The windows run with
+// backgroundThrottling off, so a page never learns it was minimised or sent to the tray — main tells it.
+const isShown = (w) => !!w && !w.isDestroyed() && w.isVisible() && !w.isMinimized();
+app.on('browser-window-created', (_e, w) => {
+  const tell = () => { try { if (!w.isDestroyed()) w.webContents.send('window-shown', isShown(w)); } catch { /* closing */ } };
+  for (const ev of ['minimize', 'hide', 'restore', 'show']) w.on(ev, tell);
+});
+ipcMain.handle('win-is-shown', (e) => isShown(BrowserWindow.fromWebContents(e.sender)));
 
 // ---- the OS clipboard, read-only via main so the Theft Conductor can watch
 // for an Aperture system list even when the renderer isn't the focused frame

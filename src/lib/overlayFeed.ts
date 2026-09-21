@@ -8,7 +8,6 @@
 // live spec), so the overlay never pretends to show health.
 import { esiAuth, tokenHasScope } from './esiChar';
 import { useAuth } from './auth';
-import { APERTURE_READS_ENABLED } from './apertureAccess';
 import {
   cloneSignature,
   lookupClone,
@@ -26,7 +25,7 @@ import { summarizeClone, type ImplantInfo } from './implantSummary';
 import { getSystem, reachFrom } from './mapdata';
 import { ESI_BASE } from './constants';
 import { esiFetch, esiErrorState } from './esiRate';
-import { fetchRaidableSkyhooks, planetInfo, parseSystemList } from './theft';
+import { fetchRaidableSkyhooks, planetInfo } from './theft';
 import { raidHistory } from './raidWatch';
 import { useApp } from './store';
 import { buildRaidAlerts, type RaidAlert } from './raidAlerts';
@@ -436,39 +435,9 @@ function freshTheftState(): { map: number[]; raidAlert: boolean; radius: number;
   return { map: map ?? [], raidAlert, radius: Math.max(0, Math.min(10, radius)), openOnly, importedAt };
 }
 
-// BACKGROUND MAP REFRESH (user rule): with the raid alert on, the distance
-// origin must stay fresh WITHOUT ever opening the Theft Conductor — the alert
-// is only as good as the map, and his chain changes daily. Pull the Aperture
-// systems in a hidden window (same authenticated session the Aperture module
-// uses) whenever the imported map is older than this. Silent: a failed pull
-// (not logged in, map unreachable) keeps the old map and retries next cycle.
-const MAP_REFRESH_MS = 30 * 60_000;
-let mapPullBusy = false;
-let lastMapPullAt = 0;
-
-async function refreshMapFromAperture(): Promise<void> {
-  // v0.214.0: no hidden window loads the map any more (apertureAccess.ts) — the imported map is
-  // the one the user pasted himself
-  if (!APERTURE_READS_ENABLED) return;
-  if (mapPullBusy) return;
-  const fn = window.appInfo?.aperture?.systems;
-  const url = (useApp.getState().settings.apertureUrl ?? '').trim();
-  if (!fn || !url) return;
-  // don't hammer a failing pull — at most one attempt per refresh interval
-  if (Date.now() - lastMapPullAt < MAP_REFRESH_MS) return;
-  mapPullBusy = true;
-  lastMapPullAt = Date.now();
-  try {
-    const text = await fn(url);
-    if (!text || !text.trim()) return;
-    const r = parseSystemList(text);
-    if (r.systemIds.length > 0) useApp.getState().setTheftMapSystems(r.systemIds);
-  } catch {
-    /* keep the old map; retry next cycle */
-  } finally {
-    mapPullBusy = false;
-  }
-}
+// v0.215.0: the BACKGROUND MAP REFRESH (a hidden window loading the corp map every 30 minutes) is
+// DELETED — lib/apertureAccess.ts. The raid alert's distance origin is the map the user imported
+// from his clipboard, until he imports another.
 
 /** nearby raidable skyhooks, using the imported Theft map as the distance
  * origin. Empty when the feature is off, no map is imported, or none are near. */
@@ -563,12 +532,6 @@ async function tick(): Promise<void> {
     // pushed with every poll so the box tracks the char boxes
     if (Date.now() - raidCache.at > RAID_ALERT_MS) {
       // keep the DISTANCE ORIGIN fresh without the Theft tab ever opening:
-      // fire-and-forget so a slow hidden-window pull never stalls the feed —
-      // the next recompute picks up whatever it imported
-      const fresh = freshTheftState();
-      if (fresh.raidAlert && Date.now() - fresh.importedAt > MAP_REFRESH_MS) {
-        void refreshMapFromAperture();
-      }
       raidCache = { at: Date.now(), alerts: await computeRaidAlerts().catch(() => []) };
     }
 

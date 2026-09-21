@@ -782,7 +782,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
           <div className="aperture-keep" style={module === 'aperture'
             ? { display: 'contents' }
             : { position: 'absolute', inset: 0, visibility: 'hidden', pointerEvents: 'none', zIndex: -1, overflow: 'hidden', display: 'flex' }}>
-            <ApertureModule view={apertureView} />
+            <ApertureModule view={apertureView} onOpenMap={() => { setApertureView('map'); logUser('view: aperture map'); }} />
           </div>
         )}
         {module === 'trade' && view === 'explorer' && <Sidebar />}

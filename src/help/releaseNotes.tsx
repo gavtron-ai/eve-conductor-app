@@ -28,6 +28,20 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.215.0', date: '2026-09-21', headline: 'Aperture: the code that read the map is deleted, the map no longer runs when nobody can see it, and the features built on it show a clear “unavailable” blocker',
+    changes: [
+      <><b>We are reworking how EVE Conductor talks to Aperture.</b> Aperture&apos;s developer told us that each copy of this app was costing their server 6,000–7,000 requests and about 1 GB a day, skewing their user numbers, and reading their data in a way they never agreed to. Our own logs agreed with them. Until a proper path is worked out <i>with</i> them, the features built on reading the map are unavailable, and say so.</>,
+      <><b>Deleted, not switched off.</b> 0.214.0 turned the reading off behind a switch. This version removes the code: the scripts that ran inside the map page and called its data routes, the hidden window that loaded the whole map every thirty minutes and clicked through it, the route and bridge that reached it, the five-minute re-reads and their retry loop, and the scan of the map&apos;s script files. There is no setting or flag that brings any of it back.</>,
+      <><b>One more leak found and closed.</b> The app&apos;s windows deliberately keep running at full speed in the background (the collectors need that), which means a page never finds out it was minimised. So a copy left on the Corp Map tab and sent to the tray still kept Aperture&apos;s page polling all day. The main process now tells the window when it is out of sight; after two minutes the map page is unloaded, and it loads again when the window comes back. The map now exists only while the Corp Map tab is on screen <i>and</i> a person can see it.</>,
+      <><b>A blocker where the features were.</b> The <b>Σ Summary</b> tab (and its pop-out window) shows a panel explaining what happened and what still works, with buttons to the Corp Map tab and to Aperture in your own browser. The Home <b>chain dashlets</b> say they are unavailable instead of showing a chain from days ago as if it were current. The Theft Conductor&apos;s <b>refresh from Aperture</b> is marked unavailable.</>,
+      <><b>A correction.</b> The 0.214.0 note said “import map from clipboard” still worked in the Theft Conductor. It did not — that button had been replaced by the automatic pull long ago. It is back in this version: copy your system list on the Corp Map tab (Map info → Systems), press <b>📋 import map from clipboard</b>, and the raid alert has its distance origin again. The app reads your clipboard once, when you press; it reads nothing from the map.</>,
+      <>What the app still does with Aperture: shows it in an ordinary embedded browser tab while you look at it, opens links you click, and opens it in your own browser when you ask. Nothing else.</>,
+    ],
+    why: <>The owner, after Aperture&apos;s developer wrote to him: “check to make sure we are cutting these negatively viewed interaction types completely off … put up a blocker pop up on those tabs that explains that we are reworking the method of interaction with Aperture and until that is solved properly the feature will be unavailable.”</>,
+    policy: <>Sanctioned sources only — and a third-party service is sanctioned when its <b>owner</b> says so, not when a login makes it reachable. Reading a private web application through the user&apos;s session, calling its internal routes and keeping its page alive in the background was never agreed with the people who run it and pay for it. These features return only through a data path Aperture&apos;s developer designs.</>,
+    published: true,
+  },
+  {
     version: '0.214.0', date: '2026-09-20', headline: 'Reading the corp map is switched off — at the request of Aperture’s developer, and rightly',
     changes: [
       <><b>The app no longer reads anything from Aperture, and makes no automated request to it.</b> Aperture&apos;s developer told us that each copy of this app was costing their server 6,000–7,000 requests and about 1 GB a day, skewing their user numbers, and reading their data in a way they never agreed to. Our own log agrees with them. This version stops all of it, today, in every install that updates.</>,
@@ -38,7 +52,6 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
     why: <>A message from Aperture&apos;s developer: the app “scrapes data from Aperture in a very hacky way … ethically questionable … throws off some of our user metrics as well as artificially inflating server load … every user of your EVE Conductor cost our server 6000 to 7000 requests and about 1GB of data per day.” The owner: “I want to fix it immediately.”</>,
     policy: <>The rule this app holds itself to — sanctioned sources only — applies to third-party services as much as to CCP: a source is sanctioned when its <b>owner</b> says so, not when a login happens to make it reachable. Reading a private web application through the user&apos;s session, calling its internal routes and keeping its page alive in the background was never agreed with the people who run it and pay for it. It is off until they say how, if at all, they want it done.</>,
-    published: true,
   },
   {
     version: '0.213.0', date: '2026-09-20', headline: 'Every update now brings fresh history with it: skyhook raids and market rates fill the gaps your own app missed',

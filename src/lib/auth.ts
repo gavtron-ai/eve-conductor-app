@@ -80,6 +80,9 @@ interface WinBridge {
   openModule?: (moduleId: string) => Promise<boolean>;
   /** a pop-out tells the main process its current module (for the saved layout) */
   reportModule?: (moduleId: string) => void;
+  /** is this window on screen (not minimised, not hidden)? — the map page is unloaded when it is not */
+  isShown?: () => Promise<boolean>;
+  onShown?: (cb: (shown: boolean) => void) => (() => void) | void;
 }
 
 interface OverlayBridge {
@@ -186,7 +189,6 @@ declare global {
       /** pull the Systems-table text from the owner's logged-in Aperture map
        * in a hidden window ('' if it couldn't be read / not logged in) */
       aperture?: {
-        systems: (url: string) => Promise<string>;
         /** popup relay for the map's overlay (guest-side shim, v0.188.3) */
         openPopup: (url: string) => Promise<boolean>;
       };
