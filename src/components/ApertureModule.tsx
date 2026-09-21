@@ -19,6 +19,7 @@ import { CHAIN_EXTRACT, chainSigsScript, type ChainExtract, type FeedRead } from
 import { inferMap, inferSignatures, type FeedReport } from '../lib/chainFeed';
 import type { ChainSig } from '../lib/chain';
 import { logInfo, logUser } from '../lib/devlog';
+import { APERTURE_READS_ENABLED, APERTURE_PAUSED_WHY } from '../lib/apertureAccess';
 import { useZoom } from '../lib/zoom';
 import ChainSummary from './ChainSummary';
 
@@ -87,6 +88,10 @@ export default function ApertureModule({ view = 'map' }: { view?: 'map' | 'summa
   // PER-SCREEN ZOOM: this screen hosts another page, so the level is
   // applied to the guest (its own text and drawing scale) rather than to
   // the <webview> box; the toolbar follows via CSS zoom below
+  // v0.214.0: the map page is loaded ONLY while the map itself is on screen. It used to stay
+  // loaded, invisible, under the Σ Summary tab "so the summary can keep reading it" — with reading
+  // paused that is nothing but load on Aperture's server (lib/apertureAccess.ts).
+  const guestMounted = APERTURE_READS_ENABLED || view !== 'summary';
   const { zoom } = useZoom('aperture');
   useEffect(() => {
     const wv = ref.current;
@@ -95,7 +100,7 @@ export default function ApertureModule({ view = 'map' }: { view?: 'map' | 'summa
     apply();
     wv.addEventListener('dom-ready', apply);
     return () => wv.removeEventListener('dom-ready', apply);
-  }, [zoom, configured]);
+  }, [zoom, configured, guestMounted]);
 
   useEffect(() => {
     const wv = ref.current;
@@ -134,7 +139,7 @@ export default function ApertureModule({ view = 'map' }: { view?: 'map' | 'summa
       wv.removeEventListener('did-stop-loading', stop);
       wv.removeEventListener('ipc-message', onIpc);
     };
-  }, []);
+  }, [guestMounted]);
 
   // CHAIN SUMMARY (v0.200): read the map in place — the Signature Search
   // table and the drawn chain — and hand it to the summary window through
@@ -147,6 +152,8 @@ export default function ApertureModule({ view = 'map' }: { view?: 'map' | 'summa
     window.setTimeout(() => runRef.current(), Math.min(6000, 2500 * attempts.current));
   };
   const runChainExtract = async () => {
+    // v0.214.0: no script is run in the map page and none of its routes is fetched (apertureAccess.ts)
+    if (!APERTURE_READS_ENABLED) return;
     const w = ref.current;
     if (!w) return;
     if (!guestReady.current) { pendingRead.current = true; return; }   // runs on did-stop-loading
@@ -293,6 +300,9 @@ export default function ApertureModule({ view = 'map' }: { view?: 'map' | 'summa
         </button>
       </div>
       )}
+      {!summaryTab && !APERTURE_READS_ENABLED && (
+      <div className="hint" style={{ margin: '2px 8px 0', fontSize: 11.5 }}>⏸ {APERTURE_PAUSED_WHY}</div>
+      )}
       {!summaryTab && (
       <div className="hint" style={{ margin: '2px 8px 4px', fontSize: 11.5 }}>
         ⚠ The map's <b>overlay pop-out does not work inside the app yet</b> — for the overlay,
@@ -302,6 +312,7 @@ export default function ApertureModule({ view = 'map' }: { view?: 'map' | 'summa
       {/* the guest stays MOUNTED on the summary tab: visibility (never
           display:none, which unloads a <webview>) hides it at full size,
           so its login persists and the summary can keep reading it */}
+      {guestMounted && (
       <div className="aperture-guest" style={summaryTab
         ? { position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', visibility: 'hidden', pointerEvents: 'none', zIndex: -1 }
         : { flex: 1, minHeight: 0, display: 'flex', flexDirection: 'column' }}>
@@ -320,6 +331,7 @@ export default function ApertureModule({ view = 'map' }: { view?: 'map' | 'summa
           <iframe title="Aperture" src={configured} className="aperture-view" />
         )}
       </div>
+      )}
     </div>
   );
 }

@@ -268,7 +268,11 @@ ipcMain.handle('storms-page', () => storms.stormPage());
 // ---- Aperture systems, pulled from the owner's own logged-in map in a hidden
 // background window (same persist:aperture session as the visible webview) so
 // the Theft Conductor can import without him opening Aperture at all ----
-ipcMain.handle('aperture-systems', (_e, url) => aperturePage.fetchSystems(String(url || '')));
+// v0.214.0: PAUSED. Aperture's developer asked for the automated reading to stop (it cost their
+// server thousands of requests a day per user — see src/lib/apertureAccess.ts). The route answers
+// nothing and no hidden window is opened until they offer a path they designed for this.
+const APERTURE_READS_ENABLED = false;
+ipcMain.handle('aperture-systems', (_e, url) => (APERTURE_READS_ENABLED ? aperturePage.fetchSystems(String(url || '')) : ''));
 
 // ---- the OS clipboard, read-only via main so the Theft Conductor can watch
 // for an Aperture system list even when the renderer isn't the focused frame

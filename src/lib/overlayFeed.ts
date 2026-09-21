@@ -8,6 +8,7 @@
 // live spec), so the overlay never pretends to show health.
 import { esiAuth, tokenHasScope } from './esiChar';
 import { useAuth } from './auth';
+import { APERTURE_READS_ENABLED } from './apertureAccess';
 import {
   cloneSignature,
   lookupClone,
@@ -446,6 +447,9 @@ let mapPullBusy = false;
 let lastMapPullAt = 0;
 
 async function refreshMapFromAperture(): Promise<void> {
+  // v0.214.0: no hidden window loads the map any more (apertureAccess.ts) — the imported map is
+  // the one the user pasted himself
+  if (!APERTURE_READS_ENABLED) return;
   if (mapPullBusy) return;
   const fn = window.appInfo?.aperture?.systems;
   const url = (useApp.getState().settings.apertureUrl ?? '').trim();

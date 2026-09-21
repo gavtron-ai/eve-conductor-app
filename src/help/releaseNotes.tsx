@@ -28,6 +28,19 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.214.0', date: '2026-09-20', headline: 'Reading the corp map is switched off — at the request of Aperture’s developer, and rightly',
+    changes: [
+      <><b>The app no longer reads anything from Aperture, and makes no automated request to it.</b> Aperture&apos;s developer told us that each copy of this app was costing their server 6,000–7,000 requests and about 1 GB a day, skewing their user numbers, and reading their data in a way they never agreed to. Our own log agrees with them. This version stops all of it, today, in every install that updates.</>,
+      <><b>What it had been doing</b> (so nobody has to guess): once opened, the map page stayed loaded — invisible — for as long as the app ran, so the page&apos;s own polling ran around the clock and every user looked online all day. Every five minutes the app fetched the whole map document and the whole system-data document again from the page&apos;s session; a hidden page never finished drawing, so each cycle re-tried up to ten times — measured on one machine in one day: 119 readings, 632 retries, 1,502 full-document fetches. With the raid alert on, a hidden window loaded the whole map application every thirty minutes. And each page load re-downloaded up to forty of the map&apos;s script and style files to look for colours.</>,
+      <><b>What is left</b> is an ordinary embedded browser tab: the map loads only while the Corp Map tab is on screen and is unloaded the moment you leave it — not under the Σ Summary, not under Home, not in the background. No script is run in the page and none of its data routes is called. The switch is enforced twice, in the window and in the main process, so no screen can reach the old route.</>,
+      <><b>What you lose for now</b>: the Σ Summary and the Home chain dashlets stop updating (dashlets keep their last reading and say “paused”), the Theft Conductor&apos;s “pull from Aperture” button is gone, and the raid alert no longer refreshes its map by itself. <b>What still works</b>: the map itself in its tab, and <i>import map from clipboard</i> in the Theft Conductor — that is you copying your own list, by hand.</>,
+      <>These features come back only through a data path Aperture&apos;s developer designs and agrees to. They have offered to work one out.</>,
+    ],
+    why: <>A message from Aperture&apos;s developer: the app “scrapes data from Aperture in a very hacky way … ethically questionable … throws off some of our user metrics as well as artificially inflating server load … every user of your EVE Conductor cost our server 6000 to 7000 requests and about 1GB of data per day.” The owner: “I want to fix it immediately.”</>,
+    policy: <>The rule this app holds itself to — sanctioned sources only — applies to third-party services as much as to CCP: a source is sanctioned when its <b>owner</b> says so, not when a login happens to make it reachable. Reading a private web application through the user&apos;s session, calling its internal routes and keeping its page alive in the background was never agreed with the people who run it and pay for it. It is off until they say how, if at all, they want it done.</>,
+    published: true,
+  },
+  {
     version: '0.213.0', date: '2026-09-20', headline: 'Every update now brings fresh history with it: skyhook raids and market rates fill the gaps your own app missed',
     changes: [
       <><b>The seed is refreshed with every build.</b> The installer has carried a starter history since 0.188 — market rates measured by the radar and the skyhook raid log — but it was baked by hand and had not been refreshed since 15 September. It is now baked from the newest measurements as part of every build, behind the same personal-data guard: a hit refuses the whole build.</>,
@@ -38,7 +51,6 @@ export const RELEASE_NOTES: ReleaseNote[] = [
     ],
     why: <>"All of this type of information should be seeded as we get more up to date data and it should update on the build locally as well so that I can seed the updates with refreshed information to be used and cut down load times."</>,
     policy: <>The seed holds only measurements derived from CCP&apos;s public data — public market order books and the public skyhook feed — and nothing from any player&apos;s login. Seeding them spares every new install weeks of repeated public reads.</>,
-    published: true,
   },
   {
     version: '0.212.0', date: '2026-09-20', headline: 'Leaderboard: the history loads itself, the board opens in under a second, and a “held” strip shows exactly what you are looking at',

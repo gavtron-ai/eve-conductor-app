@@ -3,6 +3,7 @@
 //   · ESS: no ESI route exists, so this lists WHERE one is (sov nullsec in
 //     range) and never pretends to know what's in the bank.
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { APERTURE_READS_ENABLED, APERTURE_PAUSED_WHY } from '../lib/apertureAccess';
 import { useApp } from '../lib/store';
 import { suggestSystems, regionName, reachFrom, getSystem, findSystem, systemsWithin, pathTo } from '../lib/mapdata';
 import { setWaypoint } from '../lib/esiChar';
@@ -695,6 +696,7 @@ export default function TheftConductor({ view = 'skyhooks' }: { view?: 'skyhooks
    * `silent` (the auto-refresh on tab open) keeps quiet unless it actually
    * imports, so a not-logged-in session doesn't nag on every open. */
   async function pullFromAperture(silent = false): Promise<void> {
+    if (!APERTURE_READS_ENABLED) { if (!silent) setImportMsg(APERTURE_PAUSED_WHY); return; }
     const fn = window.appInfo?.aperture?.systems;
     if (!fn) { if (!silent) setImportMsg('this needs the desktop app'); return; }
     if (!apertureUrl) { if (!silent) setImportMsg('set your Aperture map URL in Settings → Your setup first'); return; }
@@ -719,7 +721,7 @@ export default function TheftConductor({ view = 'skyhooks' }: { view?: 'skyhooks
   // is known; silent so a not-logged-in session doesn't nag on every open.
   const autoPulledRef = useRef(false);
   useEffect(() => {
-    if (autoPulledRef.current) return;
+    if (autoPulledRef.current || !APERTURE_READS_ENABLED) return;
     if (!window.appInfo?.aperture?.systems || !apertureUrl) return;
     autoPulledRef.current = true;
     void pullFromAperture(true);
@@ -801,7 +803,7 @@ export default function TheftConductor({ view = 'skyhooks' }: { view?: 'skyhooks
               onChange={() => setOpenNow(!openNow)} />
             <span>open now only</span>
           </label>
-          {window.appInfo?.aperture?.systems && (
+          {APERTURE_READS_ENABLED && window.appInfo?.aperture?.systems && (
             <button className="btn" onClick={() => void pullFromAperture()} disabled={pulling}
               title="Refresh the distance origin from YOUR logged-in Aperture map: loads it in a hidden background window (the same session the Aperture module uses), opens Map info → Systems, and imports the list — no opening Aperture, no copy, no paste. Runs automatically when you open this tab; click to refresh again. Needs you signed in to Aperture once (open the Aperture module and log in). Wormhole systems are skipped.">
               {pulling ? <span className="spin">⟳</span> : '⤓'} refresh from Aperture

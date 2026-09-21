@@ -16,6 +16,9 @@ export const APERTURE_HELP: ModuleHelp = {
       ),
       body: (
         <>
+          <Limit>
+            <b>Reading the map is switched off (since 0.214.0).</b> Aperture&apos;s developer asked for it to stop: the way this app read the map cost their server thousands of requests a day per user. Until they offer a data path they designed for it, this module is a plain browser tab — the map loads only while the Corp Map tab is on screen — and the Σ Summary, the Home chain dashlets and “pull from Aperture” do not update. The pages below describe those features as they worked and will be rewritten when they return. <i>Import map from clipboard</i> in the Theft Conductor still works.
+          </Limit>
           <p>
             Your corporation's own web map, embedded so the whole workflow lives in one app. It runs as a real browser tab with its <b>own persistent login</b>: sign in once inside the panel and it sticks across restarts. The Theft module can read your system list straight from it.
           </p>

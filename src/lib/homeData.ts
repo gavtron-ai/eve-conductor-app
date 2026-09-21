@@ -3,6 +3,7 @@
 // memory, the stats folder, or the last map reading main keeps. Two dashlets of the same kind
 // share one read (`useResource`).
 import { useEffect, useMemo, useState } from 'react';
+import { APERTURE_READS_ENABLED } from './apertureAccess';
 import type { ChainExtract } from './apertureExtract';
 import { parseReading, homeOrigin } from './chainReading';
 import { digestChain, sanitizeDigest, type ChainDigest } from './chainDigest';
@@ -113,7 +114,8 @@ export function useChainFeed(): ChainFeed {
         try { const disk = sanitizeDigest(JSON.parse(localStorage.getItem(DIGEST_KEY) ?? 'null')); if (disk) feed = { digest: disk, fromDisk: true, note: '' }; } catch { /* nothing kept */ }
       }
       void pullChain();
-      feedTimers = [setInterval(() => void pullChain(), POLL_MS), setInterval(() => window.appInfo?.chain?.refresh(), REFRESH_MS)];
+      // v0.214.0: nothing asks the map for a new reading any more (apertureAccess.ts)
+      feedTimers = [setInterval(() => void pullChain(), POLL_MS), ...(APERTURE_READS_ENABLED ? [setInterval(() => window.appInfo?.chain?.refresh(), REFRESH_MS)] : [])];
     }
     return () => { feedSubs.delete(sub); if (--feedUsers === 0) { feedTimers.forEach(clearInterval); feedTimers = []; } };
   }, []);

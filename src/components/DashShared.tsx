@@ -8,6 +8,7 @@ import { GROUP_COLOR, classColor } from '../lib/chainViz';
 import { agoShort } from '../lib/homeDigests';
 import { iskShort } from '../lib/format';
 import { useApp } from '../lib/store';
+import { APERTURE_READS_ENABLED, APERTURE_PAUSED_SHORT, APERTURE_PAUSED_WHY } from '../lib/apertureAccess';
 import { Dot, Empty, Foot, Row } from './DashKit';
 
 export interface DashletProps {
@@ -35,14 +36,14 @@ export function ChainFoot({ d, fromDisk, note, now }: { d: ChainDigest; fromDisk
   const age = now - d.at;
   return (
     <Foot warn={age > 30 * 60_000 || !!note || !d.originOk}>
-      {fromDisk ? 'last known · ' : ''}map read {agoShort(age)}
+      {!APERTURE_READS_ENABLED ? `${APERTURE_PAUSED_SHORT} · last ` : fromDisk ? 'last known · ' : ''}map read {agoShort(age)}
       {!d.originOk ? ` · “${d.origin || 'home'}” is not linked on this reading — no distances` : ''}{note ? ` · ${note}` : ''}
     </Foot>
   );
 }
 export function NoChain() {
   const url = (useApp((s) => s.settings.apertureUrl) ?? '').trim();
-  return <Empty>{url ? 'Waiting for the first map reading — it starts once Aperture has loaded.' : 'Set your corp map’s address in ⚙ Settings → Your setup, then open Aperture once and log in.'}</Empty>;
+  return <Empty>{!APERTURE_READS_ENABLED ? APERTURE_PAUSED_WHY : url ? 'Waiting for the first map reading — it starts once Aperture has loaded.' : 'Set your corp map’s address in ⚙ Settings → Your setup, then open Aperture once and log in.'}</Empty>;
 }
 /** one site: named (a dot for its activity, the site's name) or by place (class chip, the system) */
 export const SiteLine = ({ s, onGo, named = true }: { s: DigestSite; onGo: () => void; named?: boolean }) => (

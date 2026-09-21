@@ -112,13 +112,10 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
   // minute"). Once opened it now stays mounted and merely hidden — by
   // visibility, never display:none, which unloads a <webview> — so the map
   // and the last reading are there the instant you come back.
-  const [apertureWarm, setApertureWarm] = useState(module === 'aperture');
-  useEffect(() => { if (module === 'aperture') setApertureWarm(true); }, [module]);
-  // HOME'S CHAIN DASHLETS need a map reading (v0.207.0): with one on any board and a map
-  // configured, opening Home loads Aperture underneath, hidden, exactly as a visit would
-  const homeWantsChain = useApp((s) => (s.home?.boards ?? []).some((b) => b.items.some((i) => i.kind.startsWith('chain-'))));
-  const apertureConfigured = useApp((s) => !!(s.settings.apertureUrl ?? '').trim());
-  useEffect(() => { if (module === 'home' && homeWantsChain && apertureConfigured) setApertureWarm(true); }, [module, homeWantsChain, apertureConfigured]);
+  // v0.214.0: NOT ANY MORE. A hidden map page keeps polling Aperture's server around the clock
+  // and makes every user look online all day (lib/apertureAccess.ts) — the page now exists only
+  // while the Aperture module is on screen, exactly like a browser tab the user has open.
+  const apertureWarm = module === 'aperture';
   /** Battle Conductor tabs: saved battle reports vs the live game-log feed */
   const [battleView, setBattleView] = useState<'reports' | 'live' | 'sim' | 'board'>('reports');
   // MAKE BATTLE REPORT moved into the EVE Battle Conductor module

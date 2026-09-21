@@ -46,6 +46,7 @@ import { GROUP_COLOR, ageBuckets, classColor, iskByHop, layoutChain, routeBetwee
 import ChainDashboard from './ChainDashboard';
 import ZoomControl from './ZoomControl';
 import { useZoom } from '../lib/zoom';
+import { APERTURE_READS_ENABLED, APERTURE_PAUSED_WHY } from '../lib/apertureAccess';
 import { useApp } from '../lib/store';
 import { addFavorite, sanitizeFavorites, MAX_FAVORITES } from '../lib/favorites';
 import { onViewRequest } from '../lib/viewBus';
@@ -199,11 +200,12 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const refresh = () => {
+    if (!APERTURE_READS_ENABLED) return;
     logUser('chain: refresh requested');
     if (embedded) embedded.onRefresh(); else window.appInfo?.chain?.refresh();
   };
   useEffect(() => {
-    if (!auto) return undefined;
+    if (!auto || !APERTURE_READS_ENABLED) return undefined;
     const t = setInterval(refresh, AUTO_MS);
     return () => clearInterval(t);
   }, [auto]);
@@ -423,18 +425,21 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
       <div style={{ display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap', marginBottom: 8 }}>
         <h1 style={{ margin: 0, fontSize: 18 }}>Chain summary</h1>
         <span className="dim" style={{ fontSize: 12 }}>
-          {data ? `map read ${data.at ? new Date(data.at).toISOString().slice(11, 16) : ''} EVE · ${parsed?.sigs.length ?? 0} signatures · ${parsed?.nodeCount ?? 0} systems drawn · source: ${parsed?.source ?? '—'}` : embedded ? (embedded.busy ? 'reading the map… (the map page is loading; a few seconds)' : 'waiting for the map — log in on the Corp Map tab if it asks, or press ⟳ refresh') :'waiting for the map — press Summary on the Aperture module'}
+          {data ? `map read ${data.at ? new Date(data.at).toISOString().slice(11, 16) : ''} EVE · ${parsed?.sigs.length ?? 0} signatures · ${parsed?.nodeCount ?? 0} systems drawn · source: ${parsed?.source ?? '—'}` : !APERTURE_READS_ENABLED ? 'no map reading — reading the map is paused' : embedded ? (embedded.busy ? 'reading the map… (the map page is loading; a few seconds)' : 'waiting for the map — log in on the Corp Map tab if it asks, or press ⟳ refresh') :'waiting for the map — press Summary on the Aperture module'}
         </span>
-        {stale && <span style={{ fontSize: 12, color: 'var(--warn, #e0a13a)', flexBasis: '100%' }}>⚠ {stale}</span>}
+        {!APERTURE_READS_ENABLED && <span style={{ fontSize: 12, color: 'var(--warn, #e0a13a)', flexBasis: '100%' }}>⏸ {APERTURE_PAUSED_WHY}{data ? ' What is below is the last reading taken before the pause.' : ''}</span>}
+        {APERTURE_READS_ENABLED && stale && <span style={{ fontSize: 12, color: 'var(--warn, #e0a13a)', flexBasis: '100%' }}>⚠ {stale}</span>}
         {healing && <span style={{ fontSize: 12, color: 'var(--warn, #e0a13a)', flexBasis: '100%' }}>⟳ {healing}</span>}
         {!stale && data && !data.sigText && !(data.feedRead && data.feedRead.sigs.length > 0) && data.probe?.tableVisible === false && (
           <span style={{ fontSize: 12, color: 'var(--warn, #e0a13a)', flexBasis: '100%' }}>⚠ the map's Signature Search panel is not on screen — open it on the map once (any filter) and the list appears here; the app never changes what the map shows</span>
         )}
         <span style={{ marginLeft: 'auto', display: 'flex', gap: 6, alignItems: 'center' }}>
+          {APERTURE_READS_ENABLED && (<>
           <label style={{ fontSize: 12, display: 'flex', gap: 4, alignItems: 'center' }}>
             <input type="checkbox" checked={auto} onChange={(e) => setAuto(e.target.checked)} /> re-read every 5 min
           </label>
           <button className="btn mini" onClick={refresh} title="ask the map for a fresh reading now">⟳ refresh</button>
+          </>)}
           {!embedded && <ZoomControl screen="chain-summary" compact />}
         </span>
       </div>
