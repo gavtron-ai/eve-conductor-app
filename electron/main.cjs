@@ -162,56 +162,9 @@ try {
   }]);
 }
 
-// ---- Aperture pop-outs: the corp map's overlay opens a window.open()
-// popup. The webview had allowpopups but NO open handler, so Electron
-// spawned an unmanaged native window on defaults — which took the whole
-// app down (measured 2026-09-04: session ends in silence, no JS
-// exception; classic webview-popup native crash). Every webview guest now
-// gets a handler: popups become real windows on the SAME persistent
-// session, so the map's login carries into them. ----
-// MEASURED 2026-09-04 (renderer gone (crashed), exitCode 3, type webview):
-// even a MANAGED allow with overrideBrowserWindowOptions crashes the guest
-// renderer — the webview native-popup path itself is the broken part. So
-// the guest never creates a window at all: DENY, and the main process
-// builds the popup itself on the same persistent session.
-const openAperturePopup = (url) => {
-  const pop = new BrowserWindow({
-    width: 480, height: 720, autoHideMenuBar: true,
-    webPreferences: { partition: 'persist:aperture', contextIsolation: true, nodeIntegration: false },
-  });
-  // popups from the popup get the same treatment (never the native path)
-  pop.webContents.setWindowOpenHandler(({ url: u }) => {
-    openAperturePopup(u);
-    return { action: 'deny' };
-  });
-  void pop.loadURL(url);
-};
-app.on('web-contents-created', (_e, contents) => {
-  if (contents.getType() !== 'webview') return;
-  // belt only — with the guest-side shim (webviewPreload.cjs) and
-  // allowpopups removed, no open request should ever reach this natively
-  contents.setWindowOpenHandler(({ url }) => {
-    try {
-      openAperturePopup(url);
-    } catch (e) {
-      devlog.append(app.getPath('documents'), [{
-        level: 'warn', area: 'main', msg: `aperture popup failed: ${e instanceof Error ? e.message : String(e)}`,
-      }]);
-    }
-    return { action: 'deny' };
-  });
-});
-// the shim's requests, relayed by the host renderer
-ipcMain.handle('aperture-open-popup', (_e, url) => {
-  if (typeof url !== 'string' || !/^https?:/i.test(url)) return false;
-  openAperturePopup(url);
-  return true;
-});
-// the <webview> preload attribute needs an absolute file path, which only
-// the main process knows once packaged
-ipcMain.on('aperture-preload-path', (event) => {
-  event.returnValue = path.join(__dirname, 'webviewPreload.cjs');
-});
+// ---- v0.216.0: THE APP DOES NOT CONTACT APERTURE AT ALL (src/lib/apertureAccess.ts). The embedded
+// corp map, its pop-up relay, its guest preload and its persistent session are gone, and no window
+// is given the webview permission any more — the app cannot embed a web page even by accident.
 
 // ---- native-death evidence: a renderer/GPU/utility process dying leaves
 // NO JS exception, so the v0.186 handlers never saw it. These hooks are
@@ -264,16 +217,6 @@ ipcMain.handle('zkill-system-kills', (_e, arg) => {
 // ---- the storm tracker page (no CORS header — main must fetch it) ----
 ipcMain.handle('storms-page', () => storms.stormPage());
 
-// ---- v0.215.0: the hidden-window map reader (aperturePage.cjs) and its route are DELETED. Aperture's
-// developer asked for the automated reading to stop (src/lib/apertureAccess.ts); the corp map is a
-// plain embedded browser tab now, and it must not run when nobody can see it. The windows run with
-// backgroundThrottling off, so a page never learns it was minimised or sent to the tray — main tells it.
-const isShown = (w) => !!w && !w.isDestroyed() && w.isVisible() && !w.isMinimized();
-app.on('browser-window-created', (_e, w) => {
-  const tell = () => { try { if (!w.isDestroyed()) w.webContents.send('window-shown', isShown(w)); } catch { /* closing */ } };
-  for (const ev of ['minimize', 'hide', 'restore', 'show']) w.on(ev, tell);
-});
-ipcMain.handle('win-is-shown', (e) => isShown(BrowserWindow.fromWebContents(e.sender)));
 
 // ---- the OS clipboard, read-only via main so the Theft Conductor can watch
 // for an Aperture system list even when the renderer isn't the focused frame
@@ -464,10 +407,7 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      // the Aperture module embeds the corp's web map as a real guest page
-      // (its own persistent session, so the login sticks) — iframes would
-      // break that login on third-party cookie rules
-      webviewTag: true,
+      // v0.216.0: NO webviewTag — the app embeds no web page (it used to embed the corp map)
       // THE COLLECTORS MUST KEEP RUNNING WHEN THE WINDOW IS HIDDEN.
       // Chromium throttles timers in backgrounded/occluded windows to about
       // once a minute, which is the whole app's scheduling heartbeat: the
@@ -557,7 +497,6 @@ function createModuleWindow(moduleId, saved) {
       preload: path.join(__dirname, 'preload.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
-      webviewTag: true,
       backgroundThrottling: false,
     },
   });

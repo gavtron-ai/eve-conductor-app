@@ -28,6 +28,18 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.216.0', date: '2026-09-21', headline: 'EVE Conductor no longer contacts Aperture at all — until its developer is happy with how it is done',
+    changes: [
+      <><b>The embedded corp map is gone too.</b> 0.214 switched the reading off and 0.215 deleted it and unloaded the map whenever nobody could see it. This version takes the last step: the app does not load Aperture in any form. The Corp Map tab now shows the same blocker as the Σ Summary — what happened, what still works, and a button that opens Aperture in <b>your own web browser</b>.</>,
+      <><b>Removed with it</b>: the embedded page and its saved login inside the app, the pop-up relay that opened the map&apos;s links in app windows, and the permission that lets a window embed a web page at all — it is no longer granted, so the app cannot embed one even by mistake. The app now makes <b>no request to Aperture of any kind</b>. The one button that mentions it opens your normal browser; that is you visiting the site, not the app.</>,
+      <>Still available: the Theft Conductor&apos;s <b>📋 import map from clipboard</b> — copy your system list from Aperture in your browser and press it; the app reads your clipboard once and contacts nobody.</>,
+      <>These features come back only when Aperture&apos;s developer has offered, and is happy with, a way of doing it.</>,
+    ],
+    why: <>The owner: “I don&apos;t even want to interact with Aperture like that for now — let&apos;s get it completely clear of interactions with Aperture until the dev of our corp map is happy with the method of interaction.”</>,
+    policy: <>A third-party service is a sanctioned source when its <b>owner</b> says so. Until Aperture&apos;s developer has said how they want this app to work with their service — if at all — the honest position is no contact, not reduced contact.</>,
+    published: true,
+  },
+  {
     version: '0.215.0', date: '2026-09-21', headline: 'Aperture: the code that read the map is deleted, the map no longer runs when nobody can see it, and the features built on it show a clear “unavailable” blocker',
     changes: [
       <><b>We are reworking how EVE Conductor talks to Aperture.</b> Aperture&apos;s developer told us that each copy of this app was costing their server 6,000–7,000 requests and about 1 GB a day, skewing their user numbers, and reading their data in a way they never agreed to. Our own logs agreed with them. Until a proper path is worked out <i>with</i> them, the features built on reading the map are unavailable, and say so.</>,

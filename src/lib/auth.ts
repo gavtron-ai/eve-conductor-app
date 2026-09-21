@@ -80,9 +80,6 @@ interface WinBridge {
   openModule?: (moduleId: string) => Promise<boolean>;
   /** a pop-out tells the main process its current module (for the saved layout) */
   reportModule?: (moduleId: string) => void;
-  /** is this window on screen (not minimised, not hidden)? — the map page is unloaded when it is not */
-  isShown?: () => Promise<boolean>;
-  onShown?: (cb: (shown: boolean) => void) => (() => void) | void;
 }
 
 interface OverlayBridge {
@@ -128,7 +125,6 @@ declare global {
       devlog?: DevLogBridge;
       updates?: UpdatesBridge;
       /** absolute path of the guest-side popup shim for the Aperture webview */
-      aperturePreloadPath?: string;
       config?: ConfigBridge;
       /** the player's loot history for random-loot sites (v0.201) */
       hauls?: {
@@ -188,10 +184,6 @@ declare global {
       };
       /** pull the Systems-table text from the owner's logged-in Aperture map
        * in a hidden window ('' if it couldn't be read / not logged in) */
-      aperture?: {
-        /** popup relay for the map's overlay (guest-side shim, v0.188.3) */
-        openPopup: (url: string) => Promise<boolean>;
-      };
       /** the EVE client's game logs, read read-only by main */
       gamelog?: {
         list: () => Promise<{

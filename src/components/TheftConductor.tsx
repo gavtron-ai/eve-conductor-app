@@ -775,10 +775,10 @@ export default function TheftConductor({ view = 'skyhooks' }: { view?: 'skyhooks
             <span>open now only</span>
           </label>
           <button className="btn" onClick={() => void importFromClipboard()}
-            title="Set the distance origin from a system list YOU copied: on the Corp Map tab open Map info → Systems, select the list, copy it, then press this. The app reads your clipboard once, when you press — it reads nothing from the map itself.">
+            title="Set the distance origin from a system list YOU copied: in Aperture, in your own web browser, open Map info → Systems, select the list and copy it, then press this. The app reads your clipboard once, when you press — it does not contact Aperture.">
             📋 import map from clipboard
           </button>
-          <span className="dim" style={{ fontSize: 12, cursor: 'help' }} title={`“Refresh from Aperture” — ${APERTURE_BLOCK_SHORT} Copy your system list on the Corp Map tab and use “import map from clipboard”.`}>🚧 refresh from Aperture: unavailable</span>
+          <span className="dim" style={{ fontSize: 12, cursor: 'help' }} title={`“Refresh from Aperture” — ${APERTURE_BLOCK_SHORT} Copy your system list from Aperture in your own browser and use “import map from clipboard”.`}>🚧 refresh from Aperture: unavailable</span>
           {mapped.length > 0 && (
             <>
               <span className="dim" style={{ fontSize: 12, cursor: 'help' }}

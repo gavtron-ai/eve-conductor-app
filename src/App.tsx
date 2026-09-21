@@ -105,16 +105,10 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
   // Aperture's tabs: the corp map, and the chain summary (a tab since
   // v0.200.12 — it was a pop-out window)
   const [apertureView, setApertureView] = useState<'map' | 'summary'>('map');
-  // APERTURE STAYS WARM (v0.202.7): the module used to unmount whenever
-  // another module was opened, so every return reloaded the corp map from
-  // scratch (a Next.js page with its login, data and drawing — seconds of
-  // "loading", and the Σ Summary waiting on it: "it really lags there for a
-  // minute"). Once opened it now stays mounted and merely hidden — by
-  // visibility, never display:none, which unloads a <webview> — so the map
-  // and the last reading are there the instant you come back.
-  // v0.214.0: NOT ANY MORE. A hidden map page keeps polling Aperture's server around the clock
-  // and makes every user look online all day (lib/apertureAccess.ts) — the page now exists only
-  // while the Aperture module is on screen, exactly like a browser tab the user has open.
+  // The Aperture module is mounted only while it is on screen — and since v0.216.0 it holds no
+  // web page at all: the app does not contact Aperture (lib/apertureAccess.ts). From v0.202.7 to
+  // v0.213 it was kept mounted, hidden, once opened ("stays warm"), which kept the corp map's page
+  // polling Aperture's server around the clock for every user. Never again.
   const apertureWarm = module === 'aperture';
   /** Battle Conductor tabs: saved battle reports vs the live game-log feed */
   const [battleView, setBattleView] = useState<'reports' | 'live' | 'sim' | 'board'>('reports');
@@ -782,7 +776,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
           <div className="aperture-keep" style={module === 'aperture'
             ? { display: 'contents' }
             : { position: 'absolute', inset: 0, visibility: 'hidden', pointerEvents: 'none', zIndex: -1, overflow: 'hidden', display: 'flex' }}>
-            <ApertureModule view={apertureView} onOpenMap={() => { setApertureView('map'); logUser('view: aperture map'); }} />
+            <ApertureModule view={apertureView} />
           </div>
         )}
         {module === 'trade' && view === 'explorer' && <Sidebar />}

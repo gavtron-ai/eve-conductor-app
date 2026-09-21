@@ -8,9 +8,6 @@ contextBridge.exposeInMainWorld('appInfo', {
   /** the exact callback URL the login server binds — what a user must
    * register on their own EVE application for a login to complete */
   ssoCallback: ipcRenderer.sendSync('sso-callback'),
-  /** Aperture webview support: the guest-side popup shim's path, and the
-   * relay that asks main to build a popup window (see webviewPreload.cjs) */
-  aperturePreloadPath: ipcRenderer.sendSync('aperture-preload-path'),
   updates: {
     /** fires when a new version has finished downloading (installs on quit) */
     onReady: (cb) => ipcRenderer.on('update-ready', (_e, info) => cb(info)),
@@ -89,11 +86,6 @@ contextBridge.exposeInMainWorld('appInfo', {
     refresh: () => ipcRenderer.send('chain-refresh'),
     onRefreshRequest: (cb) => ipcRenderer.on('chain-refresh-request', () => cb()),
   },
-  /** the corp map is a plain embedded browser tab; nothing is read from it (v0.215.0) */
-  aperture: {
-    /** open a popup window for the map (guest-side shim relays here) */
-    openPopup: (url) => ipcRenderer.invoke('aperture-open-popup', url),
-  },
   /** the EVE client's game logs, READ-ONLY via main — open/read/close per
    * call, no held handles: the game is never touched */
   gamelog: {
@@ -119,10 +111,6 @@ contextBridge.exposeInMainWorld('appInfo', {
     openModule: (moduleId) => ipcRenderer.invoke('open-module-window', moduleId),
     /** a pop-out reports its CURRENT module so the saved layout stays accurate */
     reportModule: (moduleId) => ipcRenderer.send('module-window-module', moduleId),
-    /** v0.215.0: is this window on screen? Background throttling is off, so the page itself never
-     * learns it was minimised or sent to the tray — main says so, and the map page is unloaded */
-    isShown: () => ipcRenderer.invoke('win-is-shown'),
-    onShown: (cb) => { const f = (_e, v) => cb(!!v); ipcRenderer.on('window-shown', f); return () => ipcRenderer.removeListener('window-shown', f); },
   },
   overlay: {
     set: (on) => ipcRenderer.invoke('overlay-set', on),
