@@ -12,12 +12,20 @@
 //   3. latest.yml must exist and name this exact installer (electron-
 //      builder generates it because build.publish is configured; the
 //      updater on corp machines reads it to find updates)
+//   3b. EMERGENCY OR NOT (v0.217.0) — the owner's call at every go-live:
+//          npm run publish:beta                                  an ordinary update: a banner,
+//                                                                installed when the user restarts
+//          npm run publish:beta -- --emergency "why, one line"   installs BY ITSELF on every copy
+//                                                                (0.217.0+) after a 1-minute warning
+//      The marker is two fields in latest.yml (electron/updatePolicy.cjs). Without the flag any
+//      marker left in the file by an earlier run is REMOVED, so an emergency is never inherited.
 //   4. `gh release create vX.Y.Z` on eve-conductor-releases with the
 //      installer + blockmap + latest.yml — auth comes from the gh CLI,
 //      so no token is ever stored in this repo or the app
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
+import updatePolicy from '../electron/updatePolicy.cjs';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const version = JSON.parse(fs.readFileSync(path.join(ROOT, 'package.json'), 'utf8')).version;
@@ -42,11 +50,20 @@ const yml = fs.readFileSync(latestYml, 'utf8');
 if (!yml.includes(version)) die(`release/latest.yml does not mention v${version} — it is from an older build. Re-run "npm run ship".`);
 if (!fs.existsSync(blockmap)) die(`Missing ${path.basename(blockmap)} — differential updates need it. Re-run "npm run ship".`);
 
+// emergency or not — written into the feed file, and said out loud
+const ei = process.argv.indexOf('--emergency');
+const emergencyReason = ei >= 0 ? (process.argv[ei + 1] ?? '') : null;
+if (emergencyReason !== null && (!emergencyReason.trim() || emergencyReason.startsWith('--'))) die('--emergency needs a reason in quotes: it is shown to every user before their app restarts.');
+fs.writeFileSync(latestYml, updatePolicy.withEmergencyMarker(yml, emergencyReason));
+console.log(emergencyReason !== null
+  ? `\n*** EMERGENCY RELEASE *** every installed copy (0.217.0+) will restart into v${version} by itself.\n    reason shown to users: ${emergencyReason.trim()}\n`
+  : '\nordinary release — users get a banner and install it when they restart.\n');
+
 const assets = [installer, blockmap, latestYml];
 const args = [
   'release', 'create', `v${version}`,
   '--repo', REPO,
-  '--title', `EVE Conductor ${version}`,
+  '--title', `EVE Conductor ${version}${emergencyReason !== null ? ' (emergency update)' : ''}`,
   '--notes', `Beta build ${version}. Installed copies update themselves; new installs: run the setup exe (SmartScreen: "More info" → "Run anyway").`,
   ...assets,
 ];

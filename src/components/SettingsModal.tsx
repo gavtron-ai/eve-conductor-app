@@ -303,10 +303,8 @@ function YourSetupSection() {
         />
       </div>
       <p className="hint">
-        A web map your corporation runs, embedded as the Aperture module with its own persistent
-        login. {map === ''
-          ? <>Empty, so Aperture loads nothing at all — it will not open a page you did not choose.</>
-          : <>Loaded in a real browser tab inside the app, so signing in sticks across restarts.</>}
+        A web map your corporation runs. <b>The app does not contact it</b> (since 0.216.0) — the
+        address is used only by the “open Aperture in your own browser” button on the Aperture tabs.
       </p>
       <div className="field-grid" style={{ marginTop: 10 }}>
         <label>Home system on the map</label>

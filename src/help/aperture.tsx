@@ -1,96 +1,32 @@
-// APERTURE — the corp map, embedded. The book.
+// APERTURE — switched off (v0.216.0); this book shrank with it (v0.217.0). The pages that described
+// the embedded map, its toolbar and the Σ Summary were removed along with the features: a guide to
+// something that is not there is worse than no guide. They return — rewritten — if the features do.
 import type { ModuleHelp } from './types';
-import { Bar, Btn, Fig, Limit, Steps } from './figures';
+import { Limit } from './figures';
 
 export const APERTURE_HELP: ModuleHelp = {
   title: 'Aperture',
-  blurb: 'the corp map, embedded',
+  blurb: 'switched off for now',
   intro: [
     {
-      id: 'what', title: 'What this module is',
-      figure: (
-        <Fig caption="The map's own toolbar sits above the embedded page.">
-          <Bar brand="Aperture" tabs={['Corp Map', 'Σ Summary']} active="Corp Map"
-            right={<><Btn mini>←</Btn><Btn mini>→</Btn><Btn mini>⟳</Btn><Btn mini>🗺 map</Btn><Btn mini>↗ browser</Btn></>} />
-        </Fig>
-      ),
+      id: 'what', title: 'Why this module is switched off',
       body: (
         <>
-          <Limit>
-            <b>This module is switched off: the app does not contact Aperture at all (since 0.216.0).</b> Aperture&apos;s developer told us that the way the app loaded and read the map cost their server thousands of requests a day per user. All of it has been removed — the reading, the background loading, and now the embedded map itself — and a proper method is being worked out with them. Until they are happy with it, the <b>Corp Map</b> tab, the <b>Σ Summary</b>, the Home <b>chain dashlets</b> and the Theft Conductor&apos;s <b>refresh from Aperture</b> show a blocker. The pages below describe them as they worked and will be rewritten when they return. Use Aperture in your own browser (the blocker has a button for it — it only opens your browser); to give the raid alert its map, copy your system list there and use <b>📋 import map from clipboard</b> in the Theft Conductor.
-          </Limit>
           <p>
-            Your corporation's own web map, embedded so the whole workflow lives in one app. It runs as a real browser tab with its <b>own persistent login</b>: sign in once inside the panel and it sticks across restarts. The Theft module can read your system list straight from it.
+            This module used to show your corporation&apos;s Aperture map inside the app and build the <b>Σ Summary</b> and the Home <b>chain dashlets</b> from it. Aperture&apos;s developer told us that the way the app loaded and read the map cost their server thousands of requests a day for every copy of the app, and distorted their user numbers. They were right, and they had never been asked.
           </p>
-          <Steps items={[
-            <>⚙ Settings → <b>Your setup</b> → paste the map's address into <b>Aperture URL</b>. Nothing is hard-coded — a corp mate with a different map pastes theirs.</>,
-            <>Open the module and log in inside the panel when the map asks.</>,
-          ]} />
+          <p>
+            So all of it has been removed. <b>EVE Conductor does not contact Aperture in any way</b> — it does not load the map, read it, or keep a login for it. Both tabs here, the Σ Summary window, the chain dashlets and the Theft Conductor&apos;s “refresh from Aperture” show a notice instead.
+          </p>
+          <p>
+            <b>What still works:</b> Aperture in your own web browser, exactly as before — the notice has a button that opens your browser and sends nothing itself. And to give the raid alert its distance origin: copy your system list in Aperture (Map info → Systems), then press <b>📋 import map from clipboard</b> in the Theft Conductor. The app reads your clipboard once, when you press.
+          </p>
+          <Limit>
+            These features come back only when Aperture&apos;s developer has offered — and is happy with — a way of doing it. Until then there is nothing to configure here; the map address in ⚙ Settings → Your setup is used only by the “open in your own browser” button.
+          </Limit>
         </>
       ),
     },
   ],
-  groups: [
-    {
-      id: 'map', title: 'Corp Map',
-      pages: [
-        {
-          id: 'toolbar', title: 'The toolbar',
-          body: (
-            <ul>
-              <li><b>←</b> / <b>→</b> — back and forward inside the map, like a browser.</li>
-              <li><b>⟳</b> — reload the map page.</li>
-              <li><b>🗺 map</b> — jump back to the corp map address if you navigated away inside the panel.</li>
-              <li><b>↗ browser</b> — open Aperture in your normal browser instead (for the one feature that cannot run here, below).</li>
-            </ul>
-          ),
-        },
-        {
-          id: 'summary', title: 'Σ Summary — what is out there to do in chain',
-          figure: (
-            <Fig caption="The Σ Summary tab: ISK on field per activity, every site with its distance in jumps from home or from you.">
-              <div style={{ fontSize: 11.5 }}>
-                <div>distance counted from <Btn mini primary>🏠 home</Btn> <Btn mini>Florida</Btn> <Btn mini>🧍 me · Pilot</Btn></div>
-                <div style={{ marginTop: 6, display: 'flex', gap: 6 }}>
-                  {[['Combat', '312m · 4 sites'], ['Ore', '95m · 5 sites'], ['Gas', '41m · 2 sites'], ['Relic', '— · 1 site'], ['Data', '— · 2 sites']].map(([g, v]) => (
-                    <span key={g} style={{ padding: '4px 8px', border: '1px solid var(--border)', borderRadius: 6 }}><b>{g}</b> {v}</span>
-                  ))}
-                </div>
-                <div style={{ marginTop: 6, display: 'flex', gap: 10, alignItems: 'center' }}><span>jumps ≤ <Btn mini>2 ▾</Btn></span> <span>max age <Btn mini>6 h ▾</Btn></span> <span>class <Btn mini on>C3</Btn> <Btn mini on>C4</Btn> <Btn mini>C5</Btn></span> <span style={{ marginLeft: 'auto' }}><Btn mini>✕ clear filters</Btn></span></div>
-                <div style={{ marginTop: 4 }}>chain <Btn mini on>C4B J120452 4</Btn> <Btn mini>HS Jita 1</Btn> <Btn mini>NS MJI3-8 2</Btn></div>
-                <div style={{ marginTop: 4 }}>activity <Btn mini on>Combat</Btn> <Btn mini>Ore</Btn> <Btn mini>Gas</Btn> &nbsp; ore <Btn mini>Arkonor 2</Btn> <Btn mini>Bistot 2</Btn> <Btn mini on>Gneiss 3</Btn> <Btn mini>Kernite 4</Btn></div>
-              </div>
-            </Fig>
-          ),
-          body: (
-            <>
-              <Steps items={[
-                <>Log in on the <b>Corp Map</b> tab once, then open the <b>Σ Summary</b> tab. The app reads the map's own data feed for every system drawn on the chain — the complete signature list, all types and classes, no panel needed — through your own login; the map stays loaded underneath. Nothing leaves your machine and nothing on the map is clicked or changed. The <i>Signature Search</i> table is only a fallback if the feed cannot be read.</>,
-                <>Pick the origin: <b>🏠 home</b> — <b>Florida</b> out of the box, prefilled in ⚙ Settings → Your setup and in the tab's own field; change it if your map labels home differently, or clear it to follow the home system the map itself marks — or <b>🧍 me</b>, your active character's current system from CCP's location route. Every site shows its distance in jumps from there.</>,
-                <>Read the dashboard: the <b>chain drawn by distance</b> (a column per jump; each card shows the system, its class, ISK on field and site count — click one to focus the tiles and table on it), <b>ISK by jumps</b> (stacked by activity — click a bar to set the distance filter), the <b>activity mix</b> and <b>freshness</b> (how long since the map last looked at each signature). Under a filter, a card with <b>nothing in view dims</b> and so do the links that only touch dimmed cards, so the systems that matter for what you are after stand out; the header counts the dimmed ones.</>,
-                <>Filter by <b>jumps</b>, <b>class</b> (C1 easiest to C6 hardest, plus HS/LS/NS), <b>activity</b> and <b>max age</b> — the filter row sits between the tiles and the drawing. Tick <b>linked only</b> to leave out the systems that are on the map but have no drawn link back to the origin (their dashed column leaves the drawing and their sites leave the tiles and table; the tick is remembered). Every filter drives the tiles, the drawing and the table; when a filter hides rows only because their class or distance is unknown, or because they are not linked, the window says so.</>,
-                <>Roaming one way? The <b>chain</b> row has one chip per system <b>directly off the origin</b> — its class with the map&apos;s letter (<b>C4B</b>, as on the cards), its name, and how many systems lie down that way. Pick one, or several, and only that part of the chain stays in the tiles, the table and the charts; on the drawing the rest of the chain <b>dims</b>, like under every other filter, so the chain stays whole and navigable. A chip stands for that system <i>and everything whose way home runs through it</i>; a system two branches reach equally fast (a loop in the chain) is on both. The origin&apos;s own sites are down no branch, so they leave too. The chips follow the origin — switch to <b>🧍 me</b> and they become the systems off where you are — and a picked branch that closes is dropped from the filter rather than left filtering invisibly.</>,
-                <>Mining a particular ore? The <b>ore</b> row shows one chip per rock the chain's ore sites carry — <b>Gneiss</b>, <b>Kernite</b>, <b>Dark Ochre</b> and so on, with the number of sites holding each — grades and variants folded together, so Gneiss covers Prismatic Gneiss and Gneiss IV-Grade too. Pick one and the view becomes that rock alone: only the ore sites holding it stay, each is <b>valued on that rock's share</b> (the Basis column lists the units counted and says "Gneiss only"), the Ore tile totals it, and every other system dims on the drawing — a map of where the gneiss is. Pick two rocks to see them together; the chip's tooltip carries the total units across the chain. An ore site whose contents the tables do not know is counted apart ("hidden (contents unknown)").</>,
-                <>Use the same filters every day? Press <b>★ save view</b> (left of ✕ clear filters) and they become a favorite under the header — “Σ Summary · Gneiss · C3 branch”. The part of the chain is saved by <b>class</b>, not by today&apos;s system, so it still works after the chain rerolls; see <i>★ Favorites &amp; saved views</i> in the Everywhere book.</>,
-                <>Every panel has a drag handle at its bottom-right corner. Drag the drawing or a chart taller or shorter and the charts on the right re-fit themselves to the room they have; the <b>chain drawing spreads</b> too — its rows over the height and its columns over the width — so a bigger panel is a roomier chain, never a blank half. A panel smaller than the drawing scrolls.</>,
-                <>Click a <b>column heading</b> in the table to sort by it — jumps, system, class, activity, site, value, age or basis. Click again to reverse, a third time for the default order (nearest first, then richest). Rows with no distance, value, age or name go last either way, so a "?" is never the top row. The sort is remembered.</>,
-                <><b>⟳ refresh</b> asks the map for a fresh reading; the tab re-reads every five minutes on its own while it is open.</>,
-              ]} />
-              <Limit>Every ISK figure is <b>if untouched</b>; nothing can tell a fresh site from a half-run one. Where each number comes from (the Basis column says it per row): sleeper combat, relic and data sites — the blue loot their sleepers drop (the cans on top are random and not counted); wormhole and k-space gas and ore sites — published contents times live Jita sell; k-space combat anomalies — every rat in the spawn and the listed waves at CCP's kill bounty, before ESS or bounty modifiers, random and escalation spawns excluded; pirate relic and data sites — <b>your own average</b> from hauls you log with the <b>＋ haul</b> button (paste the loot from your inventory or type the ISK); a site you have never run borrows its tier's average. An unscanned signature has no name and no estimate. The tab names its source: "map feed" is the complete list; "Signature Search panel" means the feed could not be read. <b>Distances follow the map's drawn links</b>: the chain is walked outward from the origin along the wormholes the map has drawn, so a system that is on the map but has no drawn link back to the origin sits in the last, dashed column ("on the map, not linked"), its sites show "?" for jumps, and they drop out under a distance filter — draw the link on the map and it joins the chain on the next read.</Limit>
-            </>
-          ),
-        },
-        {
-          id: 'limits', title: 'Login & limits',
-          body: (
-            <>
-              <p>The panel keeps its own cookies, separate from the rest of the app, so logging in here does not touch your EVE logins and vice versa.</p>
-              <Limit>The map's <b>overlay pop-out</b> (the button that opens a floating window) does not work inside the app — the embedded page greys out. Use <b>↗ browser</b> for that feature; everything else works in the panel.</Limit>
-              <p>The Theft module's <b>pull from Aperture</b> button uses this same login to read your map's systems in the background — nothing to set up twice.</p>
-            </>
-          ),
-        },
-      ],
-    },
-  ],
+  groups: [],
 };

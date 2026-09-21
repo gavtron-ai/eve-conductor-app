@@ -97,7 +97,7 @@ export const HOME_HELP: ModuleHelp = {
                 <><b>＋ add dashlets</b> opens the store. Pick a shelf on the left.</>,
                 <>Each card shows the dashlet <b>live</b> — the preview is the real thing with your data, so you see exactly what you are adding. Click <b>S / M / L / XL</b> on the card to preview each version, and set its option (the ore, the range) before adding.</>,
                 <><b>＋ add</b> puts that version in the first free spot on the board in front of you. The store stays open so you can add several; arrange them afterwards.</>,
-                <>A card says what the dashlet <b>needs</b> — a logged-in trading character, your corp map set up in Aperture — so an empty preview explains itself.</>,
+                <>A card says what the dashlet <b>needs</b> — a logged-in trading character, a logged-in pilot for the corp boards — so an empty preview explains itself.</>,
               ]} />
             </>
           ),

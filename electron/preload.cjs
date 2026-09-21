@@ -66,11 +66,6 @@ contextBridge.exposeInMainWorld('appInfo', {
     /** a system's recent killmails (window in seconds) for the gatecamp check */
     systemKills: (systemId, pastSeconds) => ipcRenderer.invoke('zkill-system-kills', { systemId, pastSeconds }),
   },
-  /** EvE-Scout Rescue's Storm Track page (player-reported storm positions)
-   * — fetched by main because the page sends no CORS header */
-  storms: {
-    page: () => ipcRenderer.invoke('storms-page'),
-  },
   /** the OS clipboard, READ-ONLY — the Theft Conductor's Aperture auto-import
    * watches this; main reads it without the focus gate the renderer has */
   clipboard: {

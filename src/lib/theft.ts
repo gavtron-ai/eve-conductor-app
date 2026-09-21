@@ -431,8 +431,9 @@ export async function fetchSystemJumps(): Promise<Map<number, number>> {
 // SYSTEM EFFECTS. What ESI actually publishes: INCURSIONS (official, live,
 // with the infested system list). What it does NOT publish: metaliminal
 // storm locations — the community asked (esi-issues #1224) and CCP never
-// shipped it; the only tracker is player-reported (EvE-Scout Rescue). The
-// module links the tracker and claims nothing it cannot verify.
+// shipped it. The only tracker is a community web page with no API; the app
+// read it until v0.217.0 and no longer does (nobody there agreed to it), so
+// storms are simply not shown.
 // ---------------------------------------------------------------------------
 
 export interface IncursionMark {

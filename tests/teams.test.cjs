@@ -1,7 +1,8 @@
 // battleReport: which side is which (v0.100.0 evidence-weighted derivation).
 //
-// Driven through the REAL exported path — fetchFightData — with the network
-// stubbed, so what is tested is the code the app runs.
+// Driven through the REAL exported path the app runs — fallbackFightData (the summary built from
+// the corp's own killmails). Until v0.217.0 this went through fetchFightData with a stubbed
+// br.evetools analyze response; the app no longer calls that site, and the team rules are the same.
 //
 // The rule being pinned: every entity is scored against my own,
 //   friend evidence = killmails where it shoots the same victim I shoot
@@ -33,12 +34,9 @@ const km = (vAlly, attAllies, isk = 50e6) => ({
     : p(a, 10 + i))),
 });
 
-/** run the real fetchFightData against a stubbed analyze response */
+/** the teams the app derives from a fight's killmails */
 const teamsOf = async (kms) => {
-  global.fetch = async () => ({ ok: true, json: async () => ({ relateds: [{ systemID: 30000142, kms }] }) });
-  const fd = await br.fetchFightData({
-    timings: [{ systemID: '30000142', start: 0, end: 1 }], corpId: MY_CORP, startMs: 0, endMs: 1,
-  });
+  const fd = br.fallbackFightData(kms, MY_CORP);
   return { A: fd.teams[0].slice().sort((a, b) => a - b), B: fd.teams[1].slice().sort((a, b) => a - b) };
 };
 

@@ -19,7 +19,7 @@ export const THEFT_HELP: ModuleHelp = {
             What can be robbed near you, and when. Theft windows come from CCP's own public data and are facts. What is <i>in</i> a skyhook is a ceiling: the feed cannot see raids at the very end of a window or after it, so "should be full" can be quietly empty. The module says which is which in every column.
           </p>
           <Steps items={[
-            <>Tell it where you are: type a <b>near system</b>, or press <b>pull from Aperture</b> once so distances come from your own map.</>,
+            <>Tell it where you are: type a <b>near system</b>, or press <b>📋 import map from clipboard</b> after copying your system list from your corp map, so distances come from your own chain.</>,
             <>Read the <b>Window</b> column — OPEN rows can be robbed right now.</>,
             <>Read <b>Danger/hr</b>, <b>Jumps/hr</b> and the route ⚠ before undocking.</>,
             <>When you fly by a skyhook, read its Surplus Bay bar and enter the tics with <b>bar</b>. The history corrects itself, including raids the feed never saw.</>,
@@ -40,7 +40,7 @@ export const THEFT_HELP: ModuleHelp = {
               <li><b>near system</b> — distances are stargate jumps from here. Leave it blank and distances come from the <i>nearest k-space system on your imported map</i> (the row says "via" which one).</li>
               <li><b>ignore radius</b> — list every skyhook in the feed, however far.</li>
               <li><b>open now only</b> — hide windows that have not opened yet.</li>
-              <li><b>pull from Aperture</b> — loads your logged-in corp map in a hidden window and imports its systems as the distance origin. <b>forget map</b> clears them.</li>
+              <li><b>📋 import map from clipboard</b> — copy your system list from your corp map in your own browser (Map info → Systems), then press it: the list becomes the distance origin. The app reads your clipboard once, when you press, and contacts nobody. <b>✕ clear map</b> forgets it. (“Refresh from Aperture” is unavailable — the app no longer contacts Aperture.)</li>
             </ul>
           ),
         },

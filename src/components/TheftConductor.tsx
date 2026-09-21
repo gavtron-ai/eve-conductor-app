@@ -5,7 +5,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { APERTURE_BLOCK_SHORT } from '../lib/apertureAccess';
 import { useApp } from '../lib/store';
-import { suggestSystems, regionName, reachFrom, getSystem, findSystem, systemsWithin, pathTo } from '../lib/mapdata';
+import { suggestSystems, regionName, reachFrom, getSystem, pathTo } from '../lib/mapdata';
 import { setWaypoint } from '../lib/esiChar';
 import {
   fetchRaidableSkyhooks, fetchSovClaims, fetchSystemActivity, fetchSystemJumps, fetchIncursions, rankSkyhookTargets,
@@ -13,10 +13,6 @@ import {
   type RaidableSkyhook, type SovClaim, type SkyhookTarget, type SystemActivity, type EssSystem,
   type PlanetInfo, type IncursionMark,
 } from '../lib/theft';
-import {
-  fetchStorms, stormExposure, STORM_EFFECTS, STORM_TRACK_URL,
-  type StormFeed, type StormMark,
-} from '../lib/storms';
 import {
   raidHistory, markRaidedByMe, raidVerdict, emptyStats, bankEstimate,
   bankCycles, barFillPct, lastEmptiedMs, applyBarReading,
@@ -183,44 +179,28 @@ function HeldBy({ claim, names }: {
   );
 }
 
-/** everything known to affect a system, as clickable chips: player-reported
- * storms (strong ring solid, weak ring informational) and incursions */
-interface FxState { systemName: string; incursion?: IncursionMark; storms?: StormMark[] }
+/** what CCP's own API says affects a system, as a clickable chip: incursions.
+ * (v0.217.0: the metaliminal-storm chips are gone — they came from reading EvE-Scout Rescue's
+ * web page, a community site with no API that never agreed to be read by a tool.) */
+interface FxState { systemName: string; incursion?: IncursionMark }
 
-function EffectChips({ systemId, systemName, stormMap, incursions, onOpen }: {
+function EffectChips({ systemId, systemName, incursions, onOpen }: {
   systemId: number; systemName: string;
-  stormMap: Map<number, StormMark[]>; incursions: Map<number, IncursionMark>;
+  incursions: Map<number, IncursionMark>;
   onOpen: (fx: FxState) => void;
 }) {
-  const marks = stormMap.get(systemId);
   const inc = incursions.get(systemId);
-  if (!marks && !inc) return null;
+  if (!inc) return null;
   const open = (e: { stopPropagation(): void }) => {
     e.stopPropagation();
-    onOpen({ systemName, incursion: inc, storms: marks });
+    onOpen({ systemName, incursion: inc });
   };
   return (
-    <>
-      {(marks ?? []).map((m) => {
-        const strong = m.ring <= 1;
-        const fx = STORM_EFFECTS[m.type];
-        return (
-          <span key={m.name} className={strong ? 'flag warn' : 'flag info'}
-            style={{ marginLeft: 6, cursor: 'pointer', ...(strong ? {} : { opacity: 0.75 }) }}
-            title={`${m.type} storm ${strong ? 'STRONG' : 'weak'} ring (${m.ring}j from ${m.centerName}) — ${fx.headline}. Player-reported (EvE-Scout Rescue) — click for the full effect sheet`}
-            onClick={open}>
-            {fx.icon} {m.type.toLowerCase()}{m.ring > 1 ? ` ~${m.ring}j` : ''}
-          </span>
-        );
-      })}
-      {inc && (
-        <span className="flag warn" style={{ marginLeft: 6, cursor: 'pointer' }}
-          title="Sansha incursion in this constellation — click for the system effects"
-          onClick={open}>
-          ☣ incursion{inc.staging ? ' · staging' : ''}
-        </span>
-      )}
-    </>
+    <span className="flag warn" style={{ marginLeft: 6, cursor: 'pointer' }}
+      title="Sansha incursion in this constellation — click for the system effects"
+      onClick={open}>
+      ☣ incursion{inc.staging ? ' · staging' : ''}
+    </span>
   );
 }
 
@@ -235,36 +215,6 @@ function EffectsPopup({ fx, onClose }: { fx: FxState; onClose: () => void }) {
       <div className="modal" style={{ maxWidth: 620 }} onClick={(e) => e.stopPropagation()}>
         <h2 style={{ marginTop: 0 }}>System effects — {fx.systemName}</h2>
         <div style={{ fontSize: 13, lineHeight: 1.7 }}>
-          {(fx.storms ?? []).map((m) => {
-            const strong = m.ring <= 1;
-            const sheet = STORM_EFFECTS[m.type];
-            return (
-              <div key={m.name} style={{ marginBottom: 12 }}>
-                <p style={{ margin: '4px 0' }}>
-                  {sheet.icon} <b>{m.type} metaliminal storm</b> — this system is in the{' '}
-                  <b>{strong ? 'STRONG' : 'weak'}</b> ring
-                  ({m.ring === 0 ? 'the storm centre' : `${m.ring} jump${m.ring === 1 ? '' : 's'} from ${m.centerName}`}).
-                  {' '}Strong = centre + 1 jump; weak = 2–3 jumps out.
-                </p>
-                <ul style={{ margin: '6px 0', paddingLeft: 20 }}>
-                  {(strong ? sheet.strong : sheet.weak).map((line) => (
-                    <li key={line}>{line.startsWith('CLOAKING') ? <b>{line}</b> : line}</li>
-                  ))}
-                </ul>
-                <p className="dim" style={{ margin: '4px 0', fontSize: 12 }}>
-                  Player-reported: seen in <b>{m.centerName}</b>
-                  {m.reportedMs !== null && <> at {new Date(m.reportedMs).toUTCString().replace(' GMT', ' EVE')}</>}
-                  {m.hoursInSystem !== null && <> ({m.hoursInSystem}h in system)</>}
-                  {m.reportedBy && <> by {m.reportedBy}</>} —{' '}
-                  <a href="#" onClick={(e) => { e.preventDefault(); window.open(STORM_TRACK_URL, '_blank'); }}>
-                    EvE-Scout Rescue Storm Track
-                  </a>. Storms move ONE jump every 24–48 h, so an old report may
-                  have drifted a jump or two — no API publishes storm positions,
-                  scout reports are all anyone has.
-                </p>
-              </div>
-            );
-          })}
           {inc && (
             <div style={{ marginBottom: 12 }}>
               <p style={{ margin: '4px 0' }}>
@@ -431,7 +381,6 @@ export default function TheftConductor({ view = 'skyhooks' }: { view?: 'skyhooks
   const [activity, setActivity] = useState<Map<number, SystemActivity>>(new Map());
   const [traffic, setTraffic] = useState<Map<number, number>>(new Map());
   const [incursions, setIncursions] = useState<Map<number, IncursionMark>>(new Map());
-  const [stormFeed, setStormFeed] = useState<StormFeed | null>(null);
   const [fxPopup, setFxPopup] = useState<FxState | null>(null);
   const [routePopup, setRoutePopup] = useState<{ target: string; path: { id: number; name: string }[] } | null>(null);
   const [routeData, setRouteData] = useState<RouteSystemKills[] | null>(null);
@@ -485,10 +434,10 @@ export default function TheftConductor({ view = 'skyhooks' }: { view?: 'skyhooks
     setLoading(true);
     setError(null);
     try {
-      const [sk, cl, act, jmp, inc, h, st] = await Promise.all([
+      const [sk, cl, act, jmp, inc, h] = await Promise.all([
         fetchRaidableSkyhooks(), fetchSovClaims(), fetchSystemActivity().catch(() => new Map()),
         fetchSystemJumps().catch(() => new Map()), fetchIncursions().catch(() => new Map()),
-        raidHistory(), fetchStorms(),
+        raidHistory(),
       ]);
       setRaw(sk);
       setClaims(cl);
@@ -496,7 +445,6 @@ export default function TheftConductor({ view = 'skyhooks' }: { view?: 'skyhooks
       setTraffic(jmp as Map<number, number>);
       setIncursions(inc as Map<number, IncursionMark>);
       setHist(h);
-      setStormFeed(st);
       setLastLoadedAt(Date.now());
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -522,18 +470,6 @@ export default function TheftConductor({ view = 'skyhooks' }: { view?: 'skyhooks
       clearInterval(t2);
     };
   }, []);
-
-  // storm exposure: reported centres → every system within 3 jumps (strong =
-  // 0–1, weak = 2–3), resolved against the bundled map. Unresolved report
-  // names are surfaced, never dropped silently.
-  const stormMap = useMemo(
-    () => (stormFeed ? stormExposure(stormFeed.reports, (n) => findSystem(n)?.id, systemsWithin) : new Map<number, StormMark[]>()),
-    [stormFeed],
-  );
-  const stormsUnresolved = useMemo(
-    () => (stormFeed ? stormFeed.reports.filter((r) => !findSystem(r.system)).map((r) => `${r.name} @ ${r.system}`) : []),
-    [stormFeed],
-  );
 
   const center = centerName.trim() ? suggestSystems(centerName.trim(), 1)[0] : undefined;
   const mappedKey = mapped.join(',');
@@ -715,17 +651,6 @@ export default function TheftConductor({ view = 'skyhooks' }: { view?: 'skyhooks
           {' '}<InfoDot id="theft.skyhooks" />
           <span className="sub">
             live theft windows · {raw ? `${raw.length} skyhook(s) in the feed` : 'loading…'}
-            {' · '}
-            {stormFeed === null ? (
-              <span title="EvE-Scout Rescue's Storm Track page could not be fetched — storm chips are OFF this refresh, not 'no storms'. There is no ESI storm endpoint; the player-run tracker is all anyone has.">
-                🌩 tracker unreachable
-              </span>
-            ) : (
-              <span title={`Metaliminal storm positions from EvE-Scout Rescue's Storm Track (PLAYER-REPORTED — no ESI endpoint exists). Systems within 3 jumps of a reported centre get a chip: strong ring (centre+1j) solid, weak ring (2–3j) faint. Storms move 1 jump every 24–48 h, so old reports may have drifted.${stormsUnresolved.length > 0 ? `\n\nUnmapped report(s), shown nowhere: ${stormsUnresolved.join(', ')}` : ''}`}>
-                🌩 {stormFeed.reports.length} storm{stormFeed.reports.length === 1 ? '' : 's'} tracked
-                {stormsUnresolved.length > 0 ? ` (${stormsUnresolved.length} unmapped)` : ''}
-              </span>
-            )}
           </span>
           <span className="panel-filter" style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
             <span className="dim" style={{ fontSize: 12 }}
@@ -924,7 +849,7 @@ export default function TheftConductor({ view = 'skyhooks' }: { view?: 'skyhooks
                   <td className="hub-name">
                     {t.systemName}
                     <EffectChips systemId={t.systemId} systemName={t.systemName}
-                      stormMap={stormMap} incursions={incursions} onOpen={setFxPopup} />
+                      incursions={incursions} onOpen={setFxPopup} />
                   </td>
                   <td className="dim">{t.regionName}</td>
                   <td className={(() => {
@@ -1014,7 +939,7 @@ export default function TheftConductor({ view = 'skyhooks' }: { view?: 'skyhooks
                   <td className="hub-name">
                     {e.systemName}
                     <EffectChips systemId={e.systemId} systemName={e.systemName}
-                      stormMap={stormMap} incursions={incursions} onOpen={setFxPopup} />
+                      incursions={incursions} onOpen={setFxPopup} />
                   </td>
                   <td className={secClass(e.sec)}>{e.sec.toFixed(1)}</td>
                   <td className="dim">{e.regionName}</td>

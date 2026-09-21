@@ -574,8 +574,8 @@ export async function buildFightDigest(
 
   return {
     caveat: fd.partial
-      ? `counted from ${nameOf(corpId)}'s own killmails only — br.evetools has not`
-        + ' ingested this fight yet, so losses on mails no corp member is on are missing'
+      ? `counted from ${nameOf(corpId)}'s own killmails only — losses on killmails no corp member`
+        + ' is on (an ally\'s loss nobody in corp got on) are not included'
       : undefined,
     fight: {
       date: new Date(t0).toISOString().slice(0, 10),

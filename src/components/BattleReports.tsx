@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useAuth } from '../lib/auth';
 import {
-  makeBattleReports, corporationOf, fetchFightData, fallbackFightData, createSavedBr, POSTER_LOGOS,
+  makeBattleReports, corporationOf, fallbackFightData, POSTER_LOGOS,
 } from '../lib/battleReport';
 import type { BattleReportResult, FightData } from '../lib/battleReport';
 import { buildFightDigest } from '../lib/battleNarrative';
@@ -187,31 +187,12 @@ export default function BattleReports() {
    * report the moment their analyze has the data */
   async function ensureDigest(b: Battle): Promise<Battle> {
     if (b.digest || b.digestNote) return b;
-    let fd = b.fightData;
-    let out = b;
-    if (!fd) {
-      try {
-        fd = await fetchFightData(b.report.window, b.report.corpKms);
-      } catch {
-        // br.evetools does not have the fight (their feed can run HOURS
-        // behind zkill — or, some days, be down entirely) — the corp's own
-        // killmails are already in hand, so summarise those and SAY SO
-        if (b.report.corpKms.length > 0) {
-          fd = fallbackFightData(b.report.corpKms, b.report.window.corpId);
-        }
-      }
-    }
+    // v0.217.0: the summary is built from the corp's OWN killmails, already in hand. The app used to
+    // ask br.evetools' internal routes for the rest of the fight and create saved reports on their
+    // server by itself — nobody there agreed to that (lib/battleReport.ts).
+    const fd = b.fightData ?? (b.report.corpKms.length > 0 ? fallbackFightData(b.report.corpKms, b.report.window.corpId) : undefined);
+    const out = b;
     if (!fd) return { ...b, digestNote: 'no summary: the fight’s killmails could not be read' };
-    // THE FULL-FIGHT LINK: a multi-system fight whose analyze answered gets
-    // its saved multi-system report NOW — the one URL that covers every
-    // system and every related kill
-    if (!fd.partial && b.report.window.timings.length > 1 && !b.savedBrDone) {
-      try {
-        const url = await createSavedBr(b.report.window.timings, fd);
-        out = { ...out, report: { ...out.report, url, caveat: undefined }, savedBrDone: true };
-        logUser('battle saved br created', { url });
-      } catch { /* next selection retries */ }
-    }
     try {
       const digest = await buildFightDigest(fd, b.report.window.corpId, {
         startMs: b.report.window.startMs, endMs: b.report.window.endMs,
@@ -304,10 +285,7 @@ export default function BattleReports() {
               )}
               {b.digest && (
                 <div className="dim" style={{ fontSize: 12, marginTop: 4 }}>
-                  {b.digest.caveat
-                    ? '⚠ br.evetools has no data for this fight yet'
-                    : (b.report.window.timings.length > 1 && b.savedBrDone
-                      ? 'full multi-system report ready ✓' : 'br.evetools ready ✓')}
+                  summary from your corp’s own killmails
                 </div>
               )}
               {i === selIdx && copied && (
@@ -347,10 +325,8 @@ export default function BattleReports() {
                 copy link
               </button>
               <button className="btn mini"
-                title={d?.caveat
-                  ? 'br.evetools is still empty for this fight — opening WarBeacon, which has it live'
-                  : 'open the battle report on br.evetools.org'}
-                onClick={() => window.open(d?.caveat ? r.warbeaconUrl : r.url, '_blank')}>
+                title="open this fight's related page on br.evetools.org in your own browser — the app itself asks that site for nothing"
+                onClick={() => window.open(r.url, '_blank')}>
                 ↗ open in browser
               </button>
             </div>
@@ -366,7 +342,7 @@ export default function BattleReports() {
               // run off the board that already has the kills (first system)
               <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 4, flexWrap: 'wrap' }}>
                 <span className="dim" style={{ fontSize: 12 }}>
-                  works right now — WarBeacon battle report:
+                  if that page is still empty (its feed can run behind) — WarBeacon battle report:
                 </span>
                 <button className="btn mini"
                   onClick={() => { void navigator.clipboard.writeText(r.warbeaconUrl); }}>

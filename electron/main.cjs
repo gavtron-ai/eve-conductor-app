@@ -9,7 +9,6 @@ const appConfig = require('./appConfig.cjs');
 const overlay = require('./overlay.cjs');
 const cloneStore = require('./cloneStore.cjs');
 const zkill = require('./zkill.cjs');
-const storms = require('./storms.cjs');
 const gamelog = require('./gamelog.cjs');
 
 // The app is meant to run 24/7 (collectors). A second launch while the window
@@ -142,10 +141,25 @@ try {
   autoUpdater.on('update-not-available', (i) => updLog('info', `up to date (feed offers ${i?.version ?? '?'})`));
   autoUpdater.on('update-available', (i) => updLog('info', `update available: ${i?.version} — downloading`));
   autoUpdater.on('error', (e) => updLog('warn', `update check failed: ${e instanceof Error ? e.message : String(e)}`));
+  // EMERGENCY UPDATES (v0.217.0, electron/updatePolicy.cjs): an update the owner marked as an
+  // emergency at go-live installs BY ITSELF after a one-minute visible warning — silent install,
+  // relaunch, collectors resume. An ordinary update waits for the user, exactly as before.
+  const updatePolicy = require('./updatePolicy.cjs');
+  let emergencyTimer = null;
   autoUpdater.on('update-downloaded', (i) => {
-    updLog('info', `update ${i?.version} downloaded — installs on quit`);
+    const em = updatePolicy.emergencyOf(i);
+    const installAt = em.emergency ? Date.now() + updatePolicy.EMERGENCY_COUNTDOWN_MS : 0;
+    updLog(em.emergency ? 'warn' : 'info', em.emergency
+      ? `EMERGENCY update ${i?.version} downloaded — installing by itself in ${updatePolicy.EMERGENCY_COUNTDOWN_MS / 1000}s: ${em.reason}`
+      : `update ${i?.version} downloaded — installs on quit`);
     for (const w of BrowserWindow.getAllWindows()) {
-      try { w.webContents.send('update-ready', { version: i?.version ?? '' }); } catch { /* window may be closing */ }
+      try { w.webContents.send('update-ready', { version: i?.version ?? '', emergency: em.emergency, reason: em.reason, installAt }); } catch { /* window may be closing */ }
+    }
+    if (em.emergency && !emergencyTimer) {
+      emergencyTimer = setTimeout(() => {
+        updLog('warn', `EMERGENCY update ${i?.version}: restarting into it now`);
+        try { autoUpdater.quitAndInstall(true, true); } catch (e) { updLog('warn', `emergency install failed: ${e instanceof Error ? e.message : String(e)}`); emergencyTimer = null; }
+      }, updatePolicy.EMERGENCY_COUNTDOWN_MS);
     }
   });
   ipcMain.handle('update-restart', () => { autoUpdater.quitAndInstall(); });
@@ -153,7 +167,7 @@ try {
     if (!app.isPackaged) return;
     const check = () => { autoUpdater.checkForUpdates().catch(() => { /* logged above */ }); };
     setTimeout(check, 15_000);              // let startup settle first
-    setInterval(check, 4 * 3_600_000);      // then every 4 hours
+    setInterval(check, updatePolicy.CHECK_EVERY_MS);   // then every hour (was 4 h — too slow for an emergency)
   }).catch(() => {});
 } catch (e) {
   devlog.append(app.getPath('documents'), [{
@@ -214,8 +228,6 @@ ipcMain.handle('zkill-system-kills', (_e, arg) => {
   return zkill.systemKills(systemId, pastSeconds);
 });
 
-// ---- the storm tracker page (no CORS header — main must fetch it) ----
-ipcMain.handle('storms-page', () => storms.stormPage());
 
 
 // ---- the OS clipboard, read-only via main so the Theft Conductor can watch

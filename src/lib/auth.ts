@@ -61,7 +61,7 @@ interface DevLogBridge {
 
 interface UpdatesBridge {
   /** a new version finished downloading in the background; installs on quit */
-  onReady: (cb: (info: { version: string }) => void) => void;
+  onReady: (cb: (info: { version: string; emergency?: boolean; reason?: string; installAt?: number }) => void) => void;
   /** quit now and install the downloaded update */
   restart: () => Promise<void>;
 }
@@ -172,11 +172,6 @@ declare global {
         /** losses of ONE hull by a character, corporation or alliance (v0.203.1) */
         shipLosses?: (kind: 'character' | 'corporation' | 'alliance', id: number, shipTypeId: number) => Promise<{ killmail_id: number; hash: string; value: number; time: number; victimCharId: number; victimShipId: number }[]>;
         systemKills: (systemId: number, pastSeconds?: number) => Promise<{ killmail_id: number; hash: string; value: number; locationId: number; npc: boolean }[]>;
-      };
-      /** the storm tracker page HTML ('' = unreachable) — main fetches it
-       * because the page has no CORS header */
-      storms?: {
-        page: () => Promise<string>;
       };
       /** the OS clipboard, read-only — Aperture auto-import watches it */
       clipboard?: {

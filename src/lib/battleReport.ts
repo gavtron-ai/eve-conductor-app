@@ -11,18 +11,15 @@
 // — the first kill's system and its UTC hour bucket, exactly what zkill's
 // own "related" page links to.
 //
-// MULTI-SYSTEM FIGHTS (v0.99.1): a related URL can only name ONE system, so
-// a fight that rolls across systems loses every kill outside the first one
-// (a real fight spanning J170127 + J151045 rendered as "Team B (1)"). For
-// those, use br.evetools' own saved-report API — captured by instrumenting
-// the site's XHR while clicking "Create new BR":
-//   POST /newapi/br/analyze        {"timings":[{"systemID":"...","start":s,"end":s}, ...]}
-//   POST /newapi/old/br/create-new {"timings":[...],"teams":[["allyOrCorpId",...],[...]]}
-// start/end are epoch SECONDS, systemID a STRING, team members are alliance
-// ids (or corporation ids for unallied entities) as strings; create-new
-// answers {"_id":"..."} and the report lives at br.evetools.org/br/{_id}.
+// NO REQUEST IS MADE TO br.evetools.org (v0.217.0). From v0.99.1 the app called two of that site's
+// INTERNAL routes (/newapi/br/analyze and /newapi/old/br/create-new — found by instrumenting the
+// site's own page) to fetch a fight's killmails and to CREATE saved multi-system reports on their
+// server, the latter by itself whenever such a fight was selected. Nobody there agreed to that.
+// It is deleted. The app now only BUILDS the public related-page address above, as text, for the
+// pilot to paste in chat or open in his own browser; the summary is built from the corp's own
+// killmails (zKillboard's public API + ESI), which are already in hand.
 import { ESI_BASE } from './constants';
-import { fightPoster, fightWhy, homeAlliance, relevantKms, splitFights, type FightPoster, type SplitFight } from './fightSplit';
+import { fightPoster, fightWhy, homeAlliance, splitFights, type FightPoster, type SplitFight } from './fightSplit';
 
 /** THE OLD RULE (kept for its fixtures; no longer decides anything): chunks of
  * corp killmails separated by more than this were different fights. Measured
@@ -122,17 +119,6 @@ async function getJson<T>(url: string, opts?: { noStore?: boolean }): Promise<T>
   return r.json() as Promise<T>;
 }
 
-async function postJson<T>(url: string, body: unknown): Promise<T> {
-  const r = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(body),
-    signal: AbortSignal.timeout(NET_TIMEOUT_MS),
-  });
-  if (!r.ok) throw new Error(`${url} → HTTP ${r.status}`);
-  return r.json() as Promise<T>;
-}
-
 /** window padding around each system's part of the fight when asking
  * br.evetools for its kills. Whatever the pad lets in that shares no pilot
  * with the fight is dropped again (relevantKms). */
@@ -154,9 +140,6 @@ export interface BrKm {
   system: number;
   victim: BrParticipant & { lossValue: number };
   attackers: BrParticipant[];
-}
-interface BrAnalyze {
-  relateds: { systemID: number; kms: BrKm[] }[];
 }
 export type BrTiming = { systemID: string; start: number; end: number };
 
@@ -225,16 +208,6 @@ export const fightTimings = (mails: readonly { system: number; t: number }[]): B
     end: Math.floor((s.hi + padMs) / 1000),
   }));
 };
-
-/** every killmail br.evetools sees in the fight window, chronological */
-async function analyzeFight(timings: BrTiming[]): Promise<BrKm[]> {
-  const analyzed = await postJson<BrAnalyze>(
-    'https://br.evetools.org/newapi/br/analyze', { timings },
-  );
-  return analyzed.relateds
-    .flatMap((r) => r.kms.map((km) => ({ ...km, system: km.system || r.systemID })))
-    .sort((a, b) => a.time - b.time);
-}
 
 /** the attackers that represent PLAYERS — br.evetools zeroes NPC rows
  * (ally 0 / corp 0 / char 0), but a named NPC corp whoring a mail would
@@ -341,20 +314,6 @@ function deriveTeams(kms: BrKm[], corpId: number): FightData {
     }
   }
   return { kms, teams: [[...friends], [...enemies]], myEntity };
-}
-
-/** a SAVED report via br.evetools' own API — the only link form that can
- * carry a fight spanning several systems */
-async function createSavedReport(timings: BrTiming[], fd: FightData): Promise<string> {
-  const created = await postJson<{ _id: string }>(
-    'https://br.evetools.org/newapi/old/br/create-new',
-    {
-      timings,
-      teams: [fd.teams[0].map(String), fd.teams[1].map(String)],
-    },
-  );
-  if (!created._id) throw new Error('br.evetools did not return a report id');
-  return `https://br.evetools.org/br/${created._id}`;
 }
 
 /** UTC hour bucket the related pages key on: YYYYMMDDHH00 */
@@ -604,12 +563,8 @@ export async function makeBattleReports(
     for (const k of [...fight].reverse()) {
       if (!systems.includes(k.system)) systems.push(k.system);
     }
-    // SAVED multi-system BRs are created ON SELECTION (the component calls
-    // createSavedBr once analyze answers) — creating one per history fight
-    // up front would spam their database for reports nobody opens
     const caveat = systems.length > 1
-      ? `fight spans ${systems.length} systems — this link covers the first; the full`
-        + ' multi-system report is created when br.evetools has the fight'
+      ? `fight spans ${systems.length} systems — a related link can only name one, so this link covers the first`
       : undefined;
     return {
       url: `https://br.evetools.org/related/${first.system}/${hourBucket(first.t)}`,
@@ -653,19 +608,6 @@ const bucket30 = (ms: number): string => {
   const p2 = (n: number) => String(n).padStart(2, '0');
   return `${d.getUTCFullYear()}${p2(d.getUTCMonth() + 1)}${p2(d.getUTCDate())}${p2(d.getUTCHours())}${d.getUTCMinutes() >= 30 ? '30' : '00'}`;
 };
-
-/** the saved multi-system report, created ON DEMAND for a selected fight
- * once br.evetools' analyze has its killmails */
-export async function createSavedBr(timings: BrTiming[], fd: FightData): Promise<string> {
-  return createSavedReport(timings, fd);
-}
-
-/** the write-up's data, fetched on its own time — never in front of the link */
-export async function fetchFightData(w: FightWindow, seed: readonly BrKm[] = []): Promise<FightData> {
-  // only what shares a pilot with the corp's own killmails of this fight —
-  // a system window also catches strangers shooting strangers (v0.204.0)
-  return deriveTeams(relevantKms(await analyzeFight(w.timings), seed), w.corpId);
-}
 
 /** the summary built from the corp's OWN killmails — already in hand from
  * zkill+ESI, so it exists the moment the fight does. Marked partial: mails

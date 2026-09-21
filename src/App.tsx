@@ -305,8 +305,19 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
   // a new version downloaded itself in the background (electron-updater,
   // fed by the public releases repo) — offer the restart, never force it
   const [updateReady, setUpdateReady] = useState<string | null>(null);
+  // an update the owner marked as an EMERGENCY installs by itself (electron/updatePolicy.cjs)
+  const [updateEmergency, setUpdateEmergency] = useState<{ reason: string; installAt: number } | null>(null);
+  const [updateTick, setUpdateTick] = useState(0);
   useEffect(() => {
-    window.appInfo?.updates?.onReady((info) => setUpdateReady(info.version || 'update'));
+    if (!updateEmergency) return undefined;
+    const t = setInterval(() => setUpdateTick((x) => x + 1), 1000);
+    return () => clearInterval(t);
+  }, [updateEmergency]);
+  useEffect(() => {
+    window.appInfo?.updates?.onReady((info) => {
+      setUpdateReady(info.version || 'update');
+      if (info.emergency) setUpdateEmergency({ reason: info.reason ?? '', installAt: info.installAt ?? Date.now() + 60_000 });
+    });
   }, []);
   // boot the dogma worker at start so its ~250 ms SDE decode never lands on a
   // click. Only this window: the overlay and clone-config routes load the same
@@ -486,7 +497,20 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
 
   return (
     <div className="app">
-      {updateReady && (
+      {updateReady && updateEmergency && (
+        <div className="statusbar" data-tick={updateTick} style={{ background: 'rgba(224,90,58,.28)', justifyContent: 'center', flexWrap: 'wrap' }}>
+          <span>
+            <b>⚠ Emergency update {updateReady}</b> — it installs by itself in{' '}
+            <b>{Math.max(0, Math.ceil((updateEmergency.installAt - Date.now()) / 1000))} s</b>: the app closes for a few
+            seconds and comes straight back; collectors pick up where they left off.
+            {updateEmergency.reason ? <> Why: {updateEmergency.reason}</> : null}
+          </span>
+          <button className="btn mini" onClick={() => void window.appInfo?.updates?.restart()}>
+            Restart now
+          </button>
+        </div>
+      )}
+      {updateReady && !updateEmergency && (
         <div className="statusbar" style={{ background: 'rgba(61,153,112,.18)', justifyContent: 'center' }}>
           <span>
             <b>EVE Conductor {updateReady} is ready</b> — downloaded in the background; it
@@ -739,7 +763,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
                 : module === 'character' ? (charMode === 'fit' || charMode === 'wizard' || charMode === 'propagator' ? charMode : 'match')
                   : module === 'pi' ? 'planets'
                     : module === 'home' ? 'dashboard'
-                    : module === 'aperture' ? (apertureView === 'summary' ? 'summary' : 'toolbar') : undefined} />
+                    : undefined} />
         <ReleaseNotesButton />
         <PolicyButton />
         <ZoomControl screen={module} />

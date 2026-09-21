@@ -10,7 +10,7 @@
 // exists, so EVERY renderer request (ESI, Fuzzwork, br.evetools, the zKill
 // rig fallback) carries it automatically — Chromium sends the session UA
 // on fetch(), which a page cannot override but the app can. The main-
-// process fetchers (zkill.cjs, storms.cjs) import it directly.
+// process fetchers (zkill.cjs) import it directly.
 const { app } = require('electron');
 
 const REPO = 'https://github.com/gavtron-ai/eve-conductor-app';

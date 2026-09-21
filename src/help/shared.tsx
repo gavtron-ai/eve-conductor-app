@@ -118,7 +118,7 @@ export const SHARED: HelpGroup[] = [
             <p><b>Your setup</b></p>
             <ul>
               <li><b>Transit ship name</b> — the hauler's ship. Cargo inside it counts as in transit in My Orders and the Dashboard, not as idle stock. Leave empty if you do not haul.</li>
-              <li><b>Aperture URL</b> — your corp map's address, for the Aperture module and the Theft module's map import.</li>
+              <li><b>Aperture URL</b> — your corp map's address. The app does not contact Aperture; the address is used only by the “open in your own browser” button on the Aperture tabs.</li>
             </ul>
             <p><b>App window</b></p>
             <ul>
@@ -277,7 +277,7 @@ export const SHARED: HelpGroup[] = [
         id: 'about', title: 'About, sources & the CCP notice',
         body: (
           <>
-            <p>EVE Conductor is free, open-source and unaffiliated with CCP. Everything it knows about EVE comes from three places: CCP's official API through the EVE application you registered, the log files EVE itself writes for you, and public data (CCP's Static Data Export, image service and public feeds; zKillboard's public API; Fuzzwork's market aggregates; the EvE-Scout storm tracker). It never reads the game client, never sends it input, and identifies itself on every request with its name, version and the public source repository as contact.</p>
+            <p>EVE Conductor is free, open-source and unaffiliated with CCP. Everything it knows about EVE comes from three places: CCP's official API through the EVE application you registered, the log files EVE itself writes for you, and public data (CCP's Static Data Export, image service and public feeds; zKillboard's public API; Fuzzwork's market aggregates). It never reads the game client, never sends it input, and identifies itself on every request with its name, version and the public source repository as contact.</p>
             <p className="hint">
               EVE Online and the EVE logo are the registered trademarks of CCP hf. All rights are reserved worldwide. All other trademarks are the property of their respective owners. EVE Online, the EVE logo, EVE and all associated logos and designs are the intellectual property of CCP hf. All artwork, screenshots, characters, vehicles, storylines, world facts or other recognizable features of the intellectual property relating to these trademarks are likewise the intellectual property of CCP hf. CCP hf. has granted permission to EVE Conductor to use EVE Online and all associated logos and designs for promotional and information purposes but does not endorse, and is not in any way affiliated with, EVE Conductor. CCP is in no way responsible for the content on or functioning of this application, nor can it be liable for any damage arising from its use.
             </p>
