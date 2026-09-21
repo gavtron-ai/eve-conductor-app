@@ -1,7 +1,7 @@
 {
   "name": "eve-trade-conductor",
   "productName": "EVE Conductor",
-  "version": "0.205.1",
+  "version": "0.213.0",
   "description": "Cross-hub market price comparison and trading tool for EVE Online",
   "main": "electron/main.cjs",
   "private": true,
@@ -19,7 +19,7 @@
     "dist:all": "npm run build && electron-builder --mac --win",
     "check:shareable": "node scripts/check-shareable.mjs",
     "install:latest": "node scripts/install-latest.mjs",
-    "ship": "npm run build && node scripts/check-shareable.mjs && electron-builder --win && node scripts/check-shareable.mjs release && node scripts/install-latest.mjs",
+    "ship": "npm run build && node scripts/build-baseline.mjs --if-owner && node scripts/check-shareable.mjs && electron-builder --win && node scripts/check-shareable.mjs release && node scripts/install-latest.mjs",
     "share": "node scripts/share.mjs",
     "publish:beta": "node scripts/publish-release.mjs",
     "baseline": "node scripts/build-baseline.mjs",

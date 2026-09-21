@@ -157,10 +157,15 @@ declare global {
        * identifying user agent, one request at a time (v0.199.1) */
       zkill?: {
         /** the corp's recent kills + losses — cached by zKill for up to an hour */
-        corpKills: (corpId: number) => Promise<{
+        corpKills: (corpId: number, page?: number) => Promise<{
           kills: { killmail_id: number; zkb: { hash: string; totalValue: number } }[];
           losses: { killmail_id: number; zkb: { hash: string; totalValue: number } }[];
         }>;
+        /** one page of one month of the corp's kills or losses, whole killmails trimmed to what the
+         * leaderboard reads (v0.211.0); ok:false = the read failed, n = rows zKill returned (200 = full) */
+        /** the newest 200 kills or losses as whole, trimmed killmails (v0.212.0) */
+        corpRecent?: (corpId: number, kind: 'kills' | 'losses') => Promise<{ ok: boolean; n: number; rows: unknown[] }>;
+        corpMonth?: (corpId: number, kind: 'kills' | 'losses', year: number, month: number, page: number) => Promise<{ ok: boolean; n: number; rows: { id: number; t: number; system: number; value: number; victim: { ally: number; corp: number; char: number; ship: number; dmg: number; fb?: boolean }; attackers: { ally: number; corp: number; char: number; ship: number; dmg: number; fb?: boolean }[] }[] }>;
         /** time / victim ids are 0 when zKill's row did not carry them */
         charKills: (charId: number) => Promise<{ killmail_id: number; hash: string; value: number; time?: number; victimCharId?: number; victimShipId?: number }[]>;
         /** one killmail's list row by its id — null when zKill does not know it (v0.203.2) */

@@ -87,6 +87,8 @@ export const THEFT_HELP: ModuleHelp = {
           body: (
             <Limit>
               The public feed never lists a skyhook past its window end and drops it the moment a raid empties it — so raids in the last minutes of a window, and anything after, are invisible. That is why <b>Bar</b> is a ceiling and <b>Raids</b> says "seen". Your own bar readings and "I raided it" marks are the only settled truth, which is why the buttons are on every row.
+              <br /><br />
+              <b>Where the raid history comes from.</b> Your own app records what it sees while it runs. A new install starts with the project&apos;s collected history, and every update brings a newer one that fills the hours your app was <i>not</i> watching — never an hour you recorded yourself, never the same window twice, and only the public feed&apos;s verdicts, never anybody&apos;s own marks or bar readings.
             </Limit>
           ),
         },

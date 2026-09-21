@@ -1,4 +1,4 @@
-// BATTLE — the book: Battle Reports, Log Visualizer, Battle Sim.
+// BATTLE — the book: Battle Reports, Log Visualizer, Battle Sim, Leaderboard.
 import type { ModuleHelp, PanelHelp } from './types';
 import { Bar, Btn, Chips, Fig, Flow, Limit, Steps, Table, Tiles, Try } from './figures';
 
@@ -202,6 +202,126 @@ export const BATTLE_HELP: ModuleHelp = {
             <Limit>
               The client only logs <i>complete</i> misses, so "landed vs misses" counts full misses, not grazes. A session file over 16 MB is read from its tail. Log files live where EVE writes them; the app reads, never writes.
             </Limit>
+          ),
+        },
+      ],
+    },
+    // ------------------------------------------------------------------ board
+    {
+      id: 'board', title: 'Leaderboard',
+      pages: [
+        {
+          id: 'board-what', title: 'The corp leaderboard',
+          figure: (
+            <Fig caption="A medals table on top, 25 boards in five groups under it, every pilot on the Everyone page. ★ marks your own pilots.">
+              <Table head={['', 'Pilot', '', 'Points']} rows={[
+                ['🥇', 'Pilot One', '🥇4 🥈2', '16 pts'],
+                ['🥈', 'Pilot Two ★', '🥇2 🥈3 🥉1', '13 pts'],
+                ['🥉', 'Pilot Three', '🥇1 🥉4', '7 pts'],
+              ]} />
+            </Fig>
+          ),
+          body: (
+            <>
+              <p>
+                Everyone in your corporation who is on a <b>public killmail</b> in the window, ranked — for a bit of light competition. The rule it is built on: <b>only compare what is known equally about everyone</b>. So the one and only source is public killmails, which record every corp member the same way. Nothing from your own game logs, wallet or logins is mixed in; your pilots get a ★ and no other advantage.
+              </p>
+              <Steps items={[
+                <>Open <b>Battle → Leaderboard</b> — that is all there is to do. What the app already holds shows at once, the corp&apos;s newest kills and losses are read by themselves, and the past two years fill in by themselves in the background (see <i>How far back it reaches</i>). The killmails are kept on your machine; a killmail never changes, so it is never asked for again.</>,
+                <>Pick the <b>range</b>: 24 h to 90 days, <b>this month</b>, <b>last month</b>, <b>this year</b>, any <b>month</b> from the picker or a click on the <b>held</b> strip, or any <b>from / to</b> dates (both included) — or everything held. The line under the strip says whether the range is held whole (✓) or had to be shortened (⚠).</>,
+                <>Read the <b>medals table</b>: gold 3, silver 2, bronze 1 over the 21 honour boards; pilots level on a board all get the medal, and ▲▼ shows how a pilot moved against the window before. Each <b>board</b> shows its top five — and your own best pilot underneath when he is further down; <b>all N</b> opens the whole ranking.</>,
+                <>The pages under the title: <b>🏅 Boards</b>, <b>📋 Everyone</b> (every pilot, every number, sortable), <b>🏛 Hall of fame</b>, <b>⚔ Head to head</b>. <b>Click any pilot</b> — name or portrait, anywhere — for his card. <b>find a pilot…</b> narrows the boards and the table; <b>📋 copy for chat</b> puts the medals and every board&apos;s winner on the clipboard as text.</>,
+              ]} />
+            </>
+          ),
+        },
+        {
+          id: 'board-rules', title: 'The 25 boards, and how each is counted',
+          body: (
+            <>
+              <Table head={['Board', 'What is ranked']} rows={[
+                ['— Kills —', ''],
+                ['🗡 Most kills', 'killmails the pilot is on — one per mail'],
+                ['🎯 Final blows', 'final blows'],
+                ['🥇 Top damage on the kill', 'kills where the pilot did the most damage of anyone on the mail (a tie credits both)'],
+                ['🐺 Solo kills', 'ship kills with no other player on the mail (NPCs do not spoil it; a capsule, a structure or a deployable never counts)'],
+                ['🔥 Longest kill streak', 'the longest run of kills with no loss in between, in the order things happened (2 or more)'],
+                ['⚡ First kill of the fight', 'on the first kill of a fight that went on to have at least two'],
+                ['— Damage & ISK —', ''],
+                ['💥 Total damage dealt · 🧨 Most damage on one kill', 'damage dealt on kills · the most on a single kill'],
+                ['💰 ISK destroyed (by damage share)', 'each kill’s value × the pilot’s share of ALL the damage on it — what his guns destroyed, not the whole mail for everyone on it'],
+                ['🐋 Most valuable kill', 'the most valuable single kill the pilot was on'],
+                ['⚖ ISK efficiency', 'ISK destroyed by damage share ÷ (that + ISK lost) — needs three killmails'],
+                ['— Showing up —', ''],
+                ['🛡 Fights attended · 📅 Days active', 'fights the pilot is on a killmail for, either side · EVE days with a killmail (2 or more)'],
+                ['🍀 Fights without a loss', 'fights attended without losing a ship — needs three fights'],
+                ['🤝 Corp mates flown with', 'different corp mates the pilot shared a kill with'],
+                ['— Style —', ''],
+                ['🕸 Assists (tackle & EWAR)', 'kills the pilot is on WITHOUT a point of damage — a point, a web, a jam. The one trace tackle and EWAR leave on a killmail'],
+                ['🐘 Battleships & capitals killed · 🏗 Structures killed · 🍳 Pods killed', 'kills of battleship-or-bigger hulls · of structures and deployables (citadels, tractor units, bubbles, skyhooks…) · of capsules'],
+                ['🎭 Different ships flown · 🌍 Different systems fought in', 'different hulls flown onto a killmail · different systems with a killmail (2 or more each)'],
+                ['— Most lost (no medals) —', ''],
+                ['💸 Most ISK lost · 💎 Most expensive loss', 'ISK lost · the single most valuable loss'],
+                ['🥚 Pods lost · 🪦 Most ships lost in one fight', 'capsules lost · the most ships lost in one fight (2 or more)'],
+              ]} />
+              <p className="dim">Each board also carries its old nickname in small print (Lone wolf, Whale hunter, Whelped…).</p>
+              <ul>
+                <li>A <b>kill</b> is a killmail whose victim is <i>not</i> in the corp. Shooting a corp mate is nobody&apos;s kill; the mate still has the loss.</li>
+                <li>A <b>loss</b> is a killmail whose victim is a corp <i>pilot</i> — a corp structure dying is nobody&apos;s loss.</li>
+                <li>Fights are the ones Battle Reports splits; a killmail in none of them is a fight of its own. Hull classes come from the hull&apos;s inventory group; a hull that is not on the market counts as “other”.</li>
+                <li>Equal values share a rank (1, 1, 3).</li>
+              </ul>
+              <Limit>What a killmail <b>cannot see</b>, for anyone: logistics, boosts and scouting — a logi pilot who kept the fleet alive appears on no killmail at all — and tackle or EWAR only as an assist, when the pilot did no damage. That is why this is a leaderboard and not a performance review, and why nothing here is scored from private data that only some pilots would have.</Limit>
+            </>
+          ),
+        },
+        {
+          id: 'board-card', title: 'A pilot’s card, head to head, the hall of fame',
+          figure: (
+            <Fig caption="Click any pilot. The portrait opens zKillboard; ⚔ sends him to the head-to-head.">
+              <Tiles tiles={[{ big: '30 – 14', sub: 'kills – losses' }, { big: '1.60b', sub: 'ISK destroyed (by share)', tone: 'good' }, { big: '10', sub: 'best kill streak' }, { big: '14', sub: 'days active' }]} />
+            </Fig>
+          ),
+          body: (
+            <>
+              <Steps items={[
+                <><b>The card</b>: his place on the medals table (with the ▲▼ arrow), eight headline numbers, and <b>where he stands</b> — a chip for every board he is on, best place first. <b>What he flies</b> is a class bar over his hulls, with the ones he lost marked. <b>When he is on a killmail</b> is his activity by EVE hour. <b>The people in his story</b>: his <i>wingman</i> (the corp mate on the most of his kills — click for their card), his <i>nemesis</i> (the outsider on the most of his losses) and his <i>favourite prey</i>. His killmails, newest first, each open on zKillboard.</>,
+                <><b>⚔ Head to head</b>: pick any two pilots. Sixteen rows, the winner of each lit, and a score; on the rows marked ↓ fewer is better. It opens on your best pilot against the leader.</>,
+                <><b>🏛 Hall of fame</b>: the window&apos;s records — biggest kill and loss, hardest single hit, longest streak, most kills in one fight, busiest day, biggest turnout — a click opens the killmail. Under them, <b>the corp&apos;s days</b>: kills above the line, losses below, one bar per EVE day; hover a day for its ISK.</>,
+                <><b>▲▼ arrows</b> compare a pilot&apos;s place with the equal window just before (the 7 days before these 7; the month before this month). They are drawn only when that earlier window is <b>held whole</b> — the line under the title says so either way — because an arrow against half a window would be a guess.</>,
+              ]} />
+              <Limit>The two outsiders on a card are named by asking ESI&apos;s public names route when the card is opened — the only request the Leaderboard makes beyond reading the corp&apos;s killmails.</Limit>
+            </>
+          ),
+        },
+        {
+          id: 'board-reach', title: 'How far back it reaches — it fills in by itself, and shows you what it holds',
+          figure: (
+            <Fig caption="The “held” strip: one cell a month for two years. Green is a whole month, blue this month so far, amber only part, empty not read yet; the gold outline is the range on screen. Click a month to show it.">
+              <Table head={['Cell', 'Means']} rows={[
+                ['green', 'the whole month is held — it is never asked for again'],
+                ['blue', 'this month, up to the last read'],
+                ['amber, dashed', 'only part of the month is held — it is not counted as complete'],
+                ['pulsing', 'being read right now'],
+                ['empty', 'not read yet'],
+              ]} />
+            </Fig>
+          ),
+          body: (
+            <>
+              <p>
+                <b>There is nothing to load.</b> Opening the Leaderboard shows what the app already holds <b>at once</b>, then reads the corp&apos;s <b>newest</b> 200 kills and 200 losses (two requests), and then — by itself, in the background — reads the past <b>month by month, newest first</b>, until two years are held. zKillboard serves a corporation&apos;s kills and losses for any year and month, whole — measured, a month&apos;s rows equal zKillboard&apos;s own monthly count — and every row already carries the full killmail, so none of this costs a single ESI read. It is one request per 200 killmails, spaced the way zKillboard&apos;s rules ask: a busy corp&apos;s two years is a few hundred requests — several minutes, <b>once</b>. It carries on while you use the rest of the app, saves after every month, and picks up where it stopped if the app closes. <b>pause</b> stops it; <b>resume</b> carries on. A corp dashlet on Home keeps the same archive current, so the tab does not even have to be opened first.
+              </p>
+              <ul>
+                <li><b>Am I seeing everything?</b> Two places answer. The <b>held strip</b> shows every month and whether it is whole, with the number of killmails held and <i>complete from…</i> beside it (<b>✓ two years held</b> when there is nothing left to read). And the line under it answers for the range on screen: <b>✓ every killmail in this range is held</b>, or <b>⚠ SHORTENED</b> with the date it starts from. Every page — Boards, Everyone, Hall of fame, Head to head — and every corp dashlet on Home uses the same range rule and the same killmails.</li>
+                <li><b>Complete from…</b> is worked out each time from what was actually read — how far the newest lists reach, then the unbroken run of whole months behind them — and is never a remembered claim, so a read that was interrupted can never make the board say more than it holds. A range that starts earlier would count some pilots&apos; old kills and miss others&apos; — so it is <b>shortened to what is complete, for everyone alike</b>, and widens by itself as the history fills in.</li>
+                <li>A <b>past month read once is never asked for again</b> — it cannot change. Two years are kept in your stats folder (up to 150,000 killmails); a mail with more than forty attackers keeps every corp pilot and the biggest outsiders and folds the rest into a count, their damage and their best hit — every number on the board is identical before and after. A single month with more than 12,000 kills or losses is left incomplete rather than hammer zKillboard, and the strip says so.</li>
+                <li><b>Ranges</b>: the presets (24 h … 90 d, this month, last month, this year, everything held), the <b>month</b> picker (or a click on the strip), and <b>from / to</b> dates — both days included, EVE time; leave “to” empty for “up to now”.</li>
+                <li><b>▲▼ arrows</b> compare with the equal span just before (the month before a month, the seven days before seven days) and are drawn only when that span is held whole.</li>
+                <li>The corp&apos;s timeline draws <b>days</b> up to 92 days, <b>weeks</b> (Monday to Sunday) up to 550, and calendar <b>months</b> beyond.</li>
+                <li>A killmail that has <b>no price yet</b> counts 0 ISK until zKillboard values it; the line says how many. The newest lists are read again when the tab is opened more than ten minutes after the last read; zKillboard caches them for up to an hour, so <b>⟳ refresh</b> more often than that changes little.</li>
+              </ul>
+            </>
           ),
         },
       ],

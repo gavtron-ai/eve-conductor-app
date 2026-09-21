@@ -31,7 +31,7 @@ import { useApp } from './store';
 import { buildRaidAlerts, type RaidAlert } from './raidAlerts';
 import { piPlanets } from './pi';
 import { parseJournal, pushUndock, UNDOCK_KEY } from './undockJournal';
-import { emptyWatch, updateWatch, type MiningAlert, type MinerLoc } from './miningWatch';
+import { emptyWatch, updateWatch, type MiningAlert, type MinerLoc, type WatchState } from './miningWatch';
 import { emptyFeed, pollMiningSamples } from './miningFeed';
 import { miningAlertSettings, type MiningAlertSettings } from './store';
 import { logInfo } from './devlog';
@@ -624,6 +624,10 @@ function piOverlayAlerts(): PiOverlayAlert[] {
 let miningWatch = emptyWatch();
 const miningFeed = emptyFeed();
 let miningAlerts: MiningAlert[] = [];
+/** the mining watch as it stands (v0.209.0, the Home "Mining fleet" dashlet) — read-only; `running`
+ * is whether the overlay feed that drives it is on at all */
+export const miningWatchView = (): { running: boolean; miners: WatchState['miners']; fleetMove: boolean; alerts: MiningAlert[] } =>
+  ({ running: timer !== null, miners: miningWatch.miners, fleetMove: miningWatch.fleet.fleetMove, alerts: miningAlerts });
 /** the ⛏ page's settings, read FRESH from the persisted blob (the setup
  * window patches them there) and merged with the defaults */
 function miningSettings(): MiningAlertSettings {

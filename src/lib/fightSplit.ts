@@ -231,15 +231,22 @@ export function splitFights<T extends SplitMail>(input: readonly T[], opts: Spli
   const sidesCache = new Map<number, MailSides>();
   const sides = (m: T) => { let v = sidesCache.get(m.id); if (!v) { v = sidesOf(m, opts.corpId, homeAlly); sidesCache.set(m.id, v); } return v; };
   const related = (f: OpenFight<T>, m: T) => f.lastInSystem.has(m.system) || overlaps(sides(m).friends, f.friends);
+  // NEAREST FIRST (v0.212.0). This used to test EVERY killmail against EVERY fight — measured on a
+  // real corp's two years: 11,960 fights × 40,000 mails = 52 SECONDS, all of it here, while the
+  // grouping above took a fraction of a second. The mails are in time order, so the nearest related
+  // one is found by walking outward from the fight's own edges and stopping at the first hit. The
+  // answers are identical (checked fight by fight against the old loop on that same archive).
+  const times = mails.map((m) => m.t);
+  /** first index whose time is > t */
+  const upper = (t: number) => { let lo = 0, hi = times.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (times[mid] <= t) lo = mid + 1; else hi = mid; } return lo; };
+  /** first index whose time is >= t */
+  const lower = (t: number) => { let lo = 0, hi = times.length; while (lo < hi) { const mid = (lo + hi) >> 1; if (times[mid] < t) lo = mid + 1; else hi = mid; } return lo; };
   return all.map((f) => {
     const own = new Set(f.mails.map((m) => m.id));
     const first = f.mails[0].t; const last = f.mails[f.mails.length - 1].t;
     let before: number | null = null; let after: number | null = null;
-    for (const m of mails) {
-      if (own.has(m.id) || !related(f, m)) continue;
-      if (m.t <= first) before = before === null ? first - m.t : Math.min(before, first - m.t);
-      if (m.t >= last) after = after === null ? m.t - last : Math.min(after, m.t - last);
-    }
+    for (let i = upper(first) - 1; i >= 0; i--) { const m = mails[i]; if (own.has(m.id) || !related(f, m)) continue; before = first - m.t; break; }
+    for (let i = lower(last); i < mails.length; i++) { const m = mails[i]; if (own.has(m.id) || !related(f, m)) continue; after = m.t - last; break; }
     return { mails: f.mails.slice().reverse(), joins: f.joins, merged: f.merged, tempoMs: tempoOf(f.mails), endedByQuietMs: after, startedAfterMs: before };
   }).sort((a, b) => b.mails[0].t - a.mails[0].t);
 }

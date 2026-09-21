@@ -20,10 +20,12 @@ import { BATTLE_HELP, BATTLE_PANELS } from './help/battle';
 import { THEFT_HELP, THEFT_PANELS } from './help/theft';
 import { PI_HELP, PI_PANELS } from './help/pi';
 import { APERTURE_HELP } from './help/aperture';
+import { HOME_HELP } from './help/home';
 
 export type { HelpGroup, HelpPage, ModuleHelp, PanelHelp } from './help/types';
 
 export const MODULE_HELP: Record<ModuleId, ModuleHelp> = {
+  home: HOME_HELP,
   trade: TRADE_HELP,
   character: CHARACTER_HELP,
   battle: BATTLE_HELP,

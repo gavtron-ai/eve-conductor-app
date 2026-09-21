@@ -190,6 +190,12 @@ async function expLog(rows: object[]): Promise<void> {
   } catch { /* audit trail is best-effort */ }
 }
 
+/** the watcher's own last look at CCP's raidable feed (v0.207.0, the Home dashlets): what is
+ * listed, when we looked and the server's Last-Modified — read-only, no fetch */
+export function raidSnapshot(): { list: RaidableSkyhook[]; at: number; lm: number } | null {
+  return prevSnap ? { list: [...prevSnap.values()], at: prevSnapAt, lm: prevSnapLM } : null;
+}
+
 /** one watcher pass: snapshot the feed, record what changed */
 export async function runRaidWatchTick(): Promise<number> {
   const { list, lastModifiedMs } = await fetchRaidableSkyhooksMeta(); // throws → caller skips, no events

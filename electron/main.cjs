@@ -55,8 +55,9 @@ ipcMain.on('sso-callback', (event) => {
 ipcMain.handle('stats-info', () => ({ dir: stats.statsDir(app.getPath('documents')) }));
 
 // ---- baseline seeding: new installs inherit the project's measurement
-// history (radar + skyhook raids) instead of starting cold. Existing
-// files are never touched — the user's own history always wins. ----
+// history (radar + skyhook raids) instead of starting cold, and an update's
+// newer baseline fills the gaps (electron/baseline.cjs) — what the user
+// observed himself always wins. ----
 // IDENTIFY THE APP ON EVERY REQUEST (v0.199.2): the session user agent is
 // what Chromium sends with each renderer fetch — ESI, Fuzzwork, br.evetools
 // — and Electron lets the app set it, unlike a browser. Contact = the public
@@ -72,6 +73,15 @@ app.whenReady().then(() => {
       devlog.append(app.getPath('documents'), [{
         level: 'info', area: 'baseline',
         msg: `seeded ${res.seeded.length} baseline file(s): ${res.seeded.join(', ')}`,
+      }]);
+    }
+    // v0.213.0: an update's newer baseline fills the gaps in the history already here — once per
+    // baseline, before any window exists (the renderer reads these files, then rewrites them)
+    const merged = baseline.mergeBaseline(src, stats.statsDir(app.getPath('documents')), res.seeded);
+    if (merged) {
+      devlog.append(app.getPath('documents'), [{
+        level: merged.errors.length > 0 ? 'warn' : 'info', area: 'baseline',
+        msg: `baseline ${merged.id} merged in ${merged.ms} ms`, data: merged,
       }]);
     }
   } catch (e) {
@@ -238,7 +248,9 @@ ipcMain.handle('hauls-write', (_e, file) => appConfig.writeHauls(app.getPath('do
 
 
 // ---- the corp killboard read as a PAGE (live) rather than the cached API ----
-ipcMain.handle('zkill-corp-kills', (_e, corpId) => zkill.corpKillmails(Number(corpId) || 0));
+ipcMain.handle('zkill-corp-kills', (_e, corpId, page) => zkill.corpKillmails(Number(corpId) || 0, Number(page) || 1));
+ipcMain.handle('zkill-corp-recent', (_e, a) => zkill.corpRecent(Number(a && a.corpId) || 0, String((a && a.kind) || '')));
+ipcMain.handle('zkill-corp-month', (_e, a) => zkill.corpMonth(Number(a && a.corpId) || 0, String((a && a.kind) || ''), Number(a && a.year) || 0, Number(a && a.month) || 0, Number(a && a.page) || 1));
 ipcMain.handle('zkill-char-kills', (_e, charId) => zkill.charKillmails(Number(charId) || 0));
 // losses of one hull by a character / corporation / alliance (v0.203.1);
 // the owner kind is whitelisted inside the module, the ids are forced numeric

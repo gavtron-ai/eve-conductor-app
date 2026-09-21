@@ -2,6 +2,8 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { BUILTIN_HUBS, DEFAULT_SETTINGS } from './constants';
 import type { Hub, Settings } from './types';
+import { EMPTY_FAVORITES, type FavoritesState } from './favorites';
+import { EMPTY_HOME, type HomeState } from './homeGrid';
 
 export interface ItemGroup {
   id: string;
@@ -157,7 +159,7 @@ const DEFAULT_ALLOC: AllocSettings = {
 
 /** top-level module of the Conductor suite shown in the main area —
  * background collectors (radar, trends, wallet, net-worth) run REGARDLESS */
-export type ModuleId = 'trade' | 'character' | 'battle' | 'theft' | 'pi' | 'aperture';
+export type ModuleId = 'home' | 'trade' | 'character' | 'battle' | 'theft' | 'pi' | 'aperture';
 
 /** one ship in the fight. `source` is how the fit was CHOSEN, so the roster
  * survives a restart even though the resolved fit does not. */
@@ -284,6 +286,10 @@ export const DEFAULT_BATTLE_SIM: BattleSimState = {
 
 interface AppState {
   activeModule: ModuleId;
+  /** the player's pinned tabs and saved views (v0.206.0, lib/favorites.ts) */
+  favorites: FavoritesState;
+  /** the Home module's boards of dashlets (v0.207.0, lib/homeGrid.ts) */
+  home: HomeState;
   settings: Settings;
   customHubs: Hub[];
   watchlist: number[]; // type ids
@@ -336,6 +342,8 @@ interface AppState {
   alloc: AllocSettings;
 
   setModule: (m: ModuleId) => void;
+  setFavorites: (f: FavoritesState) => void;
+  setHome: (h: HomeState) => void;
   setSettings: (patch: Partial<Settings>) => void;
   setAlerts: (patch: Partial<AlertSettings>) => void;
   setAlloc: (patch: Partial<AllocSettings>) => void;
@@ -370,6 +378,8 @@ export const useApp = create<AppState>()(
   persist(
     (set) => ({
       activeModule: 'trade' as ModuleId,
+      favorites: EMPTY_FAVORITES,
+      home: EMPTY_HOME,
       settings: DEFAULT_SETTINGS,
       customHubs: [],
       watchlist: [44992, 34], // PLEX + Tritanium as friendly defaults
@@ -394,6 +404,8 @@ export const useApp = create<AppState>()(
       alloc: DEFAULT_ALLOC,
 
       setModule: (activeModule) => set({ activeModule }),
+      setFavorites: (favorites) => set({ favorites }),
+      setHome: (home) => set({ home }),
       setSettings: (patch) => set((s) => ({ settings: { ...s.settings, ...patch } })),
       setAlerts: (patch) => set((s) => ({ alerts: { ...s.alerts, ...patch } })),
       setAlloc: (patch) => set((s) => ({ alloc: { ...s.alloc, ...patch } })),
@@ -501,6 +513,8 @@ export const useApp = create<AppState>()(
         // partialize is an ALLOWLIST — a slice missing from it is silently
         // never persisted, which looks exactly like a broken feature
         battleSim: s.battleSim,
+        favorites: s.favorites,
+        home: s.home,
       }),
       /**
        * SCHEMA VERSION 1 (v0.60.34) — declared so future changes have a

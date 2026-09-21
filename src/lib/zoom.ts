@@ -17,7 +17,7 @@
 // same-window custom event covers the window that made it.
 import { useCallback, useEffect, useState } from 'react';
 
-export type ZoomScreen = 'trade' | 'character' | 'battle' | 'theft' | 'pi' | 'aperture' | 'chain-summary' | 'clone-config';
+export type ZoomScreen = 'home' | 'trade' | 'character' | 'battle' | 'theft' | 'pi' | 'aperture' | 'chain-summary' | 'clone-config';
 
 /** the levels a click steps through — 100 % sits in the middle, the ends
  * are as far as the UI stays usable on a laptop and a 4K panel */

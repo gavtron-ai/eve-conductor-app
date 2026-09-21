@@ -90,14 +90,22 @@ function importEventFiles(documentsPath, files) {
  * `fits-` was added for the Fitting Library's pre-sync backup — that tool
  * deletes fits in game, where EVE has no undo, so the snapshot belongs in
  * the long-term stats folder alongside the other never-delete data. */
-const AUX_NAME = /^(radar|theft|fits)-[A-Za-z0-9._-]+\.(ndjson|json)$/;
+// `ship-` and `battle-` joined in v0.208.0. MEASURED 2026-09-20: the ship watcher had been writing
+// `ship-history.ndjson` since it was built, this pattern refused the name, appendAuxLines returns
+// quietly on a bad name and the reader's throw was caught — so the file never existed and Live
+// Combat's ship band forgot everything at each restart. `battle-` holds the leaderboard's killmails.
+const AUX_NAME = /^(radar|theft|fits|ship|battle)-[A-Za-z0-9._-]+\.(ndjson|json)$/;
 
 /** returns the full path written, so a caller can VERIFY rather than assume
  * (an undefined return read as failure once already) */
 function writeAuxFile(documentsPath, name, content) {
   if (!AUX_NAME.test(name)) throw new Error('bad aux file name');
   const full = path.join(statsDir(documentsPath), name);
-  fs.writeFileSync(full, String(content));
+  // written beside the file and moved over it (v0.212.0): the killmail archive is rewritten whole
+  // at tens of MB, and a crash halfway through a plain write would leave half a file
+  const tmp = `${full}.tmp`;
+  fs.writeFileSync(tmp, String(content));
+  fs.renameSync(tmp, full);
   return full;
 }
 
@@ -130,12 +138,15 @@ function listAuxNames(documentsPath) {
     .sort((a, b) => b.mtime - a.mtime);
 }
 
+/** public data the app reads again by itself: tens of MB that a backup does not need to carry */
+const NOT_IN_BACKUPS = new Set(['battle-corp-killmails.ndjson']);
+
 /** every radar/aux file with its name — for backups */
 function listAuxFiles(documentsPath) {
   const dir = statsDir(documentsPath);
   return fs
     .readdirSync(dir)
-    .filter((f) => AUX_NAME.test(f))
+    .filter((f) => AUX_NAME.test(f) && !NOT_IN_BACKUPS.has(f))
     .sort()
     .map((f) => ({ name: f, content: fs.readFileSync(path.join(dir, f), 'utf8') }));
 }

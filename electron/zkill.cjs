@@ -28,8 +28,10 @@ const DEFAULT_BACKOFF_MS = 20_000;
 let chain = Promise.resolve();
 let lastAt = 0;
 
-/** serialised, spaced GET → parsed JSON array, or [] on any failure */
-function getRows(url) {
+/** serialised, spaced GET → parsed JSON array, or [] on any failure (strict: null on failure, so a
+ * caller that must tell "nothing there" from "could not read" can) */
+function getRows(url, strict) {
+  const FAIL = strict ? null : [];
   const run = async () => {
     const wait = lastAt + MIN_GAP_MS - Date.now();
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
@@ -39,22 +41,22 @@ function getRows(url) {
       try {
         res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(TIMEOUT_MS) });
       } catch {
-        return [];
+        return FAIL;
       }
       if (res.status === 429) {
         const ra = Number(res.headers.get('retry-after'));
         await new Promise((r) => setTimeout(r, Number.isFinite(ra) && ra > 0 ? ra * 1000 : DEFAULT_BACKOFF_MS));
         continue;
       }
-      if (!res.ok) return [];
+      if (!res.ok) return FAIL;
       try {
         const rows = await res.json();
-        return Array.isArray(rows) ? rows : [];
+        return Array.isArray(rows) ? rows : FAIL;
       } catch {
-        return [];
+        return FAIL;
       }
     }
-    return [];
+    return FAIL;
   };
   const p = chain.then(run, run);
   chain = p.catch(() => undefined);
@@ -77,10 +79,14 @@ const valid = (r) => r.killmail_id && r.zkb.hash;
  * A CORPORATION's recent kills and losses (up to 200 each) — the feed the
  * Battle Reports tab clusters into fights. Cached by zKill for an hour.
  */
-async function corpKillmails(corpId) {
+async function corpKillmails(corpId, page) {
   if (!corpId) return { kills: [], losses: [] };
-  const kills = (await getRows(`https://zkillboard.com/api/kills/corporationID/${corpId}/`)).slice(0, 200).map(row).filter(valid);
-  const losses = (await getRows(`https://zkillboard.com/api/losses/corporationID/${corpId}/`)).slice(0, 200).map(row).filter(valid);
+  // PAGES (v0.208.0, the leaderboard's "reach further back"): measured 2026-09-20 — page 2 is the
+  // next 200, strictly older, no overlap with page 1. Page 1 keeps the bare URL (zKill's cache key).
+  const p = Math.min(10, Math.max(1, Math.floor(Number(page) || 1)));
+  const tail = p > 1 ? `page/${p}/` : '';
+  const kills = (await getRows(`https://zkillboard.com/api/kills/corporationID/${corpId}/${tail}`)).slice(0, 200).map(row).filter(valid);
+  const losses = (await getRows(`https://zkillboard.com/api/losses/corporationID/${corpId}/${tail}`)).slice(0, 200).map(row).filter(valid);
   return { kills, losses };
 }
 
@@ -140,4 +146,37 @@ async function killRef(killId) {
   return rows[0] || null;
 }
 
-module.exports = { corpKillmails, charKillmails, systemKills, shipLosses, killRef, USER_AGENT };
+/**
+ * ONE PAGE OF ONE MONTH of a corporation's kills or losses (v0.211.0, the leaderboard's history).
+ * MEASURED 2026-09-20: /year/Y/month/M/ returns exactly that month (a past August: 43 rows = zKill's
+ * own monthly stat; page 2 came back empty), it reaches at least 18 months back, and every row already
+ * carries the whole killmail — attackers with damage, final blow, hull and ids — so the history needs
+ * no ESI read at all. Rows are trimmed HERE to what the board reads (no items, no positions). `ok:
+ * false` = the read failed; `n` = rows zKill returned (200 = a full page, ask for the next).
+ */
+const part = (p) => ({ ally: (p && p.alliance_id) || 0, corp: (p && p.corporation_id) || 0, char: (p && p.character_id) || 0, ship: (p && p.ship_type_id) || 0, dmg: (p && (p.damage_done ?? p.damage_taken)) || 0, ...(p && p.final_blow ? { fb: true } : {}) });
+const trimRows = (raw) => {
+  const rows = [];
+  for (const k of raw) {
+    const t = Date.parse((k && k.killmail_time) || '');
+    if (!k || !k.killmail_id || !k.victim || !Number.isFinite(t)) continue;
+    rows.push({ id: k.killmail_id, t, system: k.solar_system_id || 0, value: (k.zkb && typeof k.zkb.totalValue === 'number' ? k.zkb.totalValue : 0), victim: part(k.victim), attackers: (Array.isArray(k.attackers) ? k.attackers : []).map(part) });
+  }
+  return rows;
+};
+/** THE NEWEST 200 kills or losses, whole killmails (v0.212.0): the leaderboard's quick refresh — two
+ * requests and no ESI reads, where it used to hydrate up to 400 killmails from ESI on every visit */
+async function corpRecent(corpId, kind) {
+  if (!corpId || (kind !== 'kills' && kind !== 'losses')) return { ok: false, n: 0, rows: [] };
+  const raw = await getRows(`https://zkillboard.com/api/${kind}/corporationID/${corpId}/`, true);
+  return raw === null ? { ok: false, n: 0, rows: [] } : { ok: true, n: raw.length, rows: trimRows(raw) };
+}
+async function corpMonth(corpId, kind, year, month, page) {
+  const y = Math.floor(Number(year)), m = Math.floor(Number(month)), p = Math.min(50, Math.max(1, Math.floor(Number(page) || 1)));
+  if (!corpId || (kind !== 'kills' && kind !== 'losses') || !(y >= 2003 && y <= 2100) || !(m >= 1 && m <= 12)) return { ok: false, n: 0, rows: [] };
+  const raw = await getRows(`https://zkillboard.com/api/${kind}/corporationID/${corpId}/year/${y}/month/${m}/${p > 1 ? `page/${p}/` : ''}`, true);
+  if (raw === null) return { ok: false, n: 0, rows: [] };
+  return { ok: true, n: raw.length, rows: trimRows(raw) };
+}
+
+module.exports = { corpKillmails, corpMonth, corpRecent, charKillmails, systemKills, shipLosses, killRef, USER_AGENT };

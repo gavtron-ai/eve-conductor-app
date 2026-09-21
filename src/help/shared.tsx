@@ -42,6 +42,26 @@ export const SHARED: HelpGroup[] = [
         ),
       },
       {
+        id: 'favorites', title: '★ Favorites & saved views',
+        figure: (
+          <Fig caption="Your pinned tabs sit under the header. A dashed chip carries a saved view.">
+            <div style={{ fontSize: 11.5, display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
+              <span style={{ color: '#f0c674' }}>★</span> <Btn mini>🗺 Corp Map 1</Btn> <Btn mini on>Σ Summary 2</Btn> <Btn mini>🪝 Skyhooks 3</Btn> <Btn mini>⚔ Battle Reports 4</Btn> <Btn mini>Σ Summary · Gneiss · C3 branch 5</Btn>
+            </div>
+          </Fig>
+        ),
+        body: (
+          <>
+            <Steps items={[
+              <>Open the tab you live in and click the <b>☆</b> after the tab names. It turns <b>★</b> and the tab joins the <b>favorites strip</b> under the header — from any module, one click takes you there. Click ★ again to unpin. Up to twelve. Your own <b>Home</b> dashboard is a tab like any other — pin it first and tick “open my first favorite when the app starts” to land on it.</>,
+              <><b>Drag</b> a chip to reorder. <b>Right-click</b> it to rename or remove. <b>Alt+1 … Alt+9</b> jump to the first nine. In <b>⋯</b> at the end of the strip you can have the app open your first favorite when it starts.</>,
+              <>A tab with filters can save its <b>view</b>. In Aperture&apos;s <b>Σ Summary</b>, set the filters — say ore <b>Gneiss</b> and chain <b>C3</b> — and press <b>★ save view</b>: a dashed chip “Σ Summary · Gneiss · C3 branch” appears, and clicking it opens the tab with those filters on.</>,
+            ]} />
+            <Limit>A saved chain view remembers <b>what you meant, not today&apos;s system</b>. The chain rerolls daily, so the part of the chain is saved as the <b>class</b> of the system off home (C3, HS, NS…), never its name or the letter the map gives it that day. Tomorrow the view picks whichever C3 hangs off home then — all of them if there are two — and keeps doing so on every new reading until you touch the chain chips yourself. If there is no C3 that day it says so and shows the whole chain. A saved rock stays on even when the chain carries none of it: the chip reads 0 and the table says no site carries it, rather than quietly showing everything.</Limit>
+          </>
+        ),
+      },
+      {
         id: 'settings-chars', title: 'Settings — characters & duties',
         figure: (
           <Fig caption="A team row in ⚙ Settings. Every switch is reversible.">

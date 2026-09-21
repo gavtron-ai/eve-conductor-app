@@ -409,12 +409,13 @@ const esiCorpKillmails = (corpId: number, src: LiveSource): Promise<ZkbEntry[]> 
  * scraping their site. In the browser rig (no bridge) the renderer fetches
  * the same two endpoints directly.
  */
-async function corpLists(corpId: number): Promise<{ kills: ZkbEntry[]; losses: ZkbEntry[] }> {
+async function corpLists(corpId: number, page = 1): Promise<{ kills: ZkbEntry[]; losses: ZkbEntry[] }> {
   const bridge = window.appInfo?.zkill;
-  if (bridge?.corpKills) return bridge.corpKills(corpId) as Promise<{ kills: ZkbEntry[]; losses: ZkbEntry[] }>;
+  if (bridge?.corpKills) return bridge.corpKills(corpId, page) as Promise<{ kills: ZkbEntry[]; losses: ZkbEntry[] }>;
+  const tail = page > 1 ? `page/${page}/` : '';
   const [kills, losses] = await Promise.all([
-    getJson<ZkbEntry[]>(`https://zkillboard.com/api/kills/corporationID/${corpId}/`, { noStore: true }),
-    getJson<ZkbEntry[]>(`https://zkillboard.com/api/losses/corporationID/${corpId}/`, { noStore: true }),
+    getJson<ZkbEntry[]>(`https://zkillboard.com/api/kills/corporationID/${corpId}/${tail}`, { noStore: true }),
+    getJson<ZkbEntry[]>(`https://zkillboard.com/api/losses/corporationID/${corpId}/${tail}`, { noStore: true }),
   ]);
   return { kills, losses };
 }
@@ -453,14 +454,43 @@ export interface BattleHistory {
 /** history depth: the owner asked for the last 3 days of corp fights */
 export const HISTORY_DAYS = 3;
 
-export async function makeBattleReports(
-  corpId: number, sources: LiveSource[] = [], myCharIds: readonly number[] = sources.map((s) => s.characterId),
-): Promise<BattleHistory> {
+/** the last history this session built (v0.207.0, the Home "Latest fights" dashlet) — read-only,
+ * so a dashlet never starts a zKillboard read of its own */
+let lastHistory: { at: number; history: BattleHistory } | null = null;
+export const lastBattleHistory = (): { at: number; history: BattleHistory } | null => lastHistory;
+
+/** zKillboard hands out 200 rows a page */
+export const ZKILL_PAGE = 200;
+
+export interface CorpFeed {
+  /** every hydrated mail, newest first */
+  detail: FeedMail[];
+  liveFeeds: number;
+  /** the zKillboard lists as they came back — for the leaderboard's completeness rule: the ids of
+   * each list, and whether its LAST page came back full (older rows may exist beyond it) */
+  lists: { kills: number[]; losses: number[]; killsFull: boolean; lossesFull: boolean };
+}
+
+/** THE CORP'S KILLMAIL FEED (split out of makeBattleReports in v0.208.0 so the leaderboard reads
+ * the very same mails): zKillboard's lists (`pages` × 200 kills and losses) + every logged-in
+ * character's own mails from ESI + the corp-wide ESI feed when a Director is logged in, hydrated
+ * from ESI's public killmail route and cached for the session. */
+export async function corpFeedMails(corpId: number, sources: LiveSource[] = [], pages = 1): Promise<CorpFeed> {
+  let lastPage = { kills: 0, losses: 0 };
   // kills AND losses — a fight the corp lost still deserves its report —
   // PLUS every logged-in character's own mails live from ESI, PLUS the
   // corp-wide feed through any source holding the Director role
   const [{ kills, losses }, corpFeed, ...own] = await Promise.all([
-    corpLists(corpId),
+    (async () => {
+      const all = { kills: [] as ZkbEntry[], losses: [] as ZkbEntry[] };
+      for (let p = 1; p <= pages; p++) {
+        const one = await corpLists(corpId, p);
+        all.kills.push(...one.kills); all.losses.push(...one.losses);
+        lastPage = { kills: one.kills.length, losses: one.losses.length };
+        if (one.kills.length < ZKILL_PAGE && one.losses.length < ZKILL_PAGE) break;
+      }
+      return all;
+    })(),
     (async () => {
       for (const src of sources) {
         const rows = await esiCorpKillmails(corpId, src);
@@ -477,13 +507,17 @@ export async function makeBattleReports(
     + (corpFeed.length > 0 ? 1 : 0);
   const entries = [...byId.values()]
     .sort((a, b) => b.killmail_id - a.killmail_id) // ids are chronological
-    .slice(0, HYDRATE_LIMIT);
+    .slice(0, HYDRATE_LIMIT * pages);
   if (entries.length === 0) {
     throw new Error('zKillboard lists no recent kills or losses for this corporation');
   }
   const hydrate = async (e: ZkbEntry): Promise<FeedMail | null> => {
     const hit = mailCache.get(e.killmail_id);
-    if (hit) return hit;
+    if (hit) {
+      // a mail first seen through ESI carries no price; take zKillboard's once its list has it
+      if (!hit.br.victim.lossValue && e.zkb.totalValue) hit.br.victim.lossValue = e.zkb.totalValue;
+      return hit;
+    }
     try {
       const km = await getJson<EsiKillmail>(
         `${ESI_BASE}/killmails/${e.killmail_id}/${e.zkb.hash}/`,
@@ -511,6 +545,13 @@ export async function makeBattleReports(
   if (detail.length === 0) {
     throw new Error('ESI returned no killmail details');
   }
+  return { detail, liveFeeds, lists: { kills: kills.map((k) => k.killmail_id), losses: losses.map((k) => k.killmail_id), killsFull: lastPage.kills >= ZKILL_PAGE, lossesFull: lastPage.losses >= ZKILL_PAGE } };
+}
+
+export async function makeBattleReports(
+  corpId: number, sources: LiveSource[] = [], myCharIds: readonly number[] = sources.map((s) => s.characterId),
+): Promise<BattleHistory> {
+  const { detail, liveFeeds } = await corpFeedMails(corpId, sources);
 
   // EVERY fight in the window, newest first — split by who fought whom,
   // where, and at what tempo (fightSplit.ts), not by corp-wide silence
@@ -602,11 +643,8 @@ export async function makeBattleReports(
     };
   });
 
-  return {
-    fights,
-    newestKillmailId: detail[0].id,
-    liveFeeds,
-  };
+  lastHistory = { at: Date.now(), history: { fights, newestKillmailId: detail[0].id, liveFeeds } };
+  return lastHistory.history;
 }
 
 /** UTC 30-minute bucket, floored — WarBeacon's range URLs step in these */

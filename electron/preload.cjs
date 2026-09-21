@@ -58,7 +58,9 @@ contextBridge.exposeInMainWorld('appInfo', {
    * one request at a time (v0.199.1 — the page reader is gone) */
   zkill: {
     /** the corp's recent kills + losses from zKill's API (cached by zKill for up to an hour) */
-    corpKills: (corpId) => ipcRenderer.invoke('zkill-corp-kills', corpId),
+    corpKills: (corpId, page) => ipcRenderer.invoke('zkill-corp-kills', corpId, page),
+    corpRecent: (corpId, kind) => ipcRenderer.invoke('zkill-corp-recent', { corpId, kind }),
+    corpMonth: (corpId, kind, year, month, page) => ipcRenderer.invoke('zkill-corp-month', { corpId, kind, year, month, page }),
     charKills: (charId) => ipcRenderer.invoke('zkill-char-kills', charId),
     /** one killmail's id + hash by its id (v0.203.2) — for a battle that only knows the id */
     killRef: (killId) => ipcRenderer.invoke('zkill-kill-ref', killId),

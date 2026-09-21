@@ -16,6 +16,9 @@ import Dashboard from './components/Dashboard';
 import SellingChip from './components/SellingChip';
 import StockChip from './components/StockChip';
 import { useApp, useHubs, type MiningAlertSettings, type ModuleId } from './lib/store';
+import { FavoritesStrip } from './components/FavoritesStrip';
+import { destId, destOf, isPinned, sanitizeFavorites, togglePinned, MAX_FAVORITES, type Favorite } from './lib/favorites';
+import { requestView } from './lib/viewBus';
 import { useAuth, shortLabel, charLabel } from './lib/auth';
 import { useMyMarket } from './lib/myMarket';
 import { useStock } from './lib/stock';
@@ -36,12 +39,15 @@ import { initDevLog, logUser, logState, logRun } from './lib/devlog';
 import BattleReports from './components/BattleReports';
 import LiveCombat from './components/LiveCombat';
 import BattleSim from './components/BattleSim';
+import Leaderboard from './components/Leaderboard';
 import { warmDogmaWorker } from './lib/dogmaClient';
 import Radar from './components/Radar';
 import CharacterConductor from './components/CharacterConductor';
 import TheftConductor from './components/TheftConductor';
 import ApertureModule from './components/ApertureModule';
 import PiModule from './components/PiModule';
+import HomeModule from './components/HomeModule';
+import type { SavedView } from './lib/favorites';
 import ItemGroups from './components/ItemGroups';
 import Trends from './components/Trends';
 import { startOverlayFeed, stopOverlayFeed } from './lib/overlayFeed';
@@ -54,8 +60,9 @@ import { m3 } from './lib/format';
 // version, which is exactly the field you need to trust when reading them back
 const APP_VERSION = __APP_VERSION__;
 
-const ALL_MODULES: ModuleId[] = ['trade', 'character', 'battle', 'theft', 'pi', 'aperture'];
+const ALL_MODULES: ModuleId[] = ['home', 'trade', 'character', 'battle', 'theft', 'pi', 'aperture'];
 const MODULE_TITLE: Record<ModuleId, string> = {
+  home: 'Home',
   trade: 'Trade Conductor',
   character: 'Skill & Fit Conductor',
   battle: 'Battle Conductor',
@@ -107,11 +114,62 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
   // and the last reading are there the instant you come back.
   const [apertureWarm, setApertureWarm] = useState(module === 'aperture');
   useEffect(() => { if (module === 'aperture') setApertureWarm(true); }, [module]);
+  // HOME'S CHAIN DASHLETS need a map reading (v0.207.0): with one on any board and a map
+  // configured, opening Home loads Aperture underneath, hidden, exactly as a visit would
+  const homeWantsChain = useApp((s) => (s.home?.boards ?? []).some((b) => b.items.some((i) => i.kind.startsWith('chain-'))));
+  const apertureConfigured = useApp((s) => !!(s.settings.apertureUrl ?? '').trim());
+  useEffect(() => { if (module === 'home' && homeWantsChain && apertureConfigured) setApertureWarm(true); }, [module, homeWantsChain, apertureConfigured]);
   /** Battle Conductor tabs: saved battle reports vs the live game-log feed */
-  const [battleView, setBattleView] = useState<'reports' | 'live' | 'sim'>('reports');
+  const [battleView, setBattleView] = useState<'reports' | 'live' | 'sim' | 'board'>('reports');
   // MAKE BATTLE REPORT moved into the EVE Battle Conductor module
   // (components/BattleReports.tsx) in v0.101.0 — the Tools entry now just
   // switches there.
+  // ---- FAVORITES (v0.206.0): the pinned tabs under the header. A destination is a
+  // module plus one of its tabs; the current one is read off the state below, and
+  // going to one sets the module, its tab, and hands over the saved view if it has one.
+  const favoritesRaw = useApp((s) => s.favorites);
+  const setFavorites = useApp((s) => s.setFavorites);
+  const favorites = useMemo(() => sanitizeFavorites(favoritesRaw), [favoritesRaw]);
+  const currentTab = module === 'home' ? 'dashboard' : module === 'aperture' ? apertureView : module === 'battle' ? battleView : module === 'theft' ? theftView
+    : module === 'pi' ? 'planets' : module === 'trade' ? view
+      : (charMode === 'fit' || charMode === 'wizard' || charMode === 'propagator' ? charMode : 'match');
+  const currentDest = destId(module, currentTab);
+  /** open a tab by its destination id, handing it a saved view when there is one — what a
+   * favorite and a Home dashlet both do */
+  const goTo = (dest: string, savedView?: SavedView) => {
+    const d = destOf(dest);
+    if (!d) return;
+    setModule(d.module as ModuleId);
+    if (d.module === 'aperture') setApertureView(d.tab as 'map' | 'summary');
+    else if (d.module === 'battle') setBattleView(d.tab as 'reports' | 'live' | 'sim' | 'board');
+    else if (d.module === 'theft') setTheftView(d.tab as 'skyhooks' | 'ess');
+    else if (d.module === 'trade') setView(d.tab as typeof view);
+    else if (d.module === 'character') setCharCompare({ mode: d.tab as 'match' | 'fit' | 'wizard' | 'propagator' });
+    if (savedView) requestView(savedView);
+    logUser('destination opened', { dest, view: savedView?.kind ?? null });
+  };
+  const goToFavorite = (f: Favorite) => goTo(f.dest, f.view);
+  const goRef = useRef(goToFavorite); goRef.current = goToFavorite;
+  const favRef = useRef(favorites); favRef.current = favorites;
+  // Alt+1 … Alt+9 jump to the first nine (never while typing)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || !/^[1-9]$/.test(e.key)) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable)) return;
+      const f = favRef.current.list[Number(e.key) - 1];
+      if (f) { e.preventDefault(); goRef.current(f); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  // "open my first favorite when the app starts" — the main window only, once
+  useEffect(() => {
+    if (secondary) return;
+    const f = favRef.current;
+    if (f.openFirstOnLaunch && f.list[0]) goRef.current(f.list[0]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [overlayOn, setOverlayOn] = useState(false);
   // the overlay is a separate always-on-top window fed by THIS window.
   // IT OUTLIVES US: if this window reloads (or is reopened from the tray)
@@ -461,7 +519,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
         <div className="brand-wrap">
           <button className="brand" onClick={() => setModuleMenu((m) => !m)}
             title="Switch between Conductor modules. Background collectors (radar, trends, wallet, net-worth) keep running no matter which module is open.">
-            {module === 'aperture' ? <span>Aperture</span> : module === 'pi' ? (
+            {module === 'home' ? <span>Home</span> : module === 'aperture' ? <span>Aperture</span> : module === 'pi' ? (
               <>EVE <span>Planetary Industry</span></>
             ) : (
               <>EVE <span>{module === 'trade' ? 'Trade Conductor'
@@ -472,6 +530,11 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
           {moduleMenu && (
             <div className="module-menu" onMouseLeave={() => setModuleMenu(false)}>
               <div className="module-menu-head">EVE Conductor</div>
+              <button className={module === 'home' ? 'on' : ''}
+                onClick={() => { setModule('home'); setModuleMenu(false); }}>
+                🏠 Home
+                <span className="dim">your own dashboards · dashlets from every module</span>
+              </button>
               <button className={module === 'trade' ? 'on' : ''}
                 onClick={() => { setModule('trade'); setModuleMenu(false); }}>
                 EVE Trade Conductor
@@ -485,7 +548,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
               <button className={module === 'battle' ? 'on' : ''}
                 onClick={() => { setModule('battle'); setModuleMenu(false); }}>
                 EVE Battle Conductor
-                <span className="dim">battle reports · fight write-ups</span>
+                <span className="dim">battle reports · log visualizer · sim · corp leaderboard</span>
               </button>
               <button className={module === 'theft' ? 'on' : ''}
                 onClick={() => { setModule('theft'); setModuleMenu(false); }}>
@@ -537,6 +600,11 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
               onClick={() => { setBattleView('sim'); logUser('view: battle sim'); }}>
               Battle Sim
             </button>
+            <button className={battleView === 'board' ? 'on' : ''}
+              title="everyone in your corp who is on a public killmail, ranked — public data only, the same ruler for all"
+              onClick={() => { setBattleView('board'); logUser('view: leaderboard'); }}>
+              Leaderboard
+            </button>
           </>)}
           {module === 'theft' && (<>
             <button className={theftView === 'skyhooks' ? 'on' : ''}
@@ -549,6 +617,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
             </button>
           </>)}
           {module === 'pi' && <button className="on">Planets</button>}
+          {module === 'home' && <button className="on">Dashboard</button>}
           {module === 'aperture' && (<>
             <button className={apertureView === 'map' ? 'on' : ''}
               onClick={() => { setApertureView('map'); logUser('view: aperture map'); }}>
@@ -587,6 +656,13 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
           </button>
           </>)}
         </nav>
+        {destOf(currentDest) && (
+          <button className={`fav-star${isPinned(favorites, currentDest) ? ' on' : ''}`}
+            title={isPinned(favorites, currentDest) ? 'unpin this tab from your favorites' : favorites.list.length >= MAX_FAVORITES ? `your favorites are full (${MAX_FAVORITES}) — remove one first` : 'pin this tab to your favorites — the strip under the header'}
+            onClick={() => setFavorites(togglePinned(favorites, currentDest))}>
+            {isPinned(favorites, currentDest) ? '★' : '☆'}
+          </button>
+        )}
         {module === 'trade' && <SearchBar />}
         {/* the Skill & Fit module has its own character sidebar — a second
             picker in the header only confuses which one is in charge */}
@@ -671,6 +747,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
               : module === 'theft' ? theftView
                 : module === 'character' ? (charMode === 'fit' || charMode === 'wizard' || charMode === 'propagator' ? charMode : 'match')
                   : module === 'pi' ? 'planets'
+                    : module === 'home' ? 'dashboard'
                     : module === 'aperture' ? (apertureView === 'summary' ? 'summary' : 'toolbar') : undefined} />
         <ReleaseNotesButton />
         <PolicyButton />
@@ -679,6 +756,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
           ⚙
         </button>
       </header>
+      <FavoritesStrip state={favorites} currentDest={currentDest} onGo={goToFavorite} onChange={setFavorites} />
       {/* PER-SCREEN ZOOM (v0.200.8): CSS zoom on the content root so the
           screen reflows at its level; the header stays put. Aperture hosts
           another page and zooms that page itself (ApertureModule). */}
@@ -690,7 +768,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
         )}
         {module === 'battle' && (
           <div className="content">
-            {battleView === 'reports' ? <BattleReports /> : battleView === 'live' ? <LiveCombat /> : <BattleSim />}
+            {battleView === 'reports' ? <BattleReports /> : battleView === 'live' ? <LiveCombat /> : battleView === 'board' ? <Leaderboard /> : <BattleSim />}
           </div>
         )}
         {module === 'theft' && (
@@ -702,6 +780,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
             overflowed the app shell, the PAGE itself scrolled, and the
             statusbar (fixed at the shell's bottom) appeared stranded mid-list */}
         {module === 'pi' && <div className="content"><PiModule /></div>}
+        {module === 'home' && <div className="content"><HomeModule onGo={goTo} /></div>}
         {apertureWarm && (
           <div className="aperture-keep" style={module === 'aperture'
             ? { display: 'contents' }

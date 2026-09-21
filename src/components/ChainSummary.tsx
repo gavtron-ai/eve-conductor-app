@@ -15,9 +15,10 @@
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { ChainExtract } from '../lib/apertureExtract';
 import {
-  CHAIN_SORT_NATURAL, basePriceName, chainBranches, hopsFrom, onBranch, parseSigSearch, resolveEdges, rockFamiliesIn, sortChainRows, summarize, systemOfNodeText, tagOfNodeText,
-  type ChainFilters, type ChainSig, type ChainSort, type ChainSortKey, type SigGroup,
+  CHAIN_SORT_NATURAL, chainBranches, hopsFrom, onBranch, rockFamiliesIn, sortChainRows, summarize,
+  type ChainFilters, type ChainSort, type ChainSortKey, type SigGroup,
 } from '../lib/chain';
+import { homeOrigin, labelOnReading, parseReading } from '../lib/chainReading';
 
 /** the table's headings, in column order, with the sort key each carries */
 const SORT_COLUMNS: [ChainSortKey, string, string][] = [
@@ -32,22 +33,23 @@ const readSort = (): ChainSort | null => {
     return j && SORT_COLUMNS.some(([k]) => k === j.key) && (j.dir === 'asc' || j.dir === 'desc') ? j : null;
   } catch { return null; }
 };
-import { GAS_SITES, KSPACE_COMBAT, KSPACE_GAS, KSPACE_ORE, ORE_SITES, priceableTypeNames } from '../lib/chainTables';
+import { GAS_SITES, KSPACE_COMBAT, KSPACE_GAS, KSPACE_ORE, ORE_SITES } from '../lib/chainTables';
+import { fetchChainPrices } from '../lib/chainPrices';
 import { haulBasis, haulStats, parseHaulsFile, type Haul } from '../lib/hauls';
 import HaulLogger from './HaulLogger';
-import { findByName } from '../lib/typedb';
-import { fetchAggregates } from '../lib/market';
-import { BUILTIN_HUBS } from '../lib/constants';
 import { getLocation } from '../lib/esiChar';
 import { knownSystem, resolveSystems } from '../lib/systemNames';
 import { useAuth } from '../lib/auth';
 import { iskShort } from '../lib/format';
 import { logInfo, logUser } from '../lib/devlog';
-import { GROUP_COLOR, ageBuckets, classColor, iskByHop, layoutChain, normEffect, paletteFromProbe, routeBetween } from '../lib/chainViz';
-import WH_SYSTEMS from '../data/whSystems.json';
+import { GROUP_COLOR, ageBuckets, classColor, iskByHop, layoutChain, routeBetween } from '../lib/chainViz';
 import ChainDashboard from './ChainDashboard';
 import ZoomControl from './ZoomControl';
 import { useZoom } from '../lib/zoom';
+import { useApp } from '../lib/store';
+import { addFavorite, sanitizeFavorites, MAX_FAVORITES } from '../lib/favorites';
+import { onViewRequest } from '../lib/viewBus';
+import { CHAIN_VIEW_KIND, branchClassesOf, describeChainView, isPlainChainView, resolveBranchClasses, sanitizeChainView, type ChainViewState } from '../lib/chainView';
 
 const HOME_KEY = 'etc-chain-home';
 const GROUPS: SigGroup[] = ['Combat', 'Ore', 'Gas', 'Relic', 'Data'];
@@ -146,6 +148,13 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
   // chain filter (v0.205.0 — "which part of the chain you are interested in roaming
   // through"): the picked systems directly off the origin; empty = the whole chain
   const [branchPick, setBranchPick] = useState<Set<string>>(() => new Set());
+  // SAVED VIEWS (v0.206.0): a favorite can carry this tab's filters. The part of the chain is
+  // saved as INTENT — the class of the system off the origin ("C3"), never today's J-code —
+  // and stays live: every new reading re-picks the branches of that class, until the player
+  // touches the chain chips himself.
+  const [wantBranches, setWantBranches] = useState<string[] | null>(null);
+  const [viewNote, setViewNote] = useState('');
+  const [savedMsg, setSavedMsg] = useState('');
   // column sorting (v0.202.5): a heading click sorts its natural way, a
   // second reverses, a third returns to the default order; remembered
   const [sort, setSort] = useState<ChainSort | null>(readSort);
@@ -200,26 +209,9 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
   }, [auto]);
   useEffect(() => { try { localStorage.setItem(HOME_KEY, home); } catch { /* nicety */ } }, [home]);
 
-  // prices for every gas and ore the tables can value — one fetch per window
+  // prices for every gas and ore the tables can value — one shared fetch (lib/chainPrices.ts)
   useEffect(() => {
-    const names = priceableTypeNames();
-    const ids = names.map((n) => findByName(n)?.id).filter((x): x is number => typeof x === 'number');
-    const jita = BUILTIN_HUBS.find((h) => h.id === 'jita') ?? BUILTIN_HUBS[0];
-    const t0 = performance.now();
-    void fetchAggregates(jita, ids).then((agg) => {
-      const m = new Map<string, number>();
-      for (const n of names) { const id = findByName(n)?.id; const a = id !== undefined ? agg.get(id) : undefined; if (a?.sell?.min) m.set(n, a.sell.min); }
-      // ore variants the type list does not carry take their base ore's
-      // price — a floor, a variant yields at least that (v0.202.8)
-      let floored = 0;
-      for (const n of names) {
-        if (m.has(n)) continue;
-        const base = basePriceName(n, (x) => m.has(x));
-        if (base) { m.set(n, m.get(base)!); floored++; }
-      }
-      logInfo('chain', 'prices', { ms: Math.round(performance.now() - t0), types: ids.length, priced: m.size - floored, floored });
-      setPrices(m);
-    }).catch(() => { logInfo('chain', 'prices failed', { ms: Math.round(performance.now() - t0), types: ids.length }); setPrices(new Map()); });
+    void fetchChainPrices().then(setPrices).catch(() => setPrices(new Map()));
   }, []);
 
   // the active character's current system, from CCP — the "me" origin and
@@ -240,66 +232,9 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
     return () => { stop = true; };
   }, [activeId, data?.at]);
 
-  const parsed = useMemo(() => {
-    if (!data) return null;
-    const feed = data.feedRead && data.feedRead.sigs.length > 0 ? data.feedRead : null;
-    // THE FEED FIRST (v0.200.3): the complete list from the map's own
-    // JSON, whatever the panel shows. The panel table is the fallback.
-    const sigs: ChainSig[] = feed ? feed.sigs.map((s) => ({ ...s, group: s.group as SigGroup })) : parseSigSearch(data.sigText);
-    const known = [...new Set(sigs.map((s) => s.system))];
-    const nodeSys = new Map<string, string>();
-    const nodeCls = new Map<string, string>();
-    if (feed) {
-      for (const s of feed.systems) { nodeSys.set(s.id, s.label); if (s.cls) nodeCls.set(s.label, s.cls); }
-    }
-    for (const n of data.graph.nodes) {
-      if (nodeSys.has(n.id)) continue;
-      const { system, cls } = systemOfNodeText(n.text, known);
-      if (n.id && system) { nodeSys.set(n.id, system); if (cls) nodeCls.set(system, cls); }
-    }
-    // links: the feed's pairs when it has them; else node-id pairs from the
-    // drawing (data attributes, React Flow's aria-label, or path geometry —
-    // v0.200.1: the real map's edge ids are bare numbers)
-    const dom = resolveEdges(data.graph.nodes, data.graph.edges);
-    const pairs = feed && feed.edges.length > 0 ? feed.edges : dom.pairs;
-    const edges = pairs.filter(([a, b]) => nodeSys.has(a) && nodeSys.has(b)).map(([a, b]) => [nodeSys.get(a)!, nodeSys.get(b)!] as [string, string]);
-    // a sig row without a class chip borrows the node's
-    for (const s of sigs) if (!s.cls && nodeCls.has(s.system)) s.cls = nodeCls.get(s.system)!;
-    const drawnIds = new Set(data.graph.nodes.map((n) => n.id));
-    const drawnCount = feed ? feed.systems.filter((s) => drawnIds.has(s.id)).length || nodeSys.size : nodeSys.size;
-    // the map's per-system tag ("C2A"): from the feed, else from the node text
-    const tagOf = new Map<string, string>();
-    if (feed) for (const s of feed.systems) if (s.tag) tagOf.set(s.label, s.tag);
-    for (const n of data.graph.nodes) { const label = nodeSys.get(n.id); if (label && !tagOf.has(label)) { const t = tagOfNodeText(n.text); if (t) tagOf.set(label, t); } }
-    // the wormhole effect (v0.201.1): the feed's own field first, else CCP's
-    // data by J-code — a custom-labelled system still has its J-code in the feed
-    const effectOf = new Map<string, string>();
-    // shattered systems (v0.201.7): CCP's data by J-code — the map's
-    // dotted circle
-    const shattered = new Set<string>();
-    const jOf = (label: string): string => { const s = feed?.systems.find((x) => x.label === label); return s?.jcode || (/^J\d{6}$/.test(label) ? label : ''); };
-    for (const label of new Set([...known, ...nodeSys.values()])) {
-      const fromFeed = feed ? normEffect(feed.systems.find((x) => x.label === label)?.effect) : '';
-      const j = jOf(label);
-      const ccp = j ? (WH_SYSTEMS as Record<string, { cls: string; effect?: string; shattered?: boolean }>)[j] : undefined;
-      const fromCcp = normEffect(ccp?.effect);
-      const e = fromFeed || fromCcp;
-      if (e) effectOf.set(label, e);
-      if (ccp?.shattered) shattered.add(label);
-    }
-    // the class of EVERY system (v0.201.4): the feed / node class first,
-    // a signature row's class second — a k-space hole with no signatures
-    // still has its class
-    const clsOf = new Map<string, string>(nodeCls);
-    for (const s of sigs) if (s.cls && !clsOf.has(s.system)) clsOf.set(s.system, s.cls);
-    return {
-      sigs, edges, how: dom.how, nodeCount: drawnCount, systems: new Set([...known, ...nodeSys.values()]), tagOf, effectOf, clsOf, shattered,
-      // the map's own effect colours, when the reading measured its badges
-      palette: paletteFromProbe((data.probe as { effectStyles?: unknown }).effectStyles),
-      source: feed ? (`map feed · ${feed.systems.length} systems known` + (feed.edges.length > 0 ? '' : ' · links from the drawing')) : 'Signature Search panel',
-      nodeText: data.graph.nodes.map((n) => ({ id: n.id, text: n.text })), nodeSys,
-    };
-  }, [data]);
+  // the reading, parsed by the shared parser (lib/chainReading.ts, v0.207.0 — the Home
+  // dashlets read the chain through the same code, so their numbers are this tab's numbers)
+  const parsed = useMemo(() => (data ? parseReading(data) : null), [data]);
 
   // home: what was typed / set in Settings, else the map's own home system
   // when its feed names one (v0.200.4 — homeMapSystemId on the real map)
@@ -311,26 +246,10 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
    * whose text carries the J-code */
   const originSystem = useMemo(() => {
     if (!parsed) return null;
-    // a typed label or an ESI system name may not be the label the graph
-    // uses (custom name vs J-code): match it through the drawn node's text
-    const viaLabel = (want: string): string | null => {
-      if (parsed.systems.has(want)) return want;
-      const hit = parsed.nodeText.find((n) => ` ${n.text.replace(/\s+/g, ' ')} `.toLowerCase().includes(` ${want.toLowerCase()} `));
-      if (!hit) return null;
-      return parsed.nodeSys.get(hit.id) ?? systemOfNodeText(hit.text, [...parsed.systems]).system ?? null;
-    };
-    if (origin === 'home') {
-      const typed = homeLabel ? viaLabel(homeLabel) : null;
-      if (typed) return typed;
-      // the typed label is not on THIS reading (v0.202.9: a reading taken
-      // before the drawing settled labels systems by J-code) — the map's own
-      // home is the same system under whatever label this reading uses
-      if (feedHome && parsed.systems.has(feedHome)) return feedHome;
-      return homeLabel || '';
-    }
+    if (origin === 'home') return homeOrigin(parsed, home, feedHome);
     if (!me.system) return null;
-    return viaLabel(me.system);
-  }, [parsed, origin, homeLabel, feedHome, me.system]);
+    return labelOnReading(parsed, me.system);
+  }, [parsed, origin, home, feedHome, me.system]);
 
   const hops = useMemo(() => (parsed && originSystem && parsed.edges.length > 0 ? hopsFrom(originSystem, parsed.edges) : null), [parsed, originSystem]);
   /** the parts of the chain: one branch per system directly off the origin */
@@ -361,14 +280,42 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
   }, [parsed, focus, hops, maxHops, classes, groups, maxAgeH, prices, haulAvg, linkedOnly, rocks, branchInfo, branchPick]);
   /** the rock families the reading's ore sites carry — one chip each */
   const rockChips = useMemo(() => (parsed ? rockFamiliesIn(parsed.sigs, { ore: ORE_SITES, kore: KSPACE_ORE }) : []), [parsed]);
-  // a chip whose rock left the reading (a new map read) must not keep
-  // filtering invisibly
+  // a picked rock the chain does not carry right now stays ON and VISIBLE as a chip reading
+  // 0 (v0.206.0) — it used to be dropped on the next reading, which turned a saved "Gneiss"
+  // view into "everything" on a day with no gneiss; never filtering invisibly still holds
+  const oreChips = useMemo(() => [...rockChips, ...[...rocks].filter((r) => !rockChips.some((c) => c.family === r)).map((family) => ({ family, sites: 0, units: 0 }))], [rockChips, rocks]);
+  // ---- apply a saved view (from a favorite or a Home dashlet)
+  const applyView = (v: ChainViewState) => {
+    setOrigin(v.origin); setMaxHops(v.maxHops); setClasses(new Set(v.classes)); setGroups(new Set(v.groups));
+    setMaxAgeH(v.maxAgeH); setRocks(new Set(v.rocks)); setLinkedOnly(v.linkedOnly); setFocus(null);
+    setWantBranches(v.branchClasses.length > 0 ? v.branchClasses : null);
+    if (v.branchClasses.length === 0) { setBranchPick(new Set()); setViewNote(''); }
+    logUser('chain: saved view applied', { summary: describeChainView(v) });
+  };
+  const applyRef = useRef(applyView); applyRef.current = applyView;
+  useEffect(() => onViewRequest(CHAIN_VIEW_KIND, (view) => applyRef.current(sanitizeChainView(view.state))), []);
+  // the saved classes → today's branches, on every reading while the intent stands
   useEffect(() => {
-    if (rocks.size === 0) return;
-    const present = new Set(rockChips.map((r) => r.family));
-    if ([...rocks].every((r) => present.has(r))) return;
-    setRocks(new Set([...rocks].filter((r) => present.has(r))));
-  }, [rockChips, rocks]);
+    if (!wantBranches || !branchInfo || !parsed) return;
+    const r = resolveBranchClasses(wantBranches, branchInfo.branches, parsed.clsOf);
+    const same = r.picked.size === branchPick.size && [...r.picked].every((x) => branchPick.has(x));
+    if (!same) setBranchPick(r.picked);
+    setViewNote(r.missing.length > 0 ? `saved view: no ${r.missing.join(' or ')} system directly off ${originSystem || 'the origin'} right now${r.picked.size === 0 ? ' — the whole chain is shown' : ''}` : '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wantBranches, branchInfo, parsed]);
+  const currentView = (): ChainViewState => sanitizeChainView({
+    origin, maxHops, classes: [...classes], groups: [...groups], maxAgeH, rocks: [...rocks], linkedOnly,
+    branchClasses: wantBranches ?? branchClassesOf(branchPick, parsed?.clsOf ?? new Map()),
+  });
+  const saveView = () => {
+    const v = currentView();
+    const favs = sanitizeFavorites(useApp.getState().favorites);
+    if (favs.list.length >= MAX_FAVORITES) { setSavedMsg(`favorites are full (${MAX_FAVORITES}) — remove one first`); return; }
+    useApp.getState().setFavorites(addFavorite(favs, 'aperture:summary', { kind: CHAIN_VIEW_KIND, state: v, summary: describeChainView(v) }));
+    setSavedMsg(`★ saved to favorites: ${describeChainView(v)}`);
+    logUser('chain: view saved to favorites', { summary: describeChainView(v) });
+    window.setTimeout(() => setSavedMsg(''), 4000);
+  };
   const pickRock = (family: string) => {
     toggle(rocks, family, setRocks);
     // a rock filter means ore sites; an activity filter that leaves ore out
@@ -564,9 +511,15 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
             <input type="checkbox" checked={linkedOnly} onChange={(e) => setLinkedOnly(e.target.checked)} style={{ margin: 0 }} />
             <span className="dim" style={{ whiteSpace: 'nowrap' }}>linked only{unlinkedAll.length > 0 ? ` (${unlinkedAll.length} unlinked)` : ''}</span>
           </label>
-          <button className="btn mini" disabled={!anyFilter} style={{ marginLeft: 'auto', opacity: anyFilter ? 1 : 0.45, height: 28, boxSizing: 'border-box', lineHeight: 1 }}
+          {embedded && (
+            <button className="btn mini" disabled={isPlainChainView(currentView())}
+              style={{ marginLeft: 'auto', opacity: isPlainChainView(currentView()) ? 0.45 : 1, height: 28, boxSizing: 'border-box', lineHeight: 1 }}
+              title={isPlainChainView(currentView()) ? 'set a filter first — then this saves the view as a favorite (the plain tab is pinned with the ☆ in the header)' : `Save these filters as a favorite: “${describeChainView(currentView())}”. The part of the chain is saved by CLASS (C3, HS…), not by today's system, so it still works after the chain rerolls.`}
+              onClick={saveView}>★ save view</button>
+          )}
+          <button className="btn mini" disabled={!anyFilter} style={{ marginLeft: embedded ? 0 : 'auto', opacity: anyFilter ? 1 : 0.45, height: 28, boxSizing: 'border-box', lineHeight: 1 }}
             title={anyFilter ? 'back to every site in the chain' : 'no filter set'}
-            onClick={() => { setMaxHops(null); setClasses(new Set()); setGroups(new Set()); setMaxAgeH(null); setFocus(null); setRocks(new Set()); setBranchPick(new Set()); }}>✕ clear filters{focus ? ' & focus' : ''}</button>
+            onClick={() => { setMaxHops(null); setClasses(new Set()); setGroups(new Set()); setMaxAgeH(null); setFocus(null); setRocks(new Set()); setBranchPick(new Set()); setWantBranches(null); setViewNote(''); }}>✕ clear filters{focus ? ' & focus' : ''}</button>
         </div>
         {/* the chain row (v0.205.0): one chip per system directly off the origin — pick one
             or several and only what lies down those parts of the chain stays: tiles, table,
@@ -582,7 +535,7 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
                 const on = branchPick.has(b.first);
                 const sites = parsed ? parsed.sigs.filter((s) => s.group !== 'Wormhole' && onBranch(s.system, new Set([b.first]), branchInfo.via)).length : 0;
                 return (
-                  <button key={b.first} className={`btn mini${on ? ' on' : ''}`} onClick={() => toggle(branchPick, b.first, setBranchPick)}
+                  <button key={b.first} className={`btn mini${on ? ' on' : ''}`} onClick={() => { setWantBranches(null); setViewNote(''); toggle(branchPick, b.first, setBranchPick); }}
                     style={{ borderColor: on ? classColor(cls) : undefined }}
                     title={`${b.first}${badge ? ` (${badge})` : ''} and what lies beyond it: ${b.systems.length} system${b.systems.length === 1 ? '' : 's'}, ${sites} site${sites === 1 ? '' : 's'} — ${b.systems.slice(0, 8).join(' · ')}${b.systems.length > 8 ? ' …' : ''}`}>
                     {badge && <b style={{ color: classColor(cls), marginRight: 4 }}>{badge}</b>}{b.first}<span className="dim" style={{ marginLeft: 4, fontWeight: 400 }}>{b.systems.length}</span>
@@ -595,6 +548,9 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
             )}
           </div>
         )}
+        {(viewNote || savedMsg) && (
+          <div style={{ fontSize: 12, color: savedMsg ? '#f0c674' : 'var(--warn, #e0a36a)' }}>{savedMsg || viewNote}</div>
+        )}
         {/* row 2: activity · ore (v0.202.11: one chip per rock family the
             reading's ore sites carry, grades and variants folded together; a
             picked rock narrows the view to the ore sites holding it, valued
@@ -606,12 +562,12 @@ export default function ChainSummary({ embedded = null }: { embedded?: ChainSumm
                 onClick={() => toggle(groups, g, setGroups)}>{g}</button>
             ))}
           </FilterGroup>
-          {rockChips.length > 0 && (
+          {oreChips.length > 0 && (
             <FilterGroup label="ore" title="Only the ore sites that carry a picked rock stay in view — any grade or variant of it — and each site's value becomes that rock's share alone. Pick several to see them together.">
-              {rockChips.map((r) => (
+              {oreChips.map((r) => (
                 <button key={r.family} className={`btn mini${rocks.has(r.family) ? ' on' : ''}`} style={{ borderColor: rocks.has(r.family) ? GROUP_COLOR.Ore : undefined }}
                   onClick={() => pickRock(r.family)}
-                  title={`${r.family} · in ${r.sites} ore site${r.sites === 1 ? '' : 's'} · ${r.units.toLocaleString()} units in total, any grade`}>
+                  title={r.sites === 0 ? `${r.family} — no ore site in the chain carries it right now; the filter stays on until you click it off` : `${r.family} · in ${r.sites} ore site${r.sites === 1 ? '' : 's'} · ${r.units.toLocaleString()} units in total, any grade`}>
                   {r.family}<span className="dim" style={{ marginLeft: 3, fontWeight: 400 }}>{r.sites}</span>
                 </button>
               ))}
