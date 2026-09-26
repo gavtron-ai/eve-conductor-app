@@ -34,6 +34,13 @@ const eq = (label, got, want) => {
   eq('4 and nothing it keeps is on the never-list', G.forbidden(list), []);
   fs.rmSync(tmp, { recursive: true, force: true });
 
+  // ---- the REAL export carries every file the public build needs (2026-09-26: the first windows-build run
+  // on GitHub failed at lint because eslint.config.mjs was not in the allow list)
+  const real = G.exportFileList(path.join(__dirname, '..'));
+  const needed = ['package.json', 'package-lock.json', 'tsconfig.json', 'vite.config.ts', 'eslint.config.mjs', 'index.html', 'overlay.html', '.github/workflows/windows-build.yml', 'scripts/run-tests.mjs', 'scripts/build-notices.mjs', 'scripts/check-shareable.mjs'];
+  eq('4b the real export carries every file the public build and check need', needed.filter((f) => !real.includes(f)), []);
+  eq('4c and none of the private tree (archive, baseline, release, the scratch file)', real.filter((f) => /^(archive|baseline|release|handout|dist)\//.test(f) || /^_/.test(path.basename(f))), []);
+
   // ---- the stamp verdict
   const now = Date.parse('2026-09-23T18:00:00Z');
   const stamp = (over) => ({ version: '0.237.0', at: '2026-09-23T17:50:00Z', passed: true, failed: 0, emergency: null, ordinary: true, ...over });

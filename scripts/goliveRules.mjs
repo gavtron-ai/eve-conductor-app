@@ -18,7 +18,10 @@ import path from 'node:path';
 export const ALLOW = new Set([
   'src', 'electron', 'scripts', 'tests', 'build', '.github', 'signing',
   'index.html', 'overlay.html', 'package.json', 'package-lock.json', 'tsconfig.json',
-  'vite.config.ts', 'README.md', 'LICENSE', 'CODE_OF_CONDUCT.md',
+  'vite.config.ts', 'eslint.config.mjs', 'README.md', 'LICENSE', 'CODE_OF_CONDUCT.md',
+  // eslint.config.mjs was missing until 2026-09-26: the public repo's first windows-build run failed at
+  // `npm run lint` on the runner ("ESLint couldn't find an eslint.config.* file") — the local check never
+  // noticed because it runs in the private tree. tests/golive.test.cjs now holds the build-critical files.
 ]);
 /** subtrees pruned wherever they appear */
 export const PRUNE = new Set([
