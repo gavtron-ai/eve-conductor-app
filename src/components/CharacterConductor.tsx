@@ -21,6 +21,7 @@ import FitStatsPanel from './FitStatsPanel';
 import FitWizard from './FitWizard';
 import FitLibrary from './FitLibrary';
 import BattleSim from './BattleSim';
+import { maxOf } from '../lib/nums';
 
 const ROMAN = ['0', 'I', 'II', 'III', 'IV', 'V'];
 const lvl = (n: number | undefined) => ROMAN[Math.max(0, Math.min(5, n ?? 0))];
@@ -212,7 +213,6 @@ function FitView({ chars }: { chars: CharAccount[] }) {
   };
   useEffect(() => {
     refreshFits(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const shownFits = useMemo(() => {
@@ -451,7 +451,7 @@ function FitView({ chars }: { chars: CharAccount[] }) {
                           <LevelCell key={c.characterId} c={c} skillId={r.skill.id}
                             need={r.requiredLevel > 0 ? r.requiredLevel : undefined}
                             best={bestLevel(r) > 0 ? bestLevel(r) : undefined}
-                            peak={Math.max(0, ...chars.map((x) => levelOf(x, r.skill.id)))}
+                            peak={Math.max(0, maxOf(chars.map((x) => levelOf(x, r.skill.id))))}
                             rank={r.skill.rank} />
                         ))}
                         <td className="dim" style={{ fontSize: 12, maxWidth: 380 }}
@@ -591,7 +591,7 @@ export default function CharacterConductor() {
       <div className="panel">
         <h2>Skill &amp; Fit Conductor</h2>
         <div className="empty">Log in with EVE (Settings → EVE login) to inspect characters.
-          {' '}The <b>Battle Sim</b> tab works without login — pasted fits fly with
+          {' '}<b>Battle Sim</b> (in the Battle module) works without login — pasted fits fly with
           optimal or bare-minimum pilots.</div>
       </div>
     );

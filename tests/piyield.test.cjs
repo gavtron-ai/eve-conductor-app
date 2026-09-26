@@ -1,3 +1,5 @@
+// v0.232.0 (audit E7): runs against the fresh sim/lib compile the runner produces — until then a frozen
+// copy in tests/pi (up to 300 lines behind the shipped code) kept these passing on old behaviour.
 // Fixtures for src/lib/piYield.ts — CCP's published extractor yield formula.
 //
 // The reference values here are re-derived INLINE from the official dev-docs
@@ -13,7 +15,7 @@ const ok = (label, cond, extra = '') => {
 };
 const eq = (label, got, want) => ok(label, JSON.stringify(got) === JSON.stringify(want), `got=${JSON.stringify(got)} want=${JSON.stringify(want)}`);
 
-const Y = require('./pi/piYield.js');
+const Y = require('./sim/lib/piYield.js');
 
 // ---- the dev-docs worked example: 171000s at 1800s cycles = 95 cycles ----
 const sched = Y.yieldSchedule(6965, 1800, 171000);

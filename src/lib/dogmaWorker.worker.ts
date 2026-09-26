@@ -15,10 +15,9 @@
 // leave a second 530-line copy of a vendored dependency to drift.
 globalThis.window = globalThis as unknown as Window & typeof globalThis;
 
-import protobuf from 'protobufjs';
+import { esf } from '../data/esf/esf.static.js';
 import initWasm, { init as dogmaInit, calculate as dogmaCalculate } from '../vendor/dogma-engine/esf_dogma_engine';
 import wasmUrl from '../vendor/dogma-engine/esf_dogma_engine_bg.wasm?url';
-import protoText from '../data/esf/esf.proto?raw';
 import typesUrl from '../data/esf/types.pb2?url';
 import typeDogmaUrl from '../data/esf/typeDogma.pb2?url';
 import dogmaEffectsUrl from '../data/esf/dogmaEffects.pb2?url';
@@ -44,22 +43,22 @@ export type WorkerOut =
 
 const post = (m: WorkerOut) => (self as unknown as Worker).postMessage(m);
 
-async function fetchPb(url: string, root: protobuf.Root, message: string): Promise<Record<string, unknown>> {
+type PbDecoder = { decode(buf: Uint8Array): { entries: Record<string, unknown> } };
+async function fetchPb(url: string, message: string, decoder: PbDecoder): Promise<Record<string, unknown>> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${message}: HTTP ${res.status}`);
   const buf = new Uint8Array(await res.arrayBuffer());
-  return (root.lookupType(message).decode(buf) as unknown as { entries: Record<string, unknown> }).entries;
+  return decoder.decode(buf).entries;
 }
 
 /** the worker keeps its OWN copy of the SDE — that is the cost of the trade */
 const ready = (async () => {
   const t0 = performance.now();
-  const root = protobuf.parse(protoText).root;
   const [types, typeDogma, dogmaAttributes, dogmaEffects] = await Promise.all([
-    fetchPb(typesUrl, root, 'esf.Types'),
-    fetchPb(typeDogmaUrl, root, 'esf.TypeDogma'),
-    fetchPb(dogmaAttributesUrl, root, 'esf.DogmaAttributes'),
-    fetchPb(dogmaEffectsUrl, root, 'esf.DogmaEffects'),
+    fetchPb(typesUrl, 'esf.Types', esf.Types as PbDecoder),
+    fetchPb(typeDogmaUrl, 'esf.TypeDogma', esf.TypeDogma as PbDecoder),
+    fetchPb(dogmaAttributesUrl, 'esf.DogmaAttributes', esf.DogmaAttributes as PbDecoder),
+    fetchPb(dogmaEffectsUrl, 'esf.DogmaEffects', esf.DogmaEffects as PbDecoder),
   ]);
   const g = globalThis as unknown as Record<string, unknown>;
   g.get_dogma_attributes = (typeId: number) =>

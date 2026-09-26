@@ -75,9 +75,9 @@ function create() {
   applyClickThrough();
 
   if (process.env.VITE_DEV_SERVER_URL) {
-    win.loadURL(`${process.env.VITE_DEV_SERVER_URL}#overlay`);
+    win.loadURL(`${process.env.VITE_DEV_SERVER_URL}/overlay.html`); // v0.234.0: its own slim entry
   } else {
-    win.loadFile(path.join(__dirname, '..', 'dist', 'index.html'), { hash: 'overlay' });
+    win.loadFile(path.join(__dirname, '..', 'dist', 'overlay.html'));
   }
   // RESYNC ON LOAD: a send to a webContents that is still navigating is
   // DROPPED, not queued. Opening the setup window from the Tools menu

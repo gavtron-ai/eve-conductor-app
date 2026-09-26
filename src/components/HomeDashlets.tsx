@@ -5,9 +5,12 @@
 // the reason, never a guess. None of them fetches from EVE: they read what the collectors and the
 // tabs already hold (lib/homeData.ts). The second half lives in HomeDashlets2.tsx.
 import { useMemo, type CSSProperties } from 'react';
+import { usePersistHealth } from '../lib/devlog';
 import type { DashSize } from '../lib/homeGrid';
 import { dashletOf, optionOf } from '../lib/dashlets';
 import { useBeat, useChainFeed, useResource } from '../lib/homeData';
+import { meterSnapshot } from '../lib/netMeter';
+import { clockLine } from '../lib/clock';
 import { DIGEST_GROUPS, wayChip, withinHops } from '../lib/chainDigest';
 import { agoShort, eveClock, inShort, ordersDigest, pilotsDigest, raidLogDigest, windowsDigest, worthDigest } from '../lib/homeDigests';
 import { piBands } from '../lib/homeStats';
@@ -21,7 +24,7 @@ import { useFreshness } from '../lib/freshness';
 import { piPlanets, piLastRun } from '../lib/pi';
 import { raidSnapshot, raidEvents } from '../lib/raidWatch';
 import { loadNetWorthSeries } from '../lib/networth';
-import { computeStats } from '../lib/ledger';
+import { computeStats, useLedger } from '../lib/ledger';
 import { reloadShipHistory } from '../lib/shipHistory';
 import { lastBattleHistory } from '../lib/battleReport';
 import { fightWhen } from '../lib/fightSplit';
@@ -32,6 +35,7 @@ import type { SavedView } from '../lib/favorites';
 import { Detail, Dot, Empty, FitList, Foot, Head, Img, Row, Spark, charFace, corpLogo } from './DashKit';
 import { AMBER, ChainFoot, NoChain, SiteLine, chainView, piTone, signed, type DashletProps } from './DashShared';
 import { MORE_BODIES } from './HomeDashlets2';
+import { maxOf } from '../lib/nums';
 
 export type { DashletProps } from './DashShared';
 
@@ -103,7 +107,7 @@ function ChainNear({ spec, cfg, onGo }: DashletProps) {
   const jumps = Number(optionOf(spec, cfg, 'jumps'));
   if (!d) return <NoChain />;
   const near = withinHops(d, jumps);
-  const max = Math.max(1, ...d.byHop.map((h) => h.isk));
+  const max = Math.max(1, maxOf(d.byHop.map((h) => h.isk)));
   return (
     <>
       <Head big={d.originOk ? iskShort(near.isk) : '—'} sub={d.originOk ? <>{near.sites} site{near.sites === 1 ? '' : 's'} within {jumps} jump{jumps === 1 ? '' : 's'} of home</> : 'home is not linked on this reading'} />
@@ -225,7 +229,7 @@ function ChainFresh(_: DashletProps) {
   if (!d) return <NoChain />;
   const total = d.ages.reduce((t, a) => t + a.count, 0) + d.noAge;
   const old = d.ages[d.ages.length - 1].count;
-  const max = Math.max(1, ...d.ages.map((a) => a.count));
+  const max = Math.max(1, maxOf(d.ages.map((a) => a.count)));
   const tones = ['var(--good)', 'var(--accent)', AMBER, 'var(--bad)'];
   return (
     <>
@@ -360,7 +364,7 @@ function NetWorth({ spec, size, cfg }: DashletProps) {
   const color = d.delta === null ? 'var(--ink-2)' : d.delta >= 0 ? 'var(--good)' : 'var(--bad)';
   return (
     <>
-      <Head big={iskShort(d.total)} title="hangar stock + goods in transit + sell orders + buy escrow + wallets, every goods layer at the Jita ask"
+      <Head big={iskShort(d.total)} title="hangar stock + goods in transit + sell orders + buy escrow + wallets; goods at what they actually sold for in Jita over the last 7 days (the radar's measured fills), at your own cost where nothing sold, and at the Jita ask (a listing) only where there is neither"
         sub={d.delta === null ? 'one snapshot so far' : <><b style={{ color }}>{signed(d.delta)}</b>{d.deltaPct !== null ? ` (${(d.deltaPct * 100).toFixed(1)}%)` : ''}{d.covers ? '' : <span className="dl-dim"> since {new Date(d.baseAt!).toISOString().slice(0, 10)}</span>}
           <span className="dl-dim" title="the same change split in two. Wallets move with transfers, PLEX, ship purchases and payouts — that is not trading. Goods = hangar stock + in transit + sell orders + buy escrow."> · wallets {signed(d.deltaWallets ?? 0)}, goods {signed(d.deltaGoods ?? 0)}</span></>} />
       <Detail><Spark points={d.spark} color={color} fill={size !== 'S'} /></Detail>
@@ -394,7 +398,8 @@ function Orders(_: DashletProps) {
 function TradeToday({ spec, cfg }: DashletProps) {
   const now = useBeat(60_000);
   const range = Number(optionOf(spec, cfg, 'range'));
-  const stats = useResource(`ledger-stats-${range}`, async () => computeStats(Date.now() - range * 86_400_000), 2 * 60_000);
+  const lv = useLedger((st) => st.version); // a new key when the ledger is restored or written
+  const stats = useResource(`ledger-stats-${range}-${lv}`, async () => computeStats(Date.now() - range * 86_400_000), 2 * 60_000);
   const wallet = useFreshness((s) => s.sources['wallet']);
   if (!stats.value) return <Empty>Reading the wallet ledger…</Empty>;
   const s = stats.value;
@@ -503,6 +508,16 @@ const SOURCE_NAMES: Record<string, string> = {
 function Collectors({ size }: DashletProps) {
   const now = useBeat(5_000);
   const fresh = useFreshness((s) => s.sources);
+  // v0.221.0: what this copy asked of each service today (lib/netMeter) — the number the audit could
+  // not find anywhere; the main process's zKillboard calls are folded in
+  const meter = meterSnapshot(now);
+  const health = usePersistHealth(); // v0.228.0: writes the app carried on without (audit E1)
+  const zk = useResource('zkill-meter', () => window.appInfo?.zkill?.meter?.() ?? Promise.resolve(null), 60_000);
+  const sso = useResource('sso-meter', () => window.appInfo?.sso?.meter?.() ?? Promise.resolve(null), 60_000); // v0.237.0
+  const hosts: Record<string, number> = { ...meter.today.hosts };
+  if (zk.value && zk.value.day === meter.today.day && zk.value.count > 0) hosts.zKillboard = (hosts.zKillboard ?? 0) + zk.value.count;
+  if (sso.value && sso.value.day === meter.today.day && sso.value.count > 0) hosts['EVE login (CCP)'] = (hosts['EVE login (CCP)'] ?? 0) + sso.value.count;
+  const meterLine = Object.entries(hosts).sort((a, b) => b[1] - a[1]).map(([h, n]) => `${h} ${n.toLocaleString()}`).join(' · ');
   const ordersAt = useMyMarket((s) => s.fetchedAt);
   // the team's orders are refreshed app-wide (not by a collector with a schedule of its own): shown
   // from that refresh's own clock. "Watchlist prices" pauses while you are away from the keyboard.
@@ -514,6 +529,9 @@ function Collectors({ size }: DashletProps) {
     <>
       <Detail>
         <div className="dl-sub">{failing.length === 0 ? <b style={{ color: 'var(--good)' }}>all collectors keeping up</b> : <b style={{ color: 'var(--bad)' }}>{failing.length} failing — backing off and retrying</b>}</div>
+        <div className="dl-sub" title="every request this copy made today, by service — counted in the app, with the main process's zKillboard calls folded in; the policy page (⚖) shows yesterday's too">requests today: {meterLine || 'none yet'}</div>
+        {clockLine() && <div className="dl-sub" title="your PC clock against EVE's, measured from the Date header of every ESI answer (median of the last twelve); raid windows, planet timers and order ages are computed on EVE time">{clockLine()}</div>}
+        {health.last && <div className="dl-sub" style={{ color: 'var(--warn, #e0b341)' }} title="a cache, work-in-progress or history write the app carried on without — the diagnostics log (⚙ Settings) names each one; a full disk or a locked file is the usual cause">⚠ {health.failures} write failure{health.failures === 1 ? '' : 's'} this session · last: {health.last.area} {health.last.what} {agoShort(now - health.last.at)}</div>}
         <FitList className={size === 'M' ? 'two' : ''}>
           {keys.map((k) => {
             const s = sources[k];

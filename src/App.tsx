@@ -24,10 +24,12 @@ import { useMyMarket } from './lib/myMarket';
 import { useStock } from './lib/stock';
 import { openMarketWindowEverywhere, lastTeamOrderFailures } from './lib/esiChar';
 import { usePrices } from './lib/priceStore';
-import { syncAllLedgers } from './lib/ledger';
+import { syncAllLedgers, restoreLedger } from './lib/ledger';
 import { runTrendsTick, TRENDS_INTERVAL_MS } from './lib/trends';
 import { snapshotNetWorth } from './lib/networth';
 import { runRadarTick, restoreRadarWip, RADAR_INTERVAL_MS } from './lib/radar';
+import { clockWarning } from './lib/clock';
+import { eveClock } from './lib/homeDigests';
 import { runRaidWatchTick, restoreRaidWip, RAID_WATCH_INTERVAL_MS } from './lib/raidWatch';
 import { runShipWatchTick, primeShipHistory, SHIP_WATCH_INTERVAL_MS } from './lib/shipHistory';
 import { runPiTick, PI_INTERVAL_MS, piCharacters } from './lib/pi';
@@ -35,7 +37,8 @@ import { initTooltips } from './lib/tooltip';
 import { initActivity, isIdle } from './lib/activity';
 import { esiErrorState } from './lib/esiRate';
 import { loadSetup, needsSetup } from './lib/appConfig';
-import { initDevLog, logUser, logState, logRun } from './lib/devlog';
+import { initDevLog, logUser, logState, logRun, logInfo } from './lib/devlog';
+import { installNetMeter } from './lib/netMeter';
 import BattleReports from './components/BattleReports';
 import LiveCombat from './components/LiveCombat';
 import BattleSim from './components/BattleSim';
@@ -154,6 +157,21 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, []);
+  // v0.239.0: the module and Tools menus close on Escape and on a click anywhere else — they closed
+  // only when the pointer LEFT them, so a keyboard user, or a click that jumped straight to a tab,
+  // left a menu hanging over the page
+  useEffect(() => {
+    if (!moduleMenu && !toolsMenu) return;
+    const close = () => { setModuleMenu(false); setToolsMenu(false); };
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') close(); };
+    const onDown = (e: MouseEvent) => {
+      const t = e.target as Element | null;
+      if (!t || !t.closest('.module-menu, .menu-toggle')) close();
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('mousedown', onDown);
+    return () => { window.removeEventListener('keydown', onKey); window.removeEventListener('mousedown', onDown); };
+  }, [moduleMenu, toolsMenu]);
   // "open my first favorite when the app starts" — the main window only, once
   useEffect(() => {
     if (secondary) return;
@@ -285,6 +303,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
   const [, tick] = useState(0);
   const pricesBusy = useRef(false);
   const walletBusy = useRef(false);
+  const downtimeNoted = useRef(false);
   const trendsBusy = useRef(false);
   const nwBusy = useRef(false);
   const radarBusy = useRef(false);
@@ -294,6 +313,8 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
   const [radarProgress, setRadarProgress] = useState('');
   // WIP restores prime the COLLECTORS — a pop-out never runs them
   useEffect(() => { if (!secondary) void restoreRadarWip(); }, [secondary]);
+  // the trading ledger lives in a file (v0.226.0): loaded once per window; only the main window writes it
+  useEffect(() => { void restoreLedger({ writer: !secondary }); }, [secondary]);
   useEffect(() => { void primeShipHistory(); }, []); // read-only, Live Combat needs it
   useEffect(() => { if (charMode === 'battle') { setCharCompare({ mode: 'fit' }); } }, [charMode, setCharCompare]);
   useEffect(() => { if (!secondary) void restoreRaidWip(); }, [secondary]);
@@ -301,12 +322,19 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
   useEffect(() => { initActivity(); }, []);
   // the diagnostic log: what the app did, and what the user was doing when it
   // did it. Started before anything else so a boot failure still lands.
-  useEffect(() => { initDevLog(APP_VERSION); }, []);
+  useEffect(() => {
+    initDevLog(APP_VERSION);
+    // v0.241.0: how long the page took to reach its first render (from navigation start) — the number
+    // a code-splitting decision needs; the main process's "ready" line and this one bracket the start-up
+    logInfo('app', `renderer ready${secondary ? ' (pop-out)' : ''}`, { ms: Math.round(performance.now()) });
+  }, [secondary]);
+  // v0.221.0: count every request this copy makes, per service per day (the main window only)
+  useEffect(() => { if (!secondary) installNetMeter(); }, [secondary]);
   // a new version downloaded itself in the background (electron-updater,
   // fed by the public releases repo) — offer the restart, never force it
   const [updateReady, setUpdateReady] = useState<string | null>(null);
   // an update the owner marked as an EMERGENCY installs by itself (electron/updatePolicy.cjs)
-  const [updateEmergency, setUpdateEmergency] = useState<{ reason: string; installAt: number } | null>(null);
+  const [updateEmergency, setUpdateEmergency] = useState<{ kind: 'emergency' | 'pending'; reason: string; installAt: number } | null>(null);
   const [updateTick, setUpdateTick] = useState(0);
   useEffect(() => {
     if (!updateEmergency) return undefined;
@@ -316,7 +344,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
   useEffect(() => {
     window.appInfo?.updates?.onReady((info) => {
       setUpdateReady(info.version || 'update');
-      if (info.emergency) setUpdateEmergency({ reason: info.reason ?? '', installAt: info.installAt ?? Date.now() + 60_000 });
+      if (info.emergency || info.pending) setUpdateEmergency({ kind: info.emergency ? 'emergency' : 'pending', reason: info.reason ?? '', installAt: info.installAt ?? Date.now() + 60_000 });
     });
   }, []);
   // boot the dogma worker at start so its ~250 ms SDE decode never lands on a
@@ -331,6 +359,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
   // every other problem the user might chase is downstream of that. Say so
   // once, plainly, instead of letting them find empty screens.
   const unconfigured = setupLoaded && needsSetup() && characters.length === 0;
+  const clockWarn = clockWarning(); // re-read on every statusbar tick
   // WHAT IS ON SCREEN — the timeline of the session (grep '"area":"user"')
   useEffect(() => { logUser(`module: ${module}`); }, [module]);
   // a pop-out's taskbar/label should name its module, not read "EVE Conductor",
@@ -341,7 +370,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
       window.appInfo?.win?.reportModule?.(module);
     }
   }, [secondary, module]);
-  useEffect(() => { logUser(`view: ${view}`); }, [view]);
+  useEffect(() => { if (module === 'trade') logUser(`view: ${view}`); }, [view, module]);
   useEffect(() => { logState('session', 'characters', characters.length); }, [characters.length]);
   useEffect(() => { logUser(`overlay ${overlayOn ? 'ON' : 'off'}`); }, [overlayOn]);
   useEffect(() => {
@@ -353,6 +382,16 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
       tick((x) => x + 1); // renders the statusbar countdowns
       const f = useFreshness.getState();
       const now = Date.now();
+      // DAILY DOWNTIME (v0.236.0, round-two R3): every ESI read fails from 11:00 EVE for a quarter of
+      // an hour; asking anyway produced a warning per character per collector. Nothing is asked.
+      if (eveClock(now).inDowntimeWindow) {
+        if (!downtimeNoted.current) {
+          downtimeNoted.current = true;
+          logInfo('esi', 'daily downtime — every collector pauses until ~11:15 EVE');
+        }
+        return;
+      }
+      downtimeNoted.current = false;
       // WATCHLIST PRICES ARE A SCREEN, NOT A RECORD. They exist to keep the
       // table in front of the user current; nobody needs them refreshed for
       // an hour of an empty chair, and that spend comes out of the same ESI
@@ -385,7 +424,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
         (!wallet || (wallet.nextAt !== null && now >= wallet.nextAt))
       ) {
         walletBusy.current = true;
-        logRun('wallet', 'tick', () => syncAllLedgers())
+        logRun('wallet', 'tick', () => syncAllLedgers(), { quiet: true })
           .then(() => f.reportHeader('wallet', 10 * 60_000))
           .catch(() => f.fail('wallet'))
           .finally(() => {
@@ -400,7 +439,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
         (!nw || (nw.nextAt !== null && now >= nw.nextAt))
       ) {
         nwBusy.current = true;
-        logRun('networth', 'tick', () => snapshotNetWorth())
+        logRun('networth', 'tick', () => snapshotNetWorth(), { quiet: true })
           .then(() => f.reportHeader('networth', 30 * 60_000))
           .catch(() => f.fail('networth'))
           .finally(() => {
@@ -415,7 +454,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
         (!radar || (radar.nextAt !== null && now >= radar.nextAt))
       ) {
         radarBusy.current = true;
-        logRun('radar', 'tick', () => runRadarTick(setRadarProgress))
+        logRun('radar', 'tick', () => runRadarTick(setRadarProgress), { quiet: true })
           .then(() => f.reportHeader('radar', RADAR_INTERVAL_MS))
           .catch(() => f.fail('radar'))
           .finally(() => {
@@ -429,7 +468,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
       const raid = f.sources['raidwatch'];
       if (!raidBusy.current && (!raid || (raid.nextAt !== null && now >= raid.nextAt))) {
         raidBusy.current = true;
-        logRun('raidwatch', 'tick', () => runRaidWatchTick())
+        logRun('raidwatch', 'tick', () => runRaidWatchTick(), { quiet: true })
           .then(() => f.reportHeader('raidwatch', RAID_WATCH_INTERVAL_MS))
           .catch(() => f.fail('raidwatch'))
           .finally(() => {
@@ -443,7 +482,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
       if (useAuth.getState().characters.some((c) => c.refreshToken)
         && !shipBusy.current && (!shipw || (shipw.nextAt !== null && now >= shipw.nextAt))) {
         shipBusy.current = true;
-        logRun('shipwatch', 'tick', () => runShipWatchTick())
+        logRun('shipwatch', 'tick', () => runShipWatchTick(), { quiet: true })
           .then(() => f.reportHeader('shipwatch', SHIP_WATCH_INTERVAL_MS))
           .catch(() => f.fail('shipwatch'))
           .finally(() => {
@@ -460,7 +499,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
         (!pi || (pi.nextAt !== null && now >= pi.nextAt))
       ) {
         piBusy.current = true;
-        logRun('pi', 'tick', () => runPiTick())
+        logRun('pi', 'tick', () => runPiTick(), { quiet: true })
           .then(() => f.reportHeader('pi', PI_INTERVAL_MS))
           .catch(() => f.fail('pi'))
           .finally(() => {
@@ -475,7 +514,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
         (!trends || (trends.nextAt !== null && now >= trends.nextAt))
       ) {
         trendsBusy.current = true;
-        logRun('trends', 'tick', () => runTrendsTick())
+        logRun('trends', 'tick', () => runTrendsTick(), { quiet: true })
           .then(() => f.reportHeader('trends', TRENDS_INTERVAL_MS))
           .catch(() => f.fail('trends'))
           .finally(() => {
@@ -489,7 +528,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
 
   // recomputed on every statusbar tick (the 1s interval above)
   const esiState = esiErrorState('bulk');
-  logState('esi', 'paused', esiState.pausedLanes.join(',') || 'none',
+  logState('esi', 'paused lanes', esiState.pausedLanes.join(',') || 'none',
     { remain: esiState.remain, hardBlocked: esiState.hardBlocked });
 
   const item = selected ? getType(selected) : undefined;
@@ -498,9 +537,11 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
   return (
     <div className="app">
       {updateReady && updateEmergency && (
-        <div className="statusbar" data-tick={updateTick} style={{ background: 'rgba(224,90,58,.28)', justifyContent: 'center', flexWrap: 'wrap' }}>
+        <div className="statusbar" data-tick={updateTick} style={{ background: updateEmergency.kind === 'emergency' ? 'rgba(224,90,58,.28)' : 'rgba(61,153,112,.28)', justifyContent: 'center', flexWrap: 'wrap' }}>
           <span>
-            <b>⚠ Emergency update {updateReady}</b> — it installs by itself in{' '}
+            {updateEmergency.kind === 'emergency'
+              ? <><b>⚠ Emergency update {updateReady}</b> — it installs by itself in{' '}</>
+              : <><b>EVE Conductor {updateReady} was downloaded last time and never installed</b> — it installs now, in{' '}</>}
             <b>{Math.max(0, Math.ceil((updateEmergency.installAt - Date.now()) / 1000))} s</b>: the app closes for a few
             seconds and comes straight back; collectors pick up where they left off.
             {updateEmergency.reason ? <> Why: {updateEmergency.reason}</> : null}
@@ -521,6 +562,15 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
           </button>
         </div>
       )}
+      {clockWarn && (
+        <div className="statusbar" style={{ background: 'var(--warn-bg, #3a2c00)', justifyContent: 'center' }}>
+          <span>
+            <b>{clockWarn.text}</b> (measured from EVE&apos;s own live answers). Raid windows, planet timers and order
+            ages are corrected to EVE time; the game client&apos;s clock and logs are not. Fix it in Windows:
+            Settings → Time &amp; language → Sync now.
+          </span>
+        </div>
+      )}
       {unconfigured && (
         <div className="statusbar" style={{ background: 'var(--warn-bg, #3a2c00)', justifyContent: 'center' }}>
           <span>
@@ -532,7 +582,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
       )}
       <header className="header">
         <div className="brand-wrap">
-          <button className="brand" onClick={() => setModuleMenu((m) => !m)}
+          <button className="brand menu-toggle" onClick={() => setModuleMenu((m) => !m)}
             title="Switch between Conductor modules. Background collectors (radar, trends, wallet, net-worth) keep running no matter which module is open.">
             {module === 'home' ? <span>Home</span> : module === 'aperture' ? <span>Aperture</span> : module === 'pi' ? (
               <>EVE <span>Planetary Industry</span></>
@@ -578,7 +628,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
               <button className={module === 'aperture' ? 'on' : ''}
                 onClick={() => { setModule('aperture'); setModuleMenu(false); }}>
                 Aperture
-                <span className="dim">the corp map, embedded</span>
+                <span className="dim">switched off — opens the map in your browser</span>
               </button>
             </div>
           )}
@@ -730,7 +780,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
             its actions route through the main process, so any window may
             trigger them. */}
         <div className="char-menu-wrap">
-          <button className="btn" onClick={() => setToolsMenu((m) => !m)}
+          <button className="btn menu-toggle" onClick={() => setToolsMenu((m) => !m)}
             title="Overlay tools that float over the EVE clients">
             Tools ▾
           </button>
@@ -767,7 +817,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
         <ReleaseNotesButton />
         <PolicyButton />
         <ZoomControl screen={module} />
-        <button className="btn icon" onClick={() => setShowSettings(true)} title="Trading settings">
+        <button className="btn icon" onClick={() => setShowSettings(true)} title="Settings">
           ⚙
         </button>
       </header>
@@ -876,7 +926,7 @@ export default function App({ secondaryModule = null }: { secondaryModule?: stri
         </span>
         {(pricesFresh?.lastSuccess || lastUpdated) && (
           <span>
-            last data {new Date(Math.max(pricesFresh?.lastSuccess ?? 0, ordersFresh?.lastSuccess ?? 0, walletFresh?.lastSuccess ?? 0, lastUpdated ?? 0)).toLocaleTimeString()}
+            last data {new Date(Math.max(pricesFresh?.lastSuccess ?? 0, ordersFresh?.lastSuccess ?? 0, walletFresh?.lastSuccess ?? 0, lastUpdated ?? 0)).toISOString().slice(11, 19)} EVE
           </span>
         )}
         {loading && <span>fetching…</span>}

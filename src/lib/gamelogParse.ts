@@ -73,6 +73,10 @@ const splitTail = (rest: string): { entity: string; weapon?: string; quality?: s
 };
 
 export function parseGameLogLine(raw: string): GameLogEvent | null {
+  // a trailing CR (the client writes CRLF; a chunked reader can hand one over) and a BOM never
+  // decide whether a line parses: `.` in LINE_RE does not match CR, and that lost lines (v0.218.0)
+  if (raw.endsWith('\r')) raw = raw.slice(0, -1);
+  if (raw.charCodeAt(0) === 0xfeff) raw = raw.slice(1);
   const m = LINE_RE.exec(raw);
   if (!m) return null;
   const t = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]);

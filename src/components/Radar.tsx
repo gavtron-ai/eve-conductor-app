@@ -9,6 +9,7 @@ import ItemDetailModal from './ItemDetailModal';
 import SellingChip from './SellingChip';
 import StockChip from './StockChip';
 import { openMarketWindowEverywhere } from '../lib/esiChar';
+import { maxOf } from '../lib/nums';
 
 interface Row {
   key: string;
@@ -41,7 +42,7 @@ function TrendChip({ ratio, kind }: { ratio: number | null; kind: 'war' | 'flow'
 }
 
 function HourStrip({ counts, unit }: { counts: number[]; unit: string }) {
-  const max = Math.max(1e-9, ...counts);
+  const max = Math.max(1e-9, maxOf(counts));
   return (
     <span className="trend-strip" title="EVE-time hours, 00→24 — darker = more. Normalized per OBSERVED interval, so hours the app was off show as unobserved, not quiet.">
       {counts.map((c, i) => (
@@ -66,7 +67,7 @@ export default function Radar() {
   useEffect(() => {
     let alive = true;
     const load = () => {
-      void loadRadarSummary().then((s) => alive && setSummary(s));
+      void loadRadarSummary(regionId).then((s) => alive && setSummary(s));
       void loadRadarCoverage().then((c) => alive && setCoverage(c));
     };
     load();
@@ -75,7 +76,7 @@ export default function Radar() {
       alive = false;
       clearInterval(t);
     };
-  }, []);
+  }, [regionId]); // one region's file at a time (v0.229.0)
 
   const rows = useMemo((): Row[] => {
     if (!summary) return [];
@@ -132,7 +133,7 @@ export default function Radar() {
     { key: 'fk7', dir: 'desc' },
   );
 
-  const totalDays = summary ? Math.max(0, ...summary.map((e) => e.days.length)) : 0;
+  const totalDays = summary ? Math.max(0, maxOf(summary.map((e) => e.days.length))) : 0;
   // how much of the last 7 days this region was actually observed
   const covPct7 = (() => {
     const cov = coverage.get(regionId);
@@ -163,8 +164,8 @@ export default function Radar() {
         <label>
           <span>Region</span>
           <select value={regionId} onChange={(e) => setRegionId(Number(e.target.value))}>
-            {radarRegions().map((r) => (
-              <option key={r} value={r}>{regionName(r)}</option>
+            {[...new Set([...radarRegions(), ...coverage.keys()])].map((r) => (
+              <option key={r} value={r}>{regionName(r)}{radarRegions().includes(r) ? '' : ' · not watched now'}</option>
             ))}
           </select>
         </label>
@@ -237,8 +238,9 @@ export default function Radar() {
         real fills (both sides — sellers dumping into bids show on the buy side). Every number is
         normalized to OBSERVED time: when the app is off, those hours are marked unobserved and
         excluded — they never read as "the market went quiet". Daily rollups accumulate forever
-        in the Do-Not-Delete folder (radar-*.ndjson; excluded from backup files — the folder
-        itself carries them). Trends need ≥8 days of data; hour strips sharpen daily.
+        in the Do-Not-Delete folder (one compact radar-summary file per region; a backup seeds a
+        fresh machine with them and never overwrites local history). Trends need ≥8 days of
+        data; hour strips sharpen daily.
       </div>
       {detailTypeId !== null && <ItemDetailModal typeId={detailTypeId} onClose={() => setDetailTypeId(null)} />}
     </div>

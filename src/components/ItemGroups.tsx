@@ -440,7 +440,7 @@ export default function ItemGroups() {
                   {i === 0 && (
                     <>
                       <td rowSpan={2}>
-                        <input type="checkbox" checked={checked.has(r.typeId)} onChange={() => toggleCheck(r.typeId)} />
+                        <input type="checkbox" aria-label={`select ${r.name}`} checked={checked.has(r.typeId)} onChange={() => toggleCheck(r.typeId)} />
                       </td>
                       <td rowSpan={2} className="hub-name">
                         {r.name}

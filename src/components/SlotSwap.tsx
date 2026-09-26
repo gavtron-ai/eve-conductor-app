@@ -91,6 +91,8 @@ export default function SlotSwap({
    * The baseline (slot empty) is taken first so the panel can show the room
    * available even before any candidate has been scored.
    */
+  const swapsKey = JSON.stringify(combatant.moduleSwaps ?? {});
+  const statesKey = JSON.stringify(combatant.moduleStates ?? {});
   useEffect(() => {
     const mine = ++run.current;
     let dead = false;
@@ -112,9 +114,8 @@ export default function SlotSwap({
       }
     })();
     return () => { dead = true; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [candidates, slotKey, combatant.id, JSON.stringify(combatant.moduleSwaps ?? {}),
-    JSON.stringify(combatant.moduleStates ?? {}), combatant.propRunning, combatant.profile]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the combatant's fit identity (the two JSON keys), not the object
+  }, [candidates, slotKey, combatant.id, swapsKey, statesKey, combatant.propRunning, combatant.profile]);
 
   const show = (id: number) => !onlyFits || (verdicts.get(id) ?? 'checking') !== 'over';
   const pending = [...verdicts.values()].filter((v) => v === 'checking').length;

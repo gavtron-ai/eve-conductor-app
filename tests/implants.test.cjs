@@ -13,7 +13,7 @@ const eq = (l, g, w) => {
 // Zainou 'Gypsy' CPU Management EE-602/604/606 are slot 6; the Genolution
 // Core Augmentation line spans slots 1-4; AU-79 is the one oddity at 79.
 const EE602 = 27070, EE604 = 27072, EE606 = 27074;
-const CA1 = 33328, CA2 = 33329.1, AU79 = 33329;
+const CA1 = 33328, AU79 = 33329;
 const SQUIRE = 27101;         // slot 5 powergrid
 const RIFTER = 587;           // not an implant at all
 const D = (attrs) => ({ dogmaAttributes: attrs.map(([attributeID, value]) => ({ attributeID, value })) });

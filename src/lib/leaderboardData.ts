@@ -23,6 +23,7 @@ import { classOfGroup, compactMail, completeSince, heldFloor, monthsBackFrom, ty
 import { categories, getType } from './typedb';
 import { useAuth } from './auth';
 import { logInfo, logWarn } from './devlog';
+import { minOf } from './nums';
 
 // the stats bridge only takes names it knows the prefix of (electron/stats.cjs AUX_NAME)
 const FILE = 'battle-corp-killmails.ndjson';
@@ -270,10 +271,12 @@ const monthRows = (corpId: number, kind: 'kills' | 'losses', year: number, month
   return b?.corpMonth ? b.corpMonth(corpId, kind, year, month, page) as Promise<Rows> : rigRows(`https://zkillboard.com/api/${kind}/corporationID/${corpId}/year/${year}/month/${month}/${page > 1 ? `page/${page}/` : ''}`);
 };
 
+/** v0.238.0 (round-two U1): the logged-out state's message — the board shows it as a hint, not an error */
+export const NEED_LOGIN = 'Log a character in (⚙ Settings) to see your corporation\'s board — the corporation comes from your pilot.';
 let myCorp: { char: number; corp: number } | null = null;
 async function whoseCorp(): Promise<number> {
   const chars = useAuth.getState().characters;
-  if (chars.length === 0) throw new Error('log in a character first — the corporation comes from your pilot, never from code');
+  if (chars.length === 0) throw new Error(NEED_LOGIN);
   if (myCorp?.char !== chars[0].characterId) myCorp = { char: chars[0].characterId, corp: await corporationOf(chars[0].characterId) };
   return myCorp.corp;
 }
@@ -295,7 +298,7 @@ async function refreshRecent(): Promise<void> {
   if (lists.some((l) => !l.ok)) throw new Error('zKillboard did not answer — showing what is already held');
   const fresh: ArchMail[] = [];
   for (const l of lists) for (const row of l.rows) { const got = fold(row); if (got) fresh.push(got); }
-  const info = (l: Rows) => ({ full: l.n >= ZKILL_PAGE, oldestT: l.rows.length > 0 ? Math.min(...l.rows.map((r) => r.t)) : null, overlap: l.rows.some((r) => before.has(r.id)) });
+  const info = (l: Rows) => ({ full: l.n >= ZKILL_PAGE, oldestT: l.rows.length > 0 ? minOf(l.rows.map((r) => r.t)) : null, overlap: l.rows.some((r) => before.has(r.id)) });
   // a list that overlaps what was held keeps the floor it had; with no floor at all it is everything there is (0)
   s.recentFloor = completeSince(lists.map(info), s.recentFloor) ?? 0;
   s.recentAt = Date.now();

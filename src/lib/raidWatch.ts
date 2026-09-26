@@ -17,7 +17,9 @@
 // ESS has no ESI data at all, so its "history" is only what the user logs
 // by hand (kind 'mine'), clearly labelled as self-reported.
 import { fetchRaidableSkyhooksMeta, type RaidableSkyhook } from './theft';
-import { logInfo, logWarn } from './devlog';
+import { logInfo, logWarn, swallowed } from './devlog';
+import { serverNow } from './clock';
+import { minOf, maxOf } from './nums';
 
 /** MEASURED 2026-08-30: the feed is server-cached max-age=300 (a new body
  * every ~5 min). Polling at HALF that period guarantees we see EVERY
@@ -26,9 +28,9 @@ import { logInfo, logWarn } from './devlog';
 export const RAID_WATCH_INTERVAL_MS = 150_000;
 const FILE = 'theft-raids.ndjson';
 const WIP = 'theft-wip.json';
-/** the end-of-window ambiguity experiment + full verdict audit trail —
- * NDJSON in the Do-Not-Delete stats dir, one object per line */
-const EXP_FILE = 'theft-raid-experiment.ndjson';
+// The end-of-window ambiguity experiment used to write a raw audit trail (theft-raid-experiment.ndjson,
+// one line per tick forever — 35,000 lines and no reader by 2026-09-23). It is no longer written
+// (v0.220.0); the compact events file carries every verdict.
 /** a removal observed this close to the boundary could be CCP clock jitter
  * rather than a raid */
 const END_GRACE_MS = 90_000;
@@ -119,8 +121,8 @@ async function appendEvents(list: RaidEvent[]): Promise<void> {
   if (bridge) {
     try {
       await bridge.auxAppend(FILE, list.map((e) => JSON.stringify(e)));
-    } catch {
-      // in-memory history still works this session
+    } catch (e) {
+      swallowed('raidwatch', 'raid history append', e); // in-memory history still works this session
     }
   }
 }
@@ -179,17 +181,6 @@ export function diffRaidSnapshots(
 /** Last-Modified of the snapshot prevSnap came from (0 = unknown/legacy) */
 let prevSnapLM = 0;
 
-/** append raw lines to the experiment audit file — analysis-grade detail
- * the compact events file does not carry */
-async function expLog(rows: object[]): Promise<void> {
-  if (rows.length === 0) return;
-  const bridge = window.appInfo?.stats;
-  if (!bridge) return;
-  try {
-    await bridge.auxAppend(EXP_FILE, rows.map((r) => JSON.stringify(r)));
-  } catch { /* audit trail is best-effort */ }
-}
-
 /** the watcher's own last look at CCP's raidable feed (v0.207.0, the Home dashlets): what is
  * listed, when we looked and the server's Last-Modified — read-only, no fetch */
 export function raidSnapshot(): { list: RaidableSkyhook[]; at: number; lm: number } | null {
@@ -201,7 +192,7 @@ export async function runRaidWatchTick(): Promise<number> {
   const { list, lastModifiedMs } = await fetchRaidableSkyhooksMeta(); // throws → caller skips, no events
   const curr = new Map(list.map((s) => [s.planetId, s]));
   let recorded = 0;
-  const now = Date.now();
+  const now = serverNow(); // EVE time: the feed's windows are the server's
   const currLM = lastModifiedMs ?? now;
   // THE EXPERIMENT: is a skyhook with a theft link IN PROGRESS kept listed
   // past its window end? Any entry the SERVER (not our stale fetch) shows
@@ -213,11 +204,6 @@ export async function runRaidWatchTick(): Promise<number> {
       entries: pastEnd.map((s) => `${s.systemId}/${s.planetId} end ${new Date(s.endMs).toISOString()} (+${Math.round((currLM - s.endMs) / 1000)}s)`),
     });
   }
-  await expLog([{
-    k: 'tick', t: now, lm: currLM, listed: list.length,
-    open: list.filter((s) => currLM >= s.startMs && currLM < s.endMs).length,
-    pastEnd: pastEnd.map((s) => ({ p: s.planetId, sys: s.systemId, end: s.endMs, overBySec: Math.round((currLM - s.endMs) / 1000) })),
-  }]);
 
   if (prevSnap && currLM <= prevSnapLM && prevSnapLM !== 0) {
     // SAME server snapshot as last time (the 5-min cache) — no new
@@ -232,7 +218,6 @@ export async function runRaidWatchTick(): Promise<number> {
       await appendEvents(evs);
       recorded = evs.length;
       // the audit trail carries the full interval every verdict rests on
-      await expLog(evs.map((e) => ({ k: 'verdict', ...e, prevLM, currLM })));
       logInfo('raidwatch', `recorded ${evs.length} verdict(s)`, {
         verdicts: evs.map((e) => `${e.systemId}/${e.planetId}: ${e.kind}${e.kind === 'raided' ? ` @${e.intoWindowMin}m/${e.windowMin}m` : ''}${e.blindTailMin !== undefined ? ` blindTail ${e.blindTailMin}m` : ''}`),
       });
@@ -245,7 +230,6 @@ export async function runRaidWatchTick(): Promise<number> {
       limitMin: MAX_DIFF_GAP_MS / 60_000,
       why: 'windows that elapsed unseen cannot honestly be called survived or raided',
     });
-    await expLog([{ k: 'gap', t: now, gapMin: Math.round((now - prevSnapAt) / 60_000) }]);
   }
   prevSnap = curr;
   prevSnapAt = now;
@@ -254,8 +238,8 @@ export async function runRaidWatchTick(): Promise<number> {
   if (bridge) {
     try {
       await bridge.auxWrite(WIP, JSON.stringify({ t: Date.now(), lm: currLM, snap: [...curr.values()] }));
-    } catch {
-      // wip is a nicety
+    } catch (e) {
+      swallowed('raidwatch', 'work-in-progress save', e); // wip is a nicety
     }
   }
   return recorded;
@@ -330,14 +314,14 @@ function summarize(list: RaidEvent[]): RaidStats {
     raided: raided.length,
     raidRate: observed > 0 ? raided.length / observed : null,
     medianIntoWindowMin: mins.length > 0 ? mins[Math.floor(mins.length / 2)] : null,
-    lastRaidedMs: raided.length > 0 ? Math.max(...raided.map((e) => e.t)) : null,
+    lastRaidedMs: raided.length > 0 ? maxOf(raided.map((e) => e.t)) : null,
     unknown: unknown.length,
-    lastUnknownMs: unknown.length > 0 ? Math.max(...unknown.map((e) => e.t)) : null,
+    lastUnknownMs: unknown.length > 0 ? maxOf(unknown.map((e) => e.t)) : null,
     stealthRaids: raided.filter((e) => e.wasKind === 'survived').length,
     lateRaidShare: raided.length > 0 ? late.length / raided.length : null,
     mine: mine.length,
-    lastMineMs: mine.length > 0 ? Math.max(...mine.map((e) => e.t)) : null,
-    firstSeenMs: list.length > 0 ? Math.min(...list.map((e) => e.t)) : null,
+    lastMineMs: mine.length > 0 ? maxOf(mine.map((e) => e.t)) : null,
+    firstSeenMs: list.length > 0 ? minOf(list.map((e) => e.t)) : null,
   };
 }
 
@@ -364,7 +348,7 @@ export const emptyStats = (): RaidStats => ({ ...EMPTY });
 
 /** the user marking a target they hit themselves (skyhook: planetId; ESS: 0) */
 export async function markRaidedByMe(systemId: number, planetId = 0, note?: string): Promise<void> {
-  await appendEvents([{ t: Date.now(), planetId, systemId, kind: 'mine', note }]);
+  await appendEvents([{ t: serverNow(), planetId, systemId, kind: 'mine', note }]);
 }
 
 // ---------------------------------------------------------------------------
@@ -427,7 +411,7 @@ export function resolveWithBar(
  * file is rewritten in place (memory + disk stay in step) */
 export async function applyBarReading(systemId: number, planetId: number, tics: number): Promise<number> {
   const all = await loadEvents();
-  const readMs = Date.now();
+  const readMs = serverNow(); // compared with the feed's window ends (EVE time)
   const { resolved, changed, stealthConfirmed } = resolveWithBar(all, planetId, readMs, tics);
   events = resolved;
   await appendEvents([{ t: readMs, planetId, systemId, kind: 'bar', tics }]);
@@ -443,7 +427,6 @@ export async function applyBarReading(systemId: number, planetId: number, tics: 
       flips: stealthConfirmed,
       meaning: 'the feed recorded survived; the bar proves it was emptied — a link finished after the window closed',
     });
-    await expLog([{ k: 'stealth', t: readMs, planetId, systemId, tics, flips: stealthConfirmed }]);
   }
   logInfo('raidwatch', `bar reading ${tics} tics on ${systemId}/${planetId}`, {
     lastEmptiedEst: new Date(readMs - tics * TIC_MS).toISOString(),

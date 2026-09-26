@@ -15,8 +15,24 @@ contextBridge.exposeInMainWorld('appInfo', {
   },
   sso: {
     login: (clientId) => ipcRenderer.invoke('sso-login', clientId),
-    refresh: (clientId, refreshToken) =>
-      ipcRenderer.invoke('sso-refresh', { clientId, refreshToken }),
+    /** main's own login-host request count today (v0.237.0) — folded into the net meter */
+    meter: () => ipcRenderer.invoke('sso-meter'),
+    refresh: (clientId, refreshToken, characterId) =>
+      ipcRenderer.invoke('sso-refresh', { clientId, refreshToken, characterId }),
+  },
+  // v0.242.0: from 0.238.0 to 0.241.0 `refresh` sat inside `notices` (a text patch inserted the notices block
+  // above it) — every token refresh the page asked for threw "refresh is not a function". Local builds only;
+  // tests/preload.test.cjs now holds this bridge to every path the page uses.
+  /** the third-party licence notices shipped with the app (v0.238.0) — Help → About */
+  notices: {
+    read: () => ipcRenderer.invoke('notices-read'),
+  },
+  /** tokens at rest (v0.235.0): kept encrypted by the main process; the page holds them in memory only */
+  tokens: {
+    available: ipcRenderer.sendSync('tokens-available'),
+    load: () => ipcRenderer.invoke('tokens-load'),
+    save: (list) => ipcRenderer.invoke('tokens-save', list),
+    forget: (characterId) => ipcRenderer.invoke('tokens-forget', characterId),
   },
   stats: {
     info: () => ipcRenderer.invoke('stats-info'),
@@ -27,6 +43,9 @@ contextBridge.exposeInMainWorld('appInfo', {
     auxRead: (name) => ipcRenderer.invoke('stats-aux-read', name),
     auxAppend: (name, lines) => ipcRenderer.invoke('stats-aux-append', { name, lines }),
     auxFiles: () => ipcRenderer.invoke('stats-aux-files'),
+    /** the raw radar month files (v0.220.0: no longer written) — list, and delete on the user's press */
+    radarMonths: () => ipcRenderer.invoke('stats-radar-months'),
+    deleteRadarMonths: () => ipcRenderer.invoke('stats-radar-months-delete'),
     /** names+size+mtime only — never pulls file contents */
     auxNames: () => ipcRenderer.invoke('stats-aux-names'),
     import: (files) => ipcRenderer.invoke('stats-import', files),
@@ -57,6 +76,8 @@ contextBridge.exposeInMainWorld('appInfo', {
     /** the corp's recent kills + losses from zKill's API (cached by zKill for up to an hour) */
     corpKills: (corpId, page) => ipcRenderer.invoke('zkill-corp-kills', corpId, page),
     corpRecent: (corpId, kind) => ipcRenderer.invoke('zkill-corp-recent', { corpId, kind }),
+    /** main's own zKillboard request count today (v0.221.0) */
+    meter: () => ipcRenderer.invoke('zkill-meter'),
     corpMonth: (corpId, kind, year, month, page) => ipcRenderer.invoke('zkill-corp-month', { corpId, kind, year, month, page }),
     charKills: (charId) => ipcRenderer.invoke('zkill-char-kills', charId),
     /** one killmail's id + hash by its id (v0.203.2) — for a battle that only knows the id */

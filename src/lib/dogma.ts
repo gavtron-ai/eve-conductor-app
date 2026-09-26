@@ -2,6 +2,7 @@
 // attr 149 = cargo capacity multiplier (Expanded Cargoholds)
 // attr 614 = cargo capacity bonus % (Cargohold Optimization rigs)
 import { ESI_BASE } from './constants';
+import { swallowed } from './devlog';
 import { esiFetch } from './esiRate';
 
 export interface CargoModAttrs {
@@ -51,8 +52,8 @@ export async function cargoModAttrs(typeIds: number[]): Promise<Record<number, C
     await Promise.all(Array.from({ length: Math.min(CONCURRENCY, missing.length) }, worker));
     try {
       localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-    } catch {
-      // cache is an optimization only
+    } catch (e) {
+      swallowed('dogma', 'attribute cache save', e); // cache is an optimization only
     }
   }
   return cache;

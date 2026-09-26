@@ -8,7 +8,7 @@
 // HONEST LIMIT: it only knows what it recorded while the Conductor was
 // running and the character logged in — spans before this collector ran,
 // or while the app was closed, read "not recorded" rather than a guess.
-import { getCurrentShip, getLocation } from './esiChar';
+import { readCharState } from './charState';
 import { useAuth } from './auth';
 
 export const SHIP_WATCH_INTERVAL_MS = 60_000;
@@ -56,10 +56,10 @@ export async function runShipWatchTick(): Promise<number> {
   const fresh: ShipRecord[] = [];
   for (const c of chars) {
     try {
-      const [ship, loc] = await Promise.all([
-        getCurrentShip(c.characterId),
-        getLocation(c.characterId).catch(() => ({ solar_system_id: 0 })),
-      ]);
+      // v0.221.0: the shared reader — free when the overlay just asked; an offline pilot costs nothing
+      const cs = await readCharState(c.characterId, false);
+      if (!cs.ship || !cs.loc) continue;
+      const ship = cs.ship, loc = cs.loc;
       const sig = `${ship.ship_type_id}|${ship.ship_name}|${loc.solar_system_id}`;
       if (last.get(c.characterId) === sig) continue; // unchanged — no record
       last.set(c.characterId, sig);

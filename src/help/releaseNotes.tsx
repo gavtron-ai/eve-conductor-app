@@ -28,6 +28,314 @@ export interface ReleaseNote {
 
 export const RELEASE_NOTES: ReleaseNote[] = [
   {
+    version: '0.246.0', date: '2026-09-26', headline: 'The policy page carries the first three measured days of the request meter, including a full twelve-character day',
+    changes: [
+      <><b>Measured, and written where it belongs.</b> The request meter has now closed three days: 26,297 ESI requests on 2026-09-23, 91,115 on the 24th, and 470,220 on the 25th — a day with twelve characters online for most of it and the overlay on throughout, which is the ship-and-location poll for online pilots (every 6 s) at full stretch. The ⚖ page&apos;s ESI row states all three beside the formula it already gave, so nobody has to take the formula on trust. A copy with one or two characters stays in the low thousands.</>,
+    ],
+    why: <>RULES 22: the volume per user per day is measured and written on the policy page. The numbers are the app&apos;s own daily lines, read at go-live.</>,
+    published: true,
+  },
+  {
+    version: '0.245.0', date: '2026-09-23', headline: 'The dashlet store dims what cannot work today, says why, and will not add it; the starter board skips it',
+    changes: [
+      <><b>Eleven dashlets cannot work while the Aperture link is off</b> — the eight on the Chain shelf, the ore and gas finders, and My hauls (its haul log is fed from the Σ Summary). Their store cards are now dimmed with a banner: “Temporarily unavailable — the Aperture map link is switched off while how the app works with Aperture is reworked with its developer…”. The ＋ add button is off on those cards with the same reason as its tooltip.</>,
+      <><b>“✨ start me off” lays down only what works.</b> It used to place three chain dashlets that showed nothing but a notice. When the integration returns, every one of these comes back by itself — the list is filtered at the moment you press the button, not edited.</>,
+    ],
+    why: <>Gavin: “dim the home dashboard cards in the dashlet storefront where they are currently not working and put a banner showing they are temporarily unavailable … also remove those from any auto or starter dashboard templates.”</>,
+    published: true,
+  },
+  {
+    version: '0.244.0', date: '2026-09-23', headline: 'Polish, round three, part five: the Trade Finder\'s scan cost is on the policy page, and every control has a name',
+    changes: [
+      <><b>The policy page states what a scan asks of ESI.</b> A Deep scan reads the daily trade history of every candidate item at each destination region, once per item per day — measured today at 15,802 candidates and 16,175 requests for a day&apos;s first scan (about four and a half minutes). The page said nothing about it; it now has its own row, held to the scanner&apos;s constants by the same fixture that holds every other cadence.</>,
+      <>Seven controls had no name for a screen reader or a tooltip — two checkboxes (include a fit in the propagation; select an item in a group) and five icon-only buttons (× ✕ ✓). Named. A fixture reads every component with the TypeScript compiler and refuses a new unnamed checkbox or icon-only button.</>,
+    ],
+    why: <>LEARNINGS/AUDIT-2026-09-23-ROUND3.md, items 22–23: a real Deep scan in the rig with the request meter read afterwards; the parser census (51 checkboxes, 381 buttons).</>,
+    published: true,
+  },
+  {
+    version: '0.243.0', date: '2026-09-23', headline: 'Polish, round three, part four: the dashlet store opens on a shelf that works',
+    changes: [
+      <><b>The dashlet store no longer opens on the Chain shelf</b> — eight dashlets, every one marked unavailable since the Aperture link went off, were a stranger&apos;s first sight of it. It opens on Theft now; the Chain and Harvest shelves come last and their headings say what they need. The “My hauls” dashlet says that new hauls cannot be logged while the Σ Summary is off, instead of pointing at a button that is not there.</>,
+      <>Two log lines read better: the ESI budget line says “paused lanes: none” instead of “paused: none”, and the Trade module&apos;s remembered view is no longer logged at every start whatever module is on screen.</>,
+    ],
+    why: <>The rig walk of the Home dashlet store, logged out (LEARNINGS/AUDIT-2026-09-23-ROUND3.md, items 20–21).</>,
+    published: true,
+  },
+  {
+    version: '0.242.0', date: '2026-09-23', headline: 'Hotfix: token refreshes from the page failed in the four local builds before this one; a fixture now holds the desktop bridge to every call the page makes',
+    changes: [
+      <><b>What broke.</b> In 0.238.0 the function the page calls to refresh a character&apos;s EVE token was moved, by an editing slip, out of the sign-in part of the desktop bridge into the new third-party-notices part. Every refresh the page asked for after that threw “refresh is not a function”: on the one machine running those builds, planet reads failed for every character from 17:17 EVE and any other read that needed a fresh token would have failed the same way. None of 0.238.0–0.241.0 was published; every installed copy elsewhere runs 0.217.0 and never had the fault.</>,
+      <><b>Why the check did not catch it.</b> The bridge file is plain script the type checker does not read, and no fixture knew its shape. Now one does: tests/preload.test.cjs loads the real bridge with a stand-in for Electron and checks that every path the page reaches through it — found by reading the page&apos;s own source — exists.</>,
+    ],
+    why: <>Seen in the installed app&apos;s own diagnostics (“planet list unreadable for 12 of 12 character(s) — refresh is not a function”) while reading the log for the previous release&apos;s start-up timing. LEARNINGS/AUDIT-2026-09-23-ROUND3.md, item 19.</>,
+    published: true,
+  },
+  {
+    version: '0.241.0', date: '2026-09-23', headline: 'Polish, round three, part three: the start-up is measured, and two Settings sentences tell the truth',
+    changes: [
+      <>The diagnostics log records how long the page took to reach its first render at every start (“renderer ready”), beside the main process&apos;s own ready line — the measurement any start-up work will be judged against.</>,
+      <>Settings: the home-system hint no longer describes the chain summary as if it worked (it is switched off with the Aperture link); the alerts hint names the trend watcher as the sender, every 5 minutes.</>,
+    ],
+    why: <>LEARNINGS/AUDIT-2026-09-23-ROUND3.md, batch C: the Settings modal read end to end in the rig; the start-up timeline read from five installs&apos; logs.</>,
+    published: true,
+  },
+  {
+    version: '0.240.0', date: '2026-09-23', headline: 'Polish, round three, part two: seventeen stale-closure warnings resolved one by one, and the linter now refuses new ones',
+    changes: [
+      <><b>Two panels could show stale numbers.</b> The Dashboard&apos;s inventory rows did not recompute when you excluded an item from the books until something else changed; the order detail&apos;s economics ignored a change in the order&apos;s remaining days. Both recompute on the right inputs now.</>,
+      <>Fifteen more hook-dependency warnings were each read and resolved on their own merits — a memoised target and market-tree keys in the Fit Wizard and the Sim panel, stable callbacks in the ship tree, named keys in the slot swapper, and, where a store counter or a generation counter is the deliberate trigger, a written reason instead of a silent disable.</>,
+      <>The linter runs with zero tolerance for warnings from now on: a new one fails the check that every build and every go-live runs.</>,
+    ],
+    why: <>LEARNINGS/AUDIT-2026-09-23-ROUND3.md, item 13: every one of those warnings was a possible stale closure, and two were real.</>,
+    published: true,
+  },
+  {
+    version: '0.239.0', date: '2026-09-23', headline: 'Polish, round three: renaming a fit works again in the desktop app, menus close properly, times read in EVE time everywhere',
+    changes: [
+      <><b>Renaming a fit or a variation works in the desktop app.</b> The two ✎ buttons in the Fit Wizard asked the browser for a text prompt, which the desktop shell does not provide — they did nothing. They now open a small field in place (Enter saves, Esc keeps the old name).</>,
+      <>The module menu and the Tools menu close on Esc and on a click anywhere else; they used to close only when the pointer left them.</>,
+      <>The status bar&apos;s “last data” time is EVE time, like every other time in the app; countdowns of an hour or more read “4h 40m” instead of “280m 23s”.</>,
+      <>Words that had gone stale: the module menu no longer calls the Aperture tab “embedded”; the market radar&apos;s footer names the files it really keeps (one compact summary per region, seeded from a backup only onto a fresh machine); the Skill &amp; Fit sign-in note points at Battle Sim in the Battle module; the Aperture panel without a map address says where to set one instead of promising a button; the ⚙ page is “Settings”, not “Trading settings”.</>,
+      <>The ⚖ policy page&apos;s tables wrap instead of scrolling sideways; the header search box&apos;s placeholder fits; the Theft table shows “…” while planet names load instead of a bare id.</>,
+    ],
+    why: <>Gavin: “keep looking for more to fix, more polish on polish on polish.” A cold-start walk through every module, logged out, at 1600×1000 (LEARNINGS/AUDIT-2026-09-23-ROUND3.md).</>,
+    published: true,
+  },
+  {
+    version: '0.238.0', date: '2026-09-23', headline: 'The licences of everything the app is built on ship with it; five small things a stranger would notice',
+    changes: [
+      <><b>Third-party notices.</b> The app is built on React, zustand, protobufjs, electron-updater and their dependencies (24 packages: MIT, ISC, BSD, Apache, Python-2.0, Blue Oak), the EVEShipFit dogma engine (MIT) and CCP&apos;s data — and until now shipped only Electron&apos;s and Chromium&apos;s licence files. A THIRD-PARTY-NOTICES.txt is generated from the dependency tree at every build, ships beside the app&apos;s resources, and is shown under Help → About, sources &amp; the CCP notice. The go-live check refuses a release whose file does not match the tree.</>,
+      <>Battle Reports and the Leaderboard, opened with nobody logged in, say “Log a character in to see your corporation&apos;s fights” instead of “battle report failed: log in a character first”.</>,
+      <>The Theft table&apos;s planet column puts a space between the numeral and its class (it read “VILava” when copied or by a screen reader).</>,
+      <>The permanent “🚧 refresh from Aperture: unavailable” item is gone from the Theft toolbar — the import button&apos;s own hint and the Aperture tabs already explain; and the Home “ISK on field” dashlet no longer asks you to set up a map link that is switched off.</>,
+      <>Settings, opened in a plain browser, speaks to a user (“this is the browser preview — install the app to log in”) instead of naming a developer command.</>,
+    ],
+    why: <>LEARNINGS/AUDIT-2026-09-23-ROUND2.md, items R6 and U1–U5: the polish a stranger would notice on a cold start, and the licence notices distribution law asks for.</>,
+    published: true,
+  },
+  {
+    version: '0.237.0', date: '2026-09-23', headline: 'Go-live is a check, not a ritual: nothing is published without a passing stamp; the policy page\'s cadences are held to the code; zKillboard answers are kept for the hour it asks',
+    changes: [
+      <><b>A go-live check the publish refuses to run without.</b> Before a version reaches the corp&apos;s copies and the public source, one script checks every value the app states about itself and prints a pass or fail line for each: the tree committed at the version, the newest release note, the whole fixture suite, both shareability guards with the owner&apos;s private list, the installer and its feed file, a dry run of the public source export (exactly which files would leave, scanned, none of them from the never-list), the installed app&apos;s own diagnostics for the last 24 hours (this version ran; no error; no security-policy refusal; every warning listed), the request meter&apos;s last daily line — and the three statements only a person can make: the policy page re-read, the changed help pages re-read, emergency or ordinary. It writes a stamp; the publish refuses without one for this version, younger than 30 minutes, made with the same decision. There is no flag to skip it.</>,
+      <><b>The policy page cannot drift from the code in its numbers either.</b> Every “every 55 s”, “every 30 minutes”, “1.1 s apart”, “an hour” on the ⚖ page is checked against the constant it describes on every check, alongside the host and service lists checked since 0.234.0.</>,
+      <><b>zKillboard asks clients to keep its answers for an hour; the app now does.</b> Opening Battle Reports or the Leaderboard again within the hour asks nothing — the answer is kept in memory for as long as zKillboard&apos;s own cache header says, and the policy page says so. The Collectors dashlet&apos;s zKillboard count is requests actually sent.</>,
+      <><b>The EVE login exchange is counted too.</b> Since 0.235.0 logins and token refreshes run in the main process, where the page&apos;s request meter could not see them; the main process now counts them and the ⚖ page&apos;s live table folds them in under “EVE login (CCP)”, with a row that says when the app talks to the login server.</>,
+      <>The project&apos;s rules are now organised by priority (never / the user&apos;s ISK and trust / the process that keeps those true / hygiene), with the go-live ritual written down as the check&apos;s contract.</>,
+    ],
+    why: <>LEARNINGS/AUDIT-2026-09-23-ROUND2.md, items P1, P2, P3, P4, R4, S3. Twice in one day a version was recorded as installed when its build had failed, because a person read a filtered log; a partner&apos;s complaint had already shown what an unchecked claim costs. The values the app states about itself are now held by a machine at every check and at every go-live.</>,
+    policy: <>zKillboard&apos;s API rules ask clients to “cache responses locally and space repeated requests out” and name a one-hour client cache for killmail queries; the app has spaced its requests since 0.199.1 and now keeps the answers as asked.</>,
+    published: true,
+  },
+  {
+    version: '0.236.0', date: '2026-09-23', headline: 'Round two of the audit, first batch: names out of the diagnostics log, no collector asks ESI during downtime, the public README told the truth about Aperture',
+    changes: [
+      <><b>Your characters&apos; names and ids stay out of the diagnostics log.</b> The planet watcher and the mining alert wrote character names into the log, and the “copy a bug report” button pastes the last 200 lines — its tooltip said “no character names”, which was not true of the log tail. Log lines now say “pilot #3” (the character&apos;s place in your team list), and the bug report replaces every logged-in character&apos;s name and id before it reaches your clipboard, whatever version wrote the line.</>,
+      <><b>Daily downtime is not a failure.</b> From 11:00 EVE for a quarter of an hour every read fails; the app asked anyway and logged a warning per character per collector (thirteen a day on a twelve-character team). No collector asks now; one line says the pause began. The planet watcher, when reads do fail, writes one summary line (“planet list unreadable for N of M characters”) instead of one per character.</>,
+      <><b>The README that ships with the public source</b> described the Aperture tab as an embedded map with its own login — the state of things before 0.216.0. It now says the tab is switched off and why, and carries a “Third parties — the owner rule” section that states what the app asks of each service.</>,
+      <>A link a page opens goes to your browser only if it is http or https; anything else is refused and logged. A stale code comment that described the corp killboard as “read as a page” — the very thing removed a hundred versions ago — is gone.</>,
+    ],
+    why: <>LEARNINGS/AUDIT-2026-09-23-ROUND2.md, items R1, R2, R3, R5, R7.</>,
+    published: true,
+  },
+  {
+    version: '0.235.0', date: '2026-09-23', headline: 'Your EVE logins are stored encrypted: the tokens leave the browser store for a vault the operating system locks to your account',
+    changes: [
+      <><b>Tokens at rest.</b> The access and refresh tokens behind each character&apos;s login sat in plaintext in the app&apos;s browser store, readable by anything that could read the profile folder. They now live in one encrypted file kept by the main process (Windows: encrypted under your Windows login with DPAPI; macOS: the Keychain), and the browser store carries none. The move happens by itself at the first start: the pairs already there go into the vault and the store is rewritten without them. Nothing to log in again.</>,
+      <><b>One pair for every window.</b> Logins and refreshes now run in the main process, one at a time per character: a pop-out window that needs a fresh token gets the vault&apos;s current pair instead of spending a refresh token of its own — EVE rotates refresh tokens, and two windows refreshing the same character could revoke each other. Backups never carried tokens and still do not.</>,
+      <>A machine without operating-system encryption (some Linux desktops) keeps the old behaviour and the diagnostics log says so at every start; a vault file that cannot be read is left alone and the log asks for a fresh login.</>,
+    ],
+    why: <>Audit item E4 (LEARNINGS/AUDIT-2026-09-23.md): “Tokens at rest in plaintext in localStorage (known, deferred since v0.199).”</>,
+    published: true,
+  },
+  {
+    version: '0.234.0', date: '2026-09-23', headline: 'The overlay window loads its own small page instead of the whole app; the policy page is now checked against the code by a fixture',
+    changes: [
+      <><b>A lighter overlay.</b> The always-on-top panel used to load the entire app bundle (4.3 MB of script, about 72 MB of memory for the page alone) and pick its own component at run time. It now has a page of its own that carries the panel and only what it uses. What it shows and how the main window feeds it are unchanged.</>,
+      <><b>The policy page cannot drift from the code again unnoticed.</b> A fixture reads the sources as text and holds three lists to each other: the hosts the security policy lets the page reach, the hosts the request meter can count, and the services the policy page names — every reachable host must be counted and named, and a service the policy cannot reach must say “no contact” on the page. It also checks that every release note is marked published and that the newest note matches the version.</>,
+    ],
+    why: <>Audit items F8 and F10 (LEARNINGS/AUDIT-2026-09-23.md): “The overlay window is a second full copy of the 4.3 MB app bundle” and “Nothing checks help and policy text against the code.”</>,
+    published: true,
+  },
+  {
+    version: '0.233.0', date: '2026-09-23', headline: 'A config file re-saved by Notepad no longer reads as empty: the hand-editable files accept a byte order mark and UTF-16, proved with real bytes',
+    changes: [
+      <><b>What was wrong.</b> Your setup (Documents → EVE Conductor → config.json), the portable clone labels and the haul log are meant to be edited by hand. Notepad, asked to save, writes “UTF-8 with BOM” or “UTF-16 LE” — and a file starting with that mark is not JSON to the reader, which quietly returned an empty setup: the EVE application id gone, the app asking to be set up again. The same mark at the start of a backup file made the import call it unreadable.</>,
+      <><b>What changed.</b> Every one of those readers now reads bytes, honours the mark (UTF-8, UTF-16 LE, UTF-16 BE), and only then parses. Nothing else about the files changes; the app still writes them plain.</>,
+      <><b>Proved with real bytes</b>, not strings: the fixture writes each file in each encoding, with Windows line ends, and reads every value back; a truncated file still reads as empty rather than crashing.</>,
+    ],
+    why: <>Audit item E6 (LEARNINGS/AUDIT-2026-09-23.md): “Fixtures for file readers do not use real bytes (the CRLF lesson): chat logs, config, hauls, clones readers have not been re-checked the way the game-log reader was.”</>,
+    published: true,
+  },
+  {
+    version: '0.232.0', date: '2026-09-23', headline: 'Housekeeping under the hood: every fixture now runs against the code that ships, the clone registry gets its fixture, and the trends watcher counts what it asks ESI',
+    changes: [
+      <><b>Fixtures against the shipped code, always.</b> Eight folders of frozen compiled copies had accumulated under the test suite, and nine fixture files ran against them instead of the live code — some copies were hundreds of lines behind. Every fixture now runs against the fresh compile the test runner produces; the frozen folders are gone. Two fixtures had to be brought up to date on the way (one stubbed a function the raid watcher no longer calls; one needed the engine stub its frozen folder used to carry) — no behaviour changed.</>,
+      <><b>The clone registry has a fixture</b> (14 checks): recording, the ninety-day prune with its 128-per-character cap that never evicts a named or alerted pod, name and colour validation, forgetting, the debounced atomic save, and a damaged registry file being moved aside rather than overwritten.</>,
+      <><b>Trends counts its books.</b> The watcher reads one live order book per distinct region-and-item among your orders every five minutes; that count was never recorded. It is now written to the diagnostics log whenever it changes — the number that decides the next step of audit item A4.</>,
+    ],
+    why: <>Audit items E7, E5 and A4 (LEARNINGS/AUDIT-2026-09-23.md).</>,
+    published: true,
+  },
+  {
+    version: '0.231.0', date: '2026-09-23', headline: 'Every money number in the Trade module walked against rule 1 — its basis written in the help, and three listing columns now say they are listings',
+    changes: [
+      <><b>A new help page, “Where every number comes from”</b> (ⓘ in the Trade module): every ISK figure on the Trade Finder, Auto Haul, Dashboard, My Orders, Trends, Radar, Item Explorer and the Home wealth tiles, with which of four kinds of evidence it rests on — executed trades, your own fees and pace, a live book with its timestamps, or a listing — and the source behind it.</>,
+      <><b>Three headers corrected in place.</b> Auto Haul&apos;s “Sell @” and the Item Explorer&apos;s “Sell”, “Spread” and “vs Jita” described listings without saying so; each now says it is a listing, not a trade, and points at the columns that are trades (Bought/Sold, Day vol).</>,
+      <>Everything else already said its basis in its header; the walk found no number computed from a lone listing and presented as an opportunity.</>,
+    ],
+    why: <>Audit item F9 (LEARNINGS/AUDIT-2026-09-23.md): “A rule-1 pass over every money number on screen was not part of this audit … nobody has walked every number with the test ‘traces to executed trades, own fees, own pace, or a live book timestamp — and says which’.”</>,
+    published: true,
+  },
+  {
+    version: '0.230.0', date: '2026-09-23', headline: 'Trading value is marked at what your goods actually sold for in Jita, not at the lowest listing; one unused login scope dropped',
+    changes: [
+      <><b>The mark behind “trading value”.</b> Hangar stock, goods in transit and the stock inside your sell orders were valued at the Jita ask — the lowest sell order, which is a listing, not a price (rule 1 of this app). They are now valued at what each item actually sold for in Jita over the last seven days: ISK filled divided by units filled, measured by the market radar from the full order book. An item with no measured sale is marked at your own cost for it; only an item with neither is marked at the Jita ask, and the diagnostics log records how many items fell into each basis at every snapshot.</>,
+      <><b>Expect a step on the chart</b> at the first snapshot on this version: earlier points cannot be re-marked (they store totals, not holdings). The step is the difference between listings and sales — which is the point.</>,
+      <>The tiles say the basis in their tooltips.</>,
+      <><b>Login asks for one scope fewer.</b> <code>esi-search.search_structures.v1</code> was requested and used by nothing. Characters already logged in keep their token as it is.</>,
+    ],
+    why: <>Audit items D2 and E3 (LEARNINGS/AUDIT-2026-09-23.md): “Net worth marks unsold stock, transit and listed sells at the Jita best ask — a listing … Rule 1: listings are not prices” and “An unused scope is requested at login.”</>,
+    published: true,
+  },
+  {
+    version: '0.229.0', date: '2026-09-23', headline: 'The radar\'s 137 MB summary becomes one compact file per region: half the bytes, and only the regions you watch are ever loaded',
+    changes: [
+      <><b>What it was.</b> The market radar&apos;s rolling summary — 31 days per item per region plus all-time hour clocks — was one 137 MB file for all five regions, parsed whole into memory at start (about half a gigabyte), rewritten whole every day, and baked whole into every installer twice over.</>,
+      <><b>What it is now.</b> One file per region, in a compact form without repeated field names (the same data measured at 130 MB → 65 MB). A region&apos;s file is read only when a screen asks for that region and rewritten only when that region had a day to roll over — an install watching Jita and Amarr never touches the other three.</>,
+      <><b>The change-over is checked.</b> At the first start the old file is split into region files, each read back and its entry count compared, and only then is the old file renamed and kept (Settings → Backup shows it under “Old radar files” with a Delete button). If anything fails the old file stays and the log says why; the app can still read it.</>,
+      <>Backups never carried the summary (too big for one JSON file); now every region file is left out for the same stated reason. The installer&apos;s seed is built per region too, so an update&apos;s newer history merges region by region.</>,
+    ],
+    why: <>Audit item B2 (LEARNINGS/AUDIT-2026-09-23.md): “radar-summary.json (136.8 MB) is parsed whole into the renderer and kept forever, and rewritten whole once a day … 493 MB heap … baked into the installer.”</>,
+    published: true,
+  },
+  {
+    version: '0.228.0', date: '2026-09-23', headline: 'Nothing fails in silence: eighteen swallowed write errors now log and count, and identical collector ticks stop filling the diagnostics log',
+    changes: [
+      <><b>A write the app carries on without is now said.</b> Eighteen places caught a failed write — a cache, a work-in-progress file, the raid history append, the radar&apos;s day rollover — and continued without a word, which was the right thing to do and the wrong thing to hide: a raid event or a whole radar day could vanish with no trace. Each now writes a warning to the diagnostics log (one per place per ten minutes, so a full disk cannot flood it) and the Collectors dashlet shows the count and the last one.</>,
+      <><b>The clock measurement from 0.227.0 is corrected.</b> It warned this install that its clock was “586 s ahead”, then “109 s ahead” — false. EVE&apos;s answers carry the right time, but the app&apos;s own HTTP cache replays an earlier answer, date and all, for as long as that answer is valid (item names: up to a day). The skew is now taken only from live answers (ones valid for a minute or less), as the best of the last fifteen minutes — a replayed answer can only make EVE look earlier, never later — and the warning needs three of them.</>,
+      <><b>The diagnostics log is readable again.</b> Every collector wrote “tick ok” on every run — the ship watcher alone 856 lines a day, the raid watcher 355, trends 178, planets 164 — and real events were buried. A tick is now written only when its result differs from the last written one, once an hour regardless (saying how many identical ticks went unwritten), or as the first success after a failure. Failures are always written.</>,
+    ],
+    why: <>Audit items E1 and E2 (LEARNINGS/AUDIT-2026-09-23.md): “259 silent catch sites … the ones that matter swallow failed disk writes” and “chatty logs: ship watch ‘tick ok’ 1,370/day … real events are buried.”</>,
+    published: true,
+  },
+  {
+    version: '0.227.0', date: '2026-09-23', headline: 'Your PC clock is measured against EVE\'s: raid windows, planet timers and order ages run on EVE time, and a clock more than 30 s off is said out loud',
+    changes: [
+      <><b>Skew is measured, not assumed.</b> Every answer from EVE&apos;s API carries the server&apos;s own time. The app now keeps the difference between that and your PC clock (the median of the last twelve answers, so one slow answer cannot move it) and shows it on the Collectors dashlet — “PC clock matches EVE time”, or by how much it is ahead or behind.</>,
+      <><b>What is corrected:</b> the raid watcher&apos;s windows and your own raid marks, the planet watcher&apos;s extractor expiry and alert timing, and the order-book heat (how fresh the front-line orders are). These compare an EVE timestamp with “now”, and “now” is EVE time from here on.</>,
+      <><b>Past 30 s</b> the status bar says your clock is off, by how much, and how to fix it (Windows → Time → Sync now); the diagnostics log records the crossing both ways.</>,
+      <>Not touched: the mining alert. The game log&apos;s lines are stamped by the EVE client, and whether that stamp follows your PC clock or the server&apos;s has not been established by measurement — so it is left alone rather than corrected by a guess.</>,
+    ],
+    why: <>Audit item F7 (LEARNINGS/AUDIT-2026-09-23.md): “Clock skew is never measured … A corp mate whose clock is minutes off gets false ‘not mining’ and stale flags with no explanation. ESI answers every call with a Date header.”</>,
+    published: true,
+  },
+  {
+    version: '0.226.0', date: '2026-09-23', headline: 'The trading ledger moves out of the browser store into a file in the stats folder — no quota, no silent stop, every failure logged',
+    changes: [
+      <><b>Where the ledger lives.</b> Every transaction, fee and order event the app has ever synced — the source of every profit number — was one value in the browser&apos;s local storage, rewritten whole at every wallet sync. Chromium caps that store at about 10 MB per app and this install&apos;s was already at 5 MB; at the cap the write throws, the wallet sync fails, and the ledger quietly stops growing. It is now <code>ledger-v1.json</code> in the stats folder (Documents → EVE Conductor Stats), written beside the old copy and renamed over it so a crash can never leave half a file.</>,
+      <><b>The move is checked, not assumed.</b> On first start the old copy is adopted, written to the file, read back and compared byte for byte, and only then removed from the browser store. If any step fails the old copy stays and the diagnostics log says so; the next start tries again.</>,
+      <><b>Nothing is written over an unread ledger.</b> The file is loaded once at start; a wallet sync waits for it, and a write before it (or after a damaged file refused to load) is refused and logged instead of replacing the file with an empty ledger. A pop-out window reads the ledger and never writes it.</>,
+      <>Backups still carry the ledger as their own field and merge by ids on import; the file itself is left out of the backup&apos;s file list (it would be a duplicate).</>,
+    ],
+    why: <>Audit item B4 (LEARNINGS/AUDIT-2026-09-23.md): “The trading ledger lives in localStorage, accumulates forever, is rewritten whole on every wallet sync, with no quota handling … the ledger — the source of every profit number — silently stops updating.”</>,
+    published: true,
+  },
+  {
+    version: '0.225.0', date: '2026-09-23', headline: 'The market radar sweeps only the regions you trade in — your traders\' duty hubs by default, or the hubs you tick in Settings — instead of all five built-in regions for everyone',
+    changes: [
+      <><b>What changed.</b> Every 30 minutes the radar reads the entire order book of each region it watches. Until now that was all five built-in hub regions for every install — measured on 2026-09-23 at 902 pages a sweep, <b>≈ 43,000 requests and ≈ 1.3 GB a day</b> — whichever markets you actually traded. From this version it watches the regions of your traders&apos; duty hubs (set in ⚙ Settings → EVE login), or Jita alone if no trader has one. Jita alone is ≈ 19,600 requests a day; Jita + Amarr ≈ 28,400.</>,
+      <><b>Choose for yourself</b> in ⚙ Settings → Market radar: untick “follow my traders&apos; duty hubs” and tick any hub, built-in or your own. Each hub shows what its region costs (pages a sweep, requests a day, measured on the last sweep), and the section totals your selection.</>,
+      <><b>If you want the other hubs back</b>, tick them — nothing else changes. A region&apos;s history only accumulates while it is watched, so the hub table&apos;s measured-flow columns for an unwatched region say “not watched” from now on (existing history stays visible on the Radar screen, marked “not watched now”).</>,
+      <>A trader whose duty hub is one of your own custom hubs is now followed too (before, only the built-in hubs counted).</>,
+      <>The 30-minute cadence is unchanged on purpose: it is the measurement&apos;s resolution — an order that appears and fills inside one window is invisible to a diff, so a slower sweep would under-count flow. The region choice is the lever.</>,
+    ],
+    why: <>Audit item A2 (LEARNINGS/AUDIT-2026-09-23.md): “The market radar pulls the entire order book of five regions every 30 minutes … regions are fixed to the five built-in hubs regardless of where the user trades.”</>,
+    published: true,
+  },
+  {
+    version: '0.224.1', date: '2026-09-23', headline: 'The security policy was refusing the fit catalog: its decoders are now generated at build time, and the engine may compile on the main thread',
+    changes: [
+      <><b>Fits score again under the policy.</b> 0.224.0&apos;s policy refused two real things at start: the catalog behind every fit screen (its protobuf library wrote decoders with <code>Function()</code> at run time — twelve refusals, and the catalog never loaded), and the fit engine&apos;s WebAssembly on the main thread. The decoders are now plain generated code shipped with the app (nothing is built from text at run time), and the policy allows WebAssembly compilation only — JavaScript <code>eval</code> stays refused.</>,
+      <><b>A catalog that fails to load now says so</b> in the diagnostics log, instead of every fit screen quietly showing nothing.</>,
+      <>The fit worker was never affected (a worker file carries no page policy), which is why the Skill &amp; Fit numbers computed there kept working while the screens that read the catalog directly did not.</>,
+    ],
+    why: <>Found in the installed 0.224.0&apos;s own diagnostics log within a minute of the install — the rule that a refused request is never silent did its job on its first day.</>,
+    published: true,
+  },
+  {
+    version: '0.224.0', date: '2026-09-23', headline: 'A Content-Security-Policy: the app can only load and talk to the services it names, and any refused request is written to the diagnostics log',
+    changes: [
+      <><b>The page now carries a security policy</b> — item 6 of Electron&apos;s own checklist, missing until now. Scripts, styles, fonts and workers may come only from the app itself; images only from CCP&apos;s image service; network requests only to ESI, EVE&apos;s login, CCP&apos;s images, Fuzzwork, zKillboard and ntfy.sh; no frames, no plugins. A script that somehow ran in the page could not send your tokens anywhere the policy does not list.</>,
+      <><b>Nothing refused is silent.</b> If the policy blocks a request, the app writes what was blocked and from where to the diagnostics log (⚙ Settings → Diagnostics), so a feature that stops working says why.</>,
+      <>One consequence: an ntfy topic must be on <i>ntfy.sh</i>; a self-hosted ntfy server is outside the policy. The Settings field says so.</>,
+    ],
+    why: <>Audit item F3 (LEARNINGS/AUDIT-2026-09-23.md): “No Content-Security-Policy … the standard belt against an injected script reaching ESI with the user&apos;s tokens.”</>,
+    published: true,
+  },
+  {
+    version: '0.223.0', date: '2026-09-23', headline: 'Electron 33 → 44: the browser engine and Node inside the app are current again after seventeen months without security patches',
+    changes: [
+      <><b>The runtime under everything is current.</b> The app had been built on Electron 33.4.11 (April 2025) — eleven major versions behind, and past the point where Electron patches it — so the Chromium and Node inside every installed copy had received no security fixes for over a year. This build is on Electron 44.4.5 (released yesterday) and electron-builder 26.15.3. Nothing you use changes.</>,
+      <><b>Dependency audit: 1 critical and 19 high → zero.</b> Almost all of the old findings lived in the build chain; two touched the app itself — Electron (an ASAR integrity bypass) and the updater library (a redirect that could leak a private token; the app has none). After this upgrade and the non-breaking fixes that came with it, <code>npm audit</code> reports nothing across the 464 packages.</>,
+    ],
+    why: <>Audit items F1 and F2 (LEARNINGS/AUDIT-2026-09-23.md): “Electron is 17 months old and out of support … the Chromium and Node inside every installed copy have had no security fixes for over a year.”</>,
+    published: true,
+  },
+  {
+    version: '0.222.0', date: '2026-09-23', headline: 'A linter, one test command, and a check that every build must pass — the kind of crash the audit found can no longer be written',
+    changes: [
+      <><b>Nothing reaches a build unchecked.</b> <code>npm run check</code> — the type check, the linter and all 2,000 fixtures in one command — now runs before every build, and a GitHub workflow runs it on every push to the private repository. Until now the fixtures were run by hand from a shell loop and nothing ran on push.</>,
+      <><b>A lint rule for the audit&apos;s crash.</b> Spreading a list into <code>Math.min</code> or <code>Math.max</code> throws past about 125,000 items; two lists in the app were on course to get there. Every one of the 83 remaining spread sites now goes through two small helpers that never throw, and the rule makes writing a new one an error.</>,
+      <><b>What the first lint pass found and fixed:</b> a helper named like a React hook, two variables that never changed, three stale lint directives, nine unused names in fixtures. What it deliberately does not enforce, and why, is written at the top of the config: the React-Compiler-readiness rules would mean rewriting dozens of working components for no behavioural gain. Seventeen hook-dependency warnings are recorded to be worked down.</>,
+    ],
+    why: <>Audit item F4 (LEARNINGS/AUDIT-2026-09-23.md): “no linter and no CI … the two Math.min time bombs are exactly what a lint rule catches.”</>,
+    published: true,
+  },
+  {
+    version: '0.221.0', date: '2026-09-23', headline: 'The overlay asks ESI for a third of what it did — and the app now counts every request it makes, by service, and shows you',
+    changes: [
+      <><b>Where every pilot is: one reader, asked only when it matters.</b> The overlay used to ask ESI for every character&apos;s ship and location on every 6-second tick — logged in or not, overlay window open or not — and the ship watcher asked for the same two things again every minute on its own: about 380,000 requests a day for a 12-character install, never counted. Now there is one shared reader: it asks the online flag first (every 55 s, or 5 min when nobody is watching), asks an <b>offline pilot for nothing else</b>, reads an online pilot live only while the overlay window is on screen or the mining watch is on (otherwise once a minute), trusts every answer for as long as ESI says to, and shares its answers with the ship watcher. The fixture that replays a full day — 12 characters, 4 online, overlay open — counts 132,000 requests where it counted 364,000.</>,
+      <><b>A request meter.</b> Aperture&apos;s developer had to tell us what the app cost their server; nobody here could have said. Every request this copy makes is now counted per service per day — ESI, CCP&apos;s image service, zKillboard, Fuzzwork, GitHub, ntfy — including the main process&apos;s zKillboard calls. The <b>Collectors</b> dashlet shows today&apos;s line; the policy page (⚖) shows today and yesterday beside the cadence each service is asked on and the numbers measured on the author&apos;s install; each closed day goes to the diagnostics log. Nothing is sent anywhere.</>,
+      <><b>The policy page says what the app does to CCP, with numbers</b> — the radar&apos;s 902 pages a sweep and ≈ 43,000 requests a day included, marked as the next thing on the list to reduce.</>,
+    ],
+    why: <>Audit items A1, A3, F6 and D3 (LEARNINGS/AUDIT-2026-09-23.md): “the single largest thing the app does to anyone”, and “no ESI request counter anywhere”.</>,
+    policy: <>Rule 22 asks for a measured request count per user per day for every service. This version is where the app starts producing that number itself instead of estimating it.</>,
+    published: true,
+  },
+  {
+    version: '0.220.0', date: '2026-09-23', headline: 'Audit fixes, first batch: a crash with a date on it, a backup that could not be written, hundreds of megabytes written for nothing, and a mining watch that trusted the wrong signal',
+    changes: [
+      <><b>Two crashes that were coming.</b> The Home raid dashlets and the leaderboard&apos;s timeline found the oldest of a list by spreading every entry into a single call — fine for a thousand, fatal past about 125,000 (measured). The raid log holds 55,000 verdicts and grows by 1,500 a day, so those dashlets would have gone blank within weeks; the leaderboard allows 150,000 killmails. Both now count with a loop; fixtures run 200,000 through each.</>,
+      <><b>Backup export works again.</b> It had grown to read 784 MB of files into one JSON string, which the engine refuses (“Invalid string length”), so pressing export failed. Files too big for a JSON backup, the raw radar rows and the public killmail archive are now left out and <b>named</b> in the result; everything that matters — settings, ledger, logins without tokens, raid history, ship history, fit backups — is carried.</>,
+      <><b>The radar stops writing what nothing reads.</b> Every day it appended a raw row per item and side to <i>radar-YYYY-MM.ndjson</i> — 327 MB for August, 233 MB so far this month, 4 GB a year — and nothing in the app ever read them (the 31-day summary is what every screen uses). No longer written. <b>⚙ Settings → Backup</b> now shows the old files and their size with one button to delete them; the app deletes nothing by itself. The raid watcher&apos;s raw experiment trail (35,000 lines, no reader) is gone the same way.</>,
+      <><b>The mining watch no longer trusts ESI&apos;s “online” flag.</b> That flag lags minutes behind a login, and a character it called offline was set idle even while their mining lines were arriving. The lines are the truth now; the flag can only explain a silence (a pilot who logged off is not “not mining”), never stop the watch. Same rule the app already had for everything else — never gate on a lag-prone advisory check.</>,
+    ],
+    why: <>The owner: “find other horrible/messy implementations such as this and list them out … get to work on what you have in your list so far.” These are the first five of the audit list (LEARNINGS/AUDIT-2026-09-23.md: C1, B5, B1, B3, D1), each measured before and after.</>,
+    published: true,
+  },
+  {
+    version: '0.219.0', date: '2026-09-23', headline: 'An update you already downloaded now installs at the next start — closing the gap Aperture’s developer found; the removed Aperture code archived with its re-enable checklist',
+    changes: [
+      <><b>Updates that were downloaded but never installed.</b> An update installs when the app quits properly. Close it from Task Manager instead and nothing is installed; the next start finds the same download, shows the banner again, and waits for a quit that never comes — Aperture&apos;s developer hit exactly this on his test install. Now, when the app starts and finds an update it had already downloaded in an <b>earlier</b> run, it installs it at once: a 20-second green banner says so, the app closes for a few seconds and comes straight back. A download made in the current run still waits for your restart, as before; an emergency release still installs itself within the minute.</>,
+      <><b>Aperture: nothing changed for you</b> — the app still does not contact it. For the record: the removed code is archived in the private repository with the data contract the features need and a seven-step checklist for turning them back on <i>only</i> through an official Aperture API, once its developer provides one and is happy with the method; and a post-mortem of how the old design came about was written for the project.</>,
+    ],
+    why: <>Aperture&apos;s developer: “It did show me the new version banner up top but didn&apos;t update itself even after force-closing and restarting … didn&apos;t update even after quitting from the task manager. Might be worth taking a look at some point.” The owner: “Yeah definitely will.”</>,
+    policy: <>The rule for self-installing updates is unchanged: the release feed can only make a published release install sooner. The new case installs something the user&apos;s own copy had already downloaded and shown a banner for; it cannot run anything else.</>,
+    published: true,
+  },
+  {
+    version: '0.218.0', date: '2026-09-23', headline: 'Mining alert: the false “rate down” and “not mining” warnings are fixed — the app was losing one game-log line per read',
+    changes: [
+      <><b>What was wrong.</b> The mining watch counts the “You mined …” line each laser writes to the character&apos;s game log. The reader that follows those files dropped the <b>last line of every chunk it read</b>: EVE writes its logs with Windows line endings, the reader left the carriage return on the final line of each read, and the parser then refused that line. With the app reading every six seconds, that was the last line of almost every laser cycle — roughly half of a miner&apos;s lines never arrived. The watch then saw a thin, irregular stream: it mis-measured cycle lengths (29 s for lasers cycling every 15), set “normal” from the fuller windows, and called the rest “rate down”; a single-laser miner, whose every cycle was one line, looked silent for a minute at a time and was called “not mining”.</>,
+      <><b>Why it looked tied to crits.</b> A critical-success or residue line is written right after the cycle&apos;s own line, in the same second — so whenever there was one, <i>it</i> was the last line of the chunk and got dropped instead, and the real cycle line survived. Windows with crits counted full; windows without them counted short. The crits were not the cause, but they were exactly where the counts differed.</>,
+      <><b>Measured, before and after.</b> Fed one of the owner&apos;s real session files (203 mining lines) through the real reader in random-sized chunks: 109 lines lost; through the fixed reader in every pattern tried (one byte at a time, 4 KB flushes, whole bursts, the whole file): every line, once. Replaying the same session through the alert rule with every line present gives <b>one</b> alert in twenty minutes — a laser that really did stop for four minutes — where the installed app had raised twelve. A four-minute watch of the live files also showed the client writes each line within 0–3 s of its timestamp, so nothing else is delayed.</>,
+      <><b>Also hardened:</b> the parser itself now ignores a trailing carriage return or a byte-order mark on any line, so no reader can lose a line this way again; the fixtures now use the client&apos;s real line endings (they had used bare line feeds, which is why this was never caught).</>,
+    ],
+    why: <>“The mining warnings are totally messed up. They tell you rate is down even when it is only down because of crits prior to that point. Very annoying.”</>,
+    published: true,
+  },
+  {
     version: '0.217.0', date: '2026-09-21', headline: 'An audit of every outside service the app talks to: two more unasked-for integrations removed, a false statement corrected — and emergency updates that install themselves',
     changes: [
       <><b>The storm tracker is gone.</b> The Theft Conductor drew metaliminal-storm chips by fetching EvE-Scout Rescue&apos;s storm-track <i>web page</i> (up to every 30 minutes). That site has no API and nobody there had agreed to a tool reading its pages, so the fetch and the chips are removed. Incursion chips stay — they come from CCP&apos;s own API.</>,

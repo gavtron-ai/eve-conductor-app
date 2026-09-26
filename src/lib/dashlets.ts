@@ -6,11 +6,10 @@
 // and its title bar opens the tab that has the full story.
 import type { DashSize } from './homeGrid';
 import { BOARDS } from './leaderboard';
+import { APERTURE_FEATURES_AVAILABLE } from './apertureAccess';
 
 export type DashCategory = 'chain' | 'harvest' | 'theft' | 'planets' | 'wealth' | 'market' | 'battle' | 'corp' | 'pilots' | 'app';
 export const CATEGORIES: { id: DashCategory; label: string; icon: string; blurb: string }[] = [
-  { id: 'chain', label: 'Chain', icon: '🕸', blurb: 'what is out there, from your corp map' },
-  { id: 'harvest', label: 'Harvest', icon: '⛏', blurb: 'ore, gas and your own loot log' },
   { id: 'theft', label: 'Theft', icon: '🪝', blurb: 'skyhook raid windows and the robberies seen' },
   { id: 'planets', label: 'Planets', icon: '🪐', blurb: 'what needs a trip, and what is on the ground' },
   { id: 'wealth', label: 'Wealth', icon: '💰', blurb: 'what you are worth and what you earned' },
@@ -19,6 +18,9 @@ export const CATEGORIES: { id: DashCategory; label: string; icon: string; blurb:
   { id: 'corp', label: 'Corp', icon: '🏆', blurb: 'the leaderboard and the corp at a glance' },
   { id: 'pilots', label: 'Pilots', icon: '🧑‍🚀', blurb: 'your characters: where, in what, logged in?' },
   { id: 'app', label: 'Utility', icon: '🧰', blurb: 'the clock, notes, shortcuts, the app\'s health' },
+  // v0.243.0: the two shelves that live off the corp map come last — the map link is switched off (Help → Aperture)
+  { id: 'harvest', label: 'Harvest', icon: '⛏', blurb: 'ore, gas and your own loot log — the ore and gas finders need the corp map, which is switched off' },
+  { id: 'chain', label: 'Chain', icon: '🕸', blurb: 'what is out there, from your corp map — switched off with the Aperture link (Help → Aperture says why)' },
 ];
 
 export interface DashOption {
@@ -51,7 +53,7 @@ const DAYS_1_7_30 = pick('range', 'range', '7', [['1', '24 hours'], ['7', '7 day
 const SALES_RANGE = pick('range', 'range', '1', [['1', '24 hours'], ['7', '7 days'], ['30', '30 days']]);
 const KILL_RANGE = pick('range', 'range', '7', [['1', '24 hours'], ['3', '3 days'], ['7', '7 days'], ['30', '30 days'], ['90', '90 days'], ['365', '1 year']]);
 const RAID_RANGE = pick('range', 'range', '7', [['1', '24 hours'], ['7', '7 days'], ['30', '30 days']]);
-const MAP = 'your corp map set up in Aperture';
+const MAP = 'the Aperture map link — switched off since 0.216.0 (Help → Aperture says why)';
 const TRADER = 'a trading character, logged in';
 const PI = 'a character with planets, logged in';
 const BOARD = 'the Leaderboard opened once (it keeps what it read)';
@@ -73,7 +75,7 @@ export const DASHLETS: DashletSpec[] = [
     options: [pick('rock', 'ore', 'Gneiss', ROCKS.map((r) => [r, r] as [string, string]))] },
   { id: 'chain-gas', category: 'harvest', icon: '💨', title: 'Gas finder', blurb: 'Where is the C320? The nearest gas sites carrying one fullerite, valued on that gas alone.', sizes: ['S', 'M', 'L'], dest: 'aperture:summary', needs: MAP,
     options: [pick('gas', 'gas', 'C320', GASES.map((g) => [g, g] as [string, string]))] },
-  { id: 'hauls', category: 'harvest', icon: '🎒', title: 'My hauls', blurb: 'What you actually brought home: the loot you logged, this month and in all.', sizes: ['S', 'M'], dest: 'aperture:summary', needs: 'hauls logged with ＋ haul in the Σ Summary' },
+  { id: 'hauls', category: 'harvest', icon: '🎒', title: 'My hauls', blurb: 'What you actually brought home: the loot you logged, this month and in all.', sizes: ['S', 'M'], dest: 'aperture:summary', needs: 'hauls logged with ＋ haul in the Σ Summary — switched off with the Aperture link, so nothing new can be logged for now' },
   { id: 'mining-fleet', category: 'harvest', icon: '🚜', title: 'Mining fleet', blurb: 'Who is pulling rock and who has stopped — the mining alert\'s own view of your miners.', sizes: ['M', 'L'], dest: '', needs: 'the multibox overlay on, with its ⛏ mining alert enabled' },
   // ---- theft
   { id: 'raid-windows', category: 'theft', icon: '🪝', title: 'Raid windows', blurb: 'Skyhooks that can be robbed now or within the hour, nearest first.', sizes: ['S', 'M', 'L'], dest: 'theft:skyhooks', needs: 'nothing — public data; import your map in Skyhooks for distances' },
@@ -152,3 +154,23 @@ export function dashTitle(spec: DashletSpec, cfg: Record<string, string> | undef
   const range = spec.options?.some((o) => o.key === 'range') ? choiceLabel(spec, cfg, 'range') : '';
   return range ? `${base} · ${range}` : base;
 }
+
+// ---- WHAT CANNOT WORK TODAY (v0.245.0)
+/** the store's banner and the reason the ＋ add button is off; said in full because a stranger reads it first */
+export const UNAVAILABLE_REASON = 'Temporarily unavailable — the Aperture map link is switched off while how the app works with Aperture is reworked with its developer (Help → Aperture says why). The app does not contact Aperture at all; this dashlet comes back with the integration.';
+/** why a dashlet cannot work right now, or null. The chain shelf and the ore/gas finders read the corp map,
+ * and the haul log is fed from the Σ Summary — all switched off with the Aperture link. The store dims these,
+ * shows the reason, will not add them; the starter board skips them. When the integration returns
+ * (APERTURE_FEATURES_AVAILABLE), every one of them comes back by itself. */
+export function dashletUnavailable(spec: DashletSpec): string | null {
+  if (APERTURE_FEATURES_AVAILABLE) return null;
+  return spec.needs === MAP || spec.id === 'hauls' ? UNAVAILABLE_REASON : null;
+}
+/** what "✨ start me off" lays down: one of each shelf, sized to read well together */
+export const STARTER: [string, DashSize][] = [
+  ['chain-isk', 'L'], ['chain-ways', 'L'], ['raid-windows', 'L'], ['eve-clock', 'S'], ['logins', 'S'],
+  ['pi-planets', 'M'], ['net-worth', 'M'], ['chain-exits', 'M'],
+  ['lb-medals', 'L'], ['kill-feed', 'L'], ['profit-days', 'M'], ['pi-resets', 'M'], ['market-events', 'M'], ['shortcuts', 'M'],
+];
+/** the starter list minus what cannot work today (v0.245.0) */
+export const starterItems = (): [string, DashSize][] => STARTER.filter(([kind]) => { const s = dashletOf(kind); return !s || dashletUnavailable(s) === null; });

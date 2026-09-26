@@ -13,7 +13,9 @@ const eq = (label, got, want) => {
   if (JSON.stringify(got) === JSON.stringify(want)) pass++;
   else { fail++; console.error(`FAIL ${label}\n  got:  ${JSON.stringify(got)}\n  want: ${JSON.stringify(want)}`); }
 };
-const NL = String.fromCharCode(10);
+// CRLF — what the EVE client actually writes (measured 2026-09-23: 364 CR, 363 LF in a session file).
+// The fixture used LF alone until v0.218.0, and so never saw the reader lose the last line of every chunk.
+const NL = String.fromCharCode(13, 10);
 
 // ---- 1. readFrom on disk --------------------------------------------------------
 const docs = fs.mkdtempSync(path.join(os.tmpdir(), 'evegl-'));
@@ -91,6 +93,33 @@ fs.writeFileSync(full, header + line('12:03:00', 'You mined 137 units of Gneiss 
     feed.adoptFiles(st, [meta('20260915_121500_1001.txt', '1001', 'Alpha', NOW + 900_000)], NOW + 900_000);
     eq('I7 a newer session file replaces the followed one', [st.tracked.get(1001).file, st.tracked.get(1001).offset], ['20260915_121500_1001.txt', 0]);
     eq('I8 characters no longer listed are dropped', st.tracked.has(1002), false);
+    // ---- 3. CHUNKED DELIVERY (v0.218.0): every mining line exactly once, however the bytes land ----
+    // The bug: the last line of each chunk kept its CR and did not parse. Two write patterns: the
+    // client's own (whole lines, each poll ending exactly after a CRLF) and arbitrary byte splits.
+    {
+      const N = 60;
+      let body = header;
+      for (let k = 0; k < N; k++) body += line(`13:${String(Math.floor(k / 4)).padStart(2, '0')}:${String((k % 4) * 15).padStart(2, '0')}`, `You mined ${100 + k} units of Gneiss IV-Grade`) + NL;
+      const stamps = (got) => got.map((x) => new Date(x.t).toISOString().slice(11, 19));
+      const want = []; for (let k = 0; k < N; k++) want.push(`13:${String(Math.floor(k / 4)).padStart(2, '0')}:${String((k % 4) * 15).padStart(2, '0')}`);
+      const run = async (label, chunker) => {
+        const buf = Buffer.from(body, 'utf8'); let pos = 0; let now = NOW; const st3 = feed.emptyFeed(); const got = [];
+        disk.set('20260915_120000_1003.txt', '');
+        const br = { list: async () => ({ ok: true, files: [meta('20260915_120000_1003.txt', '1003', 'Charlie', now)] }), readFrom: bridge.readFrom };
+        while (pos < buf.length) {
+          const n = Math.min(buf.length - pos, chunker(pos)); disk.set('20260915_120000_1003.txt', buf.subarray(0, pos + n).toString('utf8')); pos += n;
+          got.push(...await feed.pollMiningSamples(st3, br, now)); now += 6000;
+        }
+        eq(label, stamps(got), want);
+      };
+      // whole lines per poll — the client's pattern: each chunk ends right after a CRLF
+      const ends = []; { let p = 0; for (const l of body.split(NL)) { p += Buffer.byteLength(l, 'utf8') + 2; ends.push(p); } }
+      let e = 0; await run('K1 one whole burst per poll: no line lost', (pos) => { while (e < ends.length && ends[e] <= pos) e++; return (ends[e] ?? Buffer.byteLength(body, 'utf8')) - pos; });
+      await run('K2 one line per byte-sized poll', () => 1);
+      let seed = 11; const rnd = () => { seed = (seed * 1103515245 + 12345) & 0x7fffffff; return seed / 0x7fffffff; };
+      await run('K3 arbitrary chunks (1..300 bytes, seeded)', () => 1 + Math.floor(rnd() * 300));
+      await run('K4 the whole file at once', () => 1e9);
+    }
     console.log(`gamelogread.test: ${pass} passed, ${fail} failed`);
     fs.rmSync(docs, { recursive: true, force: true });
     process.exit(fail === 0 ? 0 : 1);

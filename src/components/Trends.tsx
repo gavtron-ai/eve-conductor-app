@@ -9,7 +9,7 @@ import {
 import { useFreshness, countdown } from '../lib/freshness';
 import { getSystem } from '../lib/mapdata';
 import { getType } from '../lib/typedb';
-import { ledger } from '../lib/ledger';
+import { ledger, useLedger } from '../lib/ledger';
 import { useSort } from '../lib/useSort';
 import { iskShort, int } from '../lib/format';
 import Tip from './Tip';
@@ -17,6 +17,7 @@ import ItemDetailModal from './ItemDetailModal';
 
 type CoreKind = 'outbid_sell' | 'outbid_buy' | 'sale';
 import { computeSchedules, best3h, ADVICE_WINDOW_MS } from '../lib/schedule';
+import { maxOf, minOf } from '../lib/nums';
 
 const CORE = new Set<string>(['outbid_sell', 'outbid_buy', 'sale']);
 const RIVAL = new Set<string>(['rival_new', 'rival_reprice', 'rival_gone']);
@@ -106,7 +107,7 @@ function addEvent(s: KindStats, e: TrendEvent): void {
 
 /** one-hue sequential strip (magnitude): darker/denser = more events */
 function Strip({ counts, labels, unit, ticks }: { counts: number[]; labels: string[]; unit: string; ticks?: boolean }) {
-  const max = Math.max(1, ...counts);
+  const max = Math.max(1, maxOf(counts));
   return (
     <span className="trend-strip-wrap">
       <span className="trend-strip">
@@ -134,6 +135,7 @@ const HOUR_LABELS = new Array(24).fill(0).map((_, h) => {
 });
 
 export default function Trends() {
+  useLedger((st) => st.version); // re-render when the ledger is restored or written
   const characters = useAuth((s) => s.characters);
   const trendsFresh = useFreshness((s) => s.sources['trends']);
   const [events, setEvents] = useState<TrendEvent[] | null>(null);
@@ -301,7 +303,7 @@ export default function Trends() {
         r.reactors = perLineage.length;
         if (perLineage.length > 0) {
           const meds = perLineage.map(median);
-          r.respFastest = Math.min(...meds);
+          r.respFastest = minOf(meds);
           r.respTypical = median(meds);
         }
         const hours = repriceHours.get(r.typeId);

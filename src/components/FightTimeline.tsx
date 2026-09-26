@@ -17,6 +17,7 @@
 import { useMemo, useRef, useState } from 'react';
 import type { EventBattleResult, TimelineEntry } from '../lib/battleEvents';
 import { rosterColours } from '../lib/teamColours';
+import { maxOf } from '../lib/nums';
 
 type Mode = 'hp' | 'cap' | 'range' | 'transversal' | 'sig';
 
@@ -154,7 +155,7 @@ export default function FightTimeline({ fight, hideEventsFor }: {
   // fractional modes are 0..1; metric modes scale to their own maximum
   const fractional = mode === 'hp' || mode === 'cap';
   const yMax = fractional ? 1
-    : Math.max(1, ...fight.series.flatMap((p) => ids.map((id) => p[mode][id] ?? 0)));
+    : Math.max(1, maxOf(fight.series.flatMap((p) => ids.map((id) => p[mode][id] ?? 0))));
 
   const sy = (v: number) => chartBottom - Math.max(0, Math.min(1, v / yMax)) * (chartBottom - PAD_T);
 
@@ -191,11 +192,11 @@ export default function FightTimeline({ fight, hideEventsFor }: {
     const hasPos = shownPoint.pos !== undefined
       && attackerIds.every((id) => shownPoint.pos![id] !== undefined);
     const rmax = hasPos
-      ? Math.max(2000, ...ids.map((id) => {
+      ? Math.max(2000, maxOf(ids.map((id) => {
         const p = shownPoint.pos![id];
         return p ? Math.hypot(p[0], p[1]) : 0;
-      }))
-      : Math.max(2000, ...attackerIds.map((id) => shownPoint.range[id] ?? 0));
+      })))
+      : Math.max(2000, maxOf(attackerIds.map((id) => shownPoint.range[id] ?? 0)));
     const rpx = (m: number) => Math.sqrt(Math.min(m, rmax) / rmax) * (RC - RPAD);
     const deadAt = (id: string) => {
       const ship = fight.ships.find((x) => x.id === id);
@@ -431,7 +432,7 @@ export default function FightTimeline({ fight, hideEventsFor }: {
             else if (pin.n > 1 && numeric) {
               lines.push(`${landed.toLocaleString()}${full > 0 ? ` of ${full.toLocaleString()}` : ''} GJ total`);
             }
-            const boxW = Math.max(...lines.map((l) => l.length)) * 5.8 + 18;
+            const boxW = maxOf(lines.map((l) => l.length)) * 5.8 + 18;
             const boxH = lines.length * 13 + 10;
             const iconMidX = pin.x + pin.w / 2;
             const bx = Math.max(PAD_L + 2, Math.min(iconMidX - boxW / 2, W - PAD_R - boxW - 2));

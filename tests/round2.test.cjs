@@ -1,3 +1,5 @@
+// v0.232.0 (audit E7): runs against the fresh sim/lib compile the runner produces — until then a frozen
+// copy in tests/sch (up to 300 lines behind the shipped code) kept these passing on old behaviour.
 // Fixtures for the round-2 fixes, against the SHIPPED compiled modules.
 //
 //  A. freshness.fail() — a collector that has NEVER succeeded used to write
@@ -28,7 +30,7 @@ const near = (label, got, want, tol) => {
 };
 
 // ===== A. THE RETRY LOOP =================================================
-const { useFreshness } = require('./sch/freshness.js');
+const { useFreshness } = require('./sim/lib/freshness.js');
 const F = () => useFreshness.getState();
 
 eq('a brand-new collector key has no entry', F().sources['raidwatch'], undefined);
@@ -55,7 +57,7 @@ F().fail('raidwatch');
 near('...so the next failure starts over at 2 min', F().sources['raidwatch'].nextAt - Date.now(), 120_000, 2000);
 
 // ===== B. PER-SYSTEM TRACKING AGE ========================================
-const { computeSchedules } = require('./sch/schedule.js');
+const { computeSchedules } = require('./sim/lib/schedule.js');
 const DAY = 86_400_000;
 const now = Date.now();
 const ev = (t, kind, systemId, extra = {}) => ({

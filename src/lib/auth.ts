@@ -1,4 +1,5 @@
 import { create } from 'zustand';
+import { pilotHandle } from './redact';
 import { persist } from 'zustand/middleware';
 import { DEFAULT_CLIENT_ID } from './constants';
 
@@ -29,7 +30,17 @@ interface SsoTokens {
 
 interface SsoBridge {
   login: (clientId: string) => Promise<SsoTokens>;
-  refresh: (clientId: string, refreshToken: string) => Promise<SsoTokens>;
+  refresh: (clientId: string, refreshToken: string, characterId?: number) => Promise<SsoTokens>;
+  /** main's own login-host request count for the UTC day (v0.237.0; in memory — resets with the app) */
+  meter?: () => Promise<{ day: string; count: number }>;
+}
+
+/** the main process's encrypted token vault (v0.235.0, audit E4) */
+interface TokensBridge {
+  available: boolean;
+  load: () => Promise<Record<string, { accessToken: string; refreshToken: string; expiresAt: number; characterName: string }>>;
+  save: (list: { characterId: number; characterName: string; accessToken: string; refreshToken: string; expiresAt: number }[]) => Promise<number>;
+  forget: (characterId: number) => Promise<boolean>;
 }
 
 interface StatsBridge {
@@ -42,7 +53,10 @@ interface StatsBridge {
   auxRead: (name: string) => Promise<string | null>;
   auxAppend: (name: string, lines: string[]) => Promise<void>;
   /** all radar/aux files (for backups) — optional: older shells lack it */
-  auxFiles?: () => Promise<{ name: string; content: string }[]>;
+  /** files a backup can carry — and the ones left out, named, with why (v0.220.0) */
+  auxFiles?: () => Promise<{ files: { name: string; content: string }[]; skipped: SkippedAux[] }>;
+  radarMonths?: () => Promise<{ name: string; size: number }[]>;
+  deleteRadarMonths?: () => Promise<{ deleted: number; bytes: number }>;
   /** aux file NAMES only (+size/mtime) — listing without loading contents */
   auxNames?: () => Promise<{ name: string; size: number; mtime: number }[]>;
 }
@@ -61,7 +75,7 @@ interface DevLogBridge {
 
 interface UpdatesBridge {
   /** a new version finished downloading in the background; installs on quit */
-  onReady: (cb: (info: { version: string; emergency?: boolean; reason?: string; installAt?: number }) => void) => void;
+  onReady: (cb: (info: { version: string; emergency?: boolean; pending?: boolean; reason?: string; installAt?: number }) => void) => void;
   /** quit now and install the downloaded update */
   restart: () => Promise<void>;
 }
@@ -70,6 +84,8 @@ interface BackupBridge {
   /** native save dialog; returns the saved path or null if cancelled */
   save: (defaultName: string, content: string) => Promise<string | null>;
 }
+
+export interface SkippedAux { name: string; size: number; why: string }
 
 interface WinBridge {
   /** keep the app window above every other application */
@@ -121,6 +137,7 @@ declare global {
       /** the exact callback URL the login server binds (main process owns it) */
       ssoCallback?: string;
       sso?: SsoBridge;
+      tokens?: TokensBridge;
       stats?: StatsBridge;
       devlog?: DevLogBridge;
       updates?: UpdatesBridge;
@@ -171,8 +188,12 @@ declare global {
         killRef?: (killId: number) => Promise<{ killmail_id: number; hash: string; value: number; time: number; victimCharId: number; victimShipId: number } | null>;
         /** losses of ONE hull by a character, corporation or alliance (v0.203.1) */
         shipLosses?: (kind: 'character' | 'corporation' | 'alliance', id: number, shipTypeId: number) => Promise<{ killmail_id: number; hash: string; value: number; time: number; victimCharId: number; victimShipId: number }[]>;
+        /** main's own zKillboard request count for the UTC day (in memory — resets with the app) */
+        meter?: () => Promise<{ day: string; count: number }>;
         systemKills: (systemId: number, pastSeconds?: number) => Promise<{ killmail_id: number; hash: string; value: number; locationId: number; npc: boolean }[]>;
       };
+      /** the third-party licence notices shipped with the app (v0.238.0) — Help → About */
+      notices?: { read: () => Promise<string | null> };
       /** the OS clipboard, read-only — Aperture auto-import watches it */
       clipboard?: {
         read: () => Promise<string>;
@@ -284,6 +305,10 @@ const blankChar = (t: SsoTokens): CharAccount => ({
   lastSync: null,
 });
 
+// TOKENS AT REST (v0.235.0, audit E4) — see the persist options below and restoreTokens()
+const vaultOn = (): boolean => Boolean(window.appInfo?.tokens?.available);
+let restoreOnce: Promise<void> | null = null;
+
 export const useAuth = create<AuthState>()(
   persist(
     (set) => ({
@@ -332,6 +357,7 @@ export const useAuth = create<AuthState>()(
       setActive: (charId) => set({ activeId: charId }),
       removeCharacter: (charId) =>
         set((s) => {
+          void window.appInfo?.tokens?.forget(charId); // the vault forgets with the store
           const characters = s.characters.filter((c) => c.characterId !== charId);
           return {
             characters,
@@ -343,6 +369,13 @@ export const useAuth = create<AuthState>()(
     {
       name: 'eve-trade-conductor-auth',
       version: 5,
+      // TOKENS AT REST (v0.235.0, audit E4): with the main process's vault available, the persisted
+      // blob carries NO tokens — they live in memory and in userData/tokens.enc (safeStorage). On a
+      // machine without encryption the blob keeps them, as before, and the log says so at start.
+      partialize: (s) => (vaultOn() ? { ...s, characters: s.characters.map((c) => ({ ...c, accessToken: null, refreshToken: null })) } : s),
+      // deferred a tick: the middleware hydrates synchronously inside create(), before the rest of
+      // this module has run
+      onRehydrateStorage: () => () => { setTimeout(() => { void restoreTokens(); }, 0); },
       // v3: multi-character. Older saves held a single character at the root —
       // wrap it into characters[0] so nothing is lost.
       // v4: clear a stored Client ID that matches the OLD baked-in default —
@@ -397,6 +430,30 @@ export const useAuth = create<AuthState>()(
   ),
 );
 
+/** after the store rehydrates: take the vault's pairs into memory; on the first run after the
+ * upgrade, move the pairs the old blob still carries INTO the vault, then rewrite the blob without them */
+export function restoreTokens(): Promise<void> {
+  if (!restoreOnce) restoreOnce = doRestoreTokens();
+  return restoreOnce;
+}
+async function doRestoreTokens(): Promise<void> {
+  const bridge = window.appInfo?.tokens;
+  if (!bridge || !bridge.available) return;
+  const stored = await bridge.load();
+  const chars = useAuth.getState().characters;
+  const toVault = chars.filter((c) => c.accessToken && c.refreshToken && !stored[String(c.characterId)]);
+  if (toVault.length > 0) {
+    await bridge.save(toVault.map((c) => ({ characterId: c.characterId, characterName: c.characterName, accessToken: c.accessToken as string, refreshToken: c.refreshToken as string, expiresAt: c.expiresAt })));
+  }
+  const merged = await bridge.load();
+  useAuth.setState((s) => ({
+    characters: s.characters.map((c) => {
+      const v = merged[String(c.characterId)];
+      return v ? { ...c, accessToken: v.accessToken, refreshToken: v.refreshToken, expiresAt: v.expiresAt } : c;
+    }),
+  })); // this write also rewrites the persisted blob through partialize — token-free from here on
+}
+
 /** the character the app acts as (null when logged out) */
 export function activeChar(): CharAccount | null {
   const s = useAuth.getState();
@@ -416,6 +473,9 @@ export function getChar(charId: number): CharAccount | null {
 // Several of the user's characters share a first word ("Brad's …"), so the
 // old first-word shorthand was ambiguous. Nickname wins everywhere; the
 // fallback stays the first word of the real name.
+
+/** the anonymous log handle for a character ("pilot #3") — names and ids stay out of the log (v0.236.0) */
+export const pilotHandleOf = (charId: number): string => pilotHandle(useAuth.getState().characters, charId);
 
 /** duty shorthand: "J-Trader" / "A-Trader" / "Hauler" — null when no duty set */
 export function dutyLabel(c: CharAccount): string | null {
@@ -472,7 +532,7 @@ async function doRefresh(charId: number): Promise<string> {
   if (!refreshInFlight.has(charId)) {
     refreshInFlight.set(
       charId,
-      bridge.refresh(effectiveClientId(), c.refreshToken).finally(() => {
+      bridge.refresh(effectiveClientId(), c.refreshToken, charId).finally(() => {
         refreshInFlight.delete(charId);
       }),
     );

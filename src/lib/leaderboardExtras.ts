@@ -2,6 +2,7 @@
 // definitions as lib/leaderboard.ts: a pilot's card, the hall of fame, the corp's days, and the
 // text a player pastes into chat.
 import { BOARDS, CAPSULES, corpRows, medalTable, pilotStats, rankBoard, windowMails, type BoardInput, type LbMail, type MedalRow, type PilotStats, type ShipClass } from './leaderboard';
+import { maxOf } from './nums';
 
 const dayKey = (ms: number) => new Date(ms).toISOString().slice(0, 10);
 const isLoss = (m: LbMail, corpId: number) => m.victim.corp === corpId && m.victim.char > 0;
@@ -93,7 +94,7 @@ export function hallOfFame(inp: BoardInput): HallOfFame {
     if (!biggestKill || m.value > biggestKill.value) biggestKill = { chars: [...rows.keys()].sort((a, b) => a - b), value: m.value, mail: m.id, ship: m.victim.ship };
     for (const [c, a] of rows) if ((a.dmg ?? 0) > 0 && (!hardestHit || (a.dmg ?? 0) > hardestHit.value)) hardestHit = { chars: [c], value: a.dmg ?? 0, mail: m.id, ship: m.victim.ship };
   }
-  const bestStreak = Math.max(0, ...stats.map((s) => s.streak));
+  const bestStreak = Math.max(0, maxOf(stats.map((s) => s.streak)));
   // fights: the given ones, plus every loose mail as a fight of its own
   const inFight = new Set<number>(); const fights: number[][] = [];
   for (const f of inp.fights ?? []) { const ids = f.filter((id) => byId.has(id)); if (ids.length > 0) { fights.push(ids); ids.forEach((id) => inFight.add(id)); } }
@@ -106,7 +107,7 @@ export function hallOfFame(inp: BoardInput): HallOfFame {
       if (isLoss(m, corpId)) { losses++; pilots.add(m.victim.char); } else if (isKill(m, corpId)) { kills++; for (const c of corpRows(m, corpId).keys()) { pilots.add(c); killsBy.set(c, (killsBy.get(c) ?? 0) + 1); } }
     }
     if (pilots.size > 0 && (!biggestFight || pilots.size > biggestFight.pilots || (pilots.size === biggestFight.pilots && (f.length > biggestFight.mails || (f.length === biggestFight.mails && startT < biggestFight.startT))))) biggestFight = { pilots: pilots.size, kills, losses, mails: f.length, startT };
-    const top = Math.max(0, ...killsBy.values());
+    const top = Math.max(0, maxOf(killsBy.values()));
     if (top >= 2 && (!mostKillsInFight || top > mostKillsInFight.value)) mostKillsInFight = { chars: [...killsBy.entries()].filter(([, n]) => n === top).map(([c]) => c).sort((a, b) => a - b), value: top };
   }
   const day = [...perDay.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))[0];
@@ -127,7 +128,10 @@ export const DAILY_UP_TO = 92, WEEKLY_UP_TO = 550;
 export function corpDays(inp: BoardInput, now: number): CorpDay[] {
   const mails = windowMails(inp);
   if (mails.length === 0) return [];
-  const first = inp.since ?? Math.min(...mails.map((m) => m.t));
+  // a loop, never a spread: up to 150,000 mails are held and V8 refuses ~125,000 spread arguments (v0.220.0)
+  let oldest = Infinity;
+  for (const m of mails) if (m.t < oldest) oldest = m.t;
+  const first = inp.since ?? oldest;
   const last = inp.until !== null && inp.until !== undefined ? inp.until - 1 : now;
   const spanDays = (last - first) / 86_400_000;
   const bucket: Bucket = spanDays <= DAILY_UP_TO ? 'day' : spanDays <= WEEKLY_UP_TO ? 'week' : 'month';

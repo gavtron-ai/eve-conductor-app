@@ -1,3 +1,5 @@
+// v0.232.0 (audit E7): runs against the fresh sim/lib compile the runner produces — until then a frozen
+// copy in tests/led (up to 300 lines behind the shipped code) kept these passing on old behaviour.
 // Fixtures for computeStats() in the SHIPPED ledger.ts.
 //
 // USER: "report whatever profit is provably true, never allow a lie to get
@@ -6,6 +8,8 @@
 // cost disappeared from the books entirely. Selling 100 units of which 60
 // were bought at a known price makes the profit on those 60 a FACT.
 
+global.localStorage = global.localStorage ?? { getItem: () => null, setItem: () => {}, removeItem: () => {} };
+global.window = global.window ?? { appInfo: undefined, localStorage: global.localStorage };
 const TX = [];
 const FEES = [];
 const EVENTS = [];
@@ -40,7 +44,9 @@ global.localStorage = {
   removeItem: (k) => store.delete(k),
 };
 
-const { computeStats } = require('./led/ledger.js');
+// v0.226.0: the ledger is restored ONCE, asynchronously (no file bridge here → the localStorage copy);
+// a computeStats before the restore would see an empty ledger
+const L1 = require('./sim/lib/ledger.js');
 
 let pass = 0, fail = 0;
 const eq = (label, got, want) => {
@@ -49,7 +55,9 @@ const eq = (label, got, want) => {
   ok ? pass++ : fail++;
 };
 
-const s = computeStats();
+(async () => {
+await L1.restoreLedger();
+const s = L1.computeStats();
 const sale = s.sales[0];
 
 // 60 of 100 units are covered -> 60% of the revenue and 60% of the tax
@@ -80,8 +88,9 @@ TX.length = 0; FEES.length = 0;
 buy(100, 100, 1);
 sell(100, 200, 2, 400);
 store.set('etc-ledger-v1', JSON.stringify({ tx: TX, fees: FEES, orderEvents: EVENTS, lastSync: null }));
-delete require.cache[require.resolve('./led/ledger.js')];
-const s2 = require('./led/ledger.js').computeStats();
+delete require.cache[require.resolve('./sim/lib/ledger.js')];
+const L2 = require('./sim/lib/ledger.js'); await L2.restoreLedger();
+const s2 = L2.computeStats();
 eq('a fully covered sale still reports the whole profit', s2.realizedProfit, 20000 - 400 - 10000);
 eq('...and nothing at all in the loot bucket', s2.unmatchedRevenue, 0);
 eq('...with every unit matched', s2.sales[0].matchedQty, 100);
@@ -90,11 +99,13 @@ eq('...with every unit matched', s2.sales[0].matchedQty, 100);
 TX.length = 0; FEES.length = 0;
 sell(100, 200, 2, 400);
 store.set('etc-ledger-v1', JSON.stringify({ tx: TX, fees: FEES, orderEvents: EVENTS, lastSync: null }));
-delete require.cache[require.resolve('./led/ledger.js')];
-const s3 = require('./led/ledger.js').computeStats();
+delete require.cache[require.resolve('./sim/lib/ledger.js')];
+const L3 = require('./sim/lib/ledger.js'); await L3.restoreLedger();
+const s3 = L3.computeStats();
 eq('pure loot claims NO profit', s3.sales[0].profit, null);
 eq('...its whole revenue is unmatched', s3.unmatchedRevenue, 20000);
 eq('...and it adds nothing to realized profit', s3.realizedProfit, 0);
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
+})();

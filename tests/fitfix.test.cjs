@@ -1,3 +1,5 @@
+// v0.232.0 (audit E7): runs against the fresh sim/lib compile the runner produces — until then a frozen
+// copy in tests/fx (up to 300 lines behind the shipped code) kept these passing on old behaviour.
 // Fixtures for the SHIPPED fitFix.ts rules.
 //
 // THE CORRECTION THIS ENCODES (user, v0.61.3): capacitor is NOT a fitting
@@ -27,8 +29,16 @@ const ok = (label, cond, extra = '') => {
   cond ? pass++ : fail++;
 };
 
-const { fittingProblems, capacitorVerdict } = require('./fx/fitFix.js');
-const { isAncillary, ANCILLARY_COUNT } = require('./fx/ancillaryTypes.js');
+// the engine and its catalog are not needed here (the frozen copy shipped a stub in their place):
+// the same stub, seeded into the module cache before fitFix pulls dogmaStats in
+const dogmaStatsPath = require.resolve('./sim/lib/dogmaStats.js');
+require.cache[dogmaStatsPath] = { id: dogmaStatsPath, filename: dogmaStatsPath, loaded: true, exports: {
+  calculateFitStats: async () => { throw new Error('engine not needed for these fixtures'); },
+  calculateFromEsfFit: async () => { throw new Error('engine not needed'); },
+  getEsfData: async () => ({ typeDogma: {}, types: {} }),
+} };
+const { fittingProblems, capacitorVerdict } = require('./sim/lib/fitFix.js');
+const { isAncillary, ANCILLARY_COUNT } = require('./sim/lib/ancillaryTypes.js');
 
 // ===== A. THE GENERATED ANCILLARY SET ===================================
 // real ids from CCP's own group table

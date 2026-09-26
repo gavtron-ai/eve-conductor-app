@@ -1,3 +1,5 @@
+import { noteServerDate } from './clock';
+import { swallowed } from './devlog';
 // ESI RATE LIMITS — obeyed, not guessed at.
 //
 // CCP publishes a per-route limit in the OpenAPI spec as `x-rate-limit`.
@@ -116,7 +118,8 @@ class GroupLimiter {
         stateKey(this.spec.group),
         JSON.stringify({ windowStart: this.windowStart, spent: this.spent }),
       );
-    } catch {
+    } catch (e) {
+      swallowed('esi', 'error-budget state save', e);
       // a full/absent localStorage must never stop a run — worst case we are
       // back to the old in-memory-only behaviour
     }
@@ -343,6 +346,7 @@ export function esiErrorState(lane: EsiLane = 'interactive'): EsiErrorState {
  */
 export function noteEsiResponse(status: number, headers: Headers, lane: EsiLane = 'interactive'): void {
   const now = Date.now();
+  noteServerDate(headers.get('date'), headers.get('expires'), now); // clock skew, from live answers only (lib/clock)
   const num = (name: string): number | null => {
     const raw = headers.get(name);
     if (raw === null || raw.trim() === '') return null;

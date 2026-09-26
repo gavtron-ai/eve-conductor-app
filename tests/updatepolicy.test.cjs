@@ -37,6 +37,18 @@ check('W5 an emergency with no reason is refused', (() => { try { P.withEmergenc
 check('W6 a long, multi-line reason is flattened and cut to 240', (() => { const r = P.emergencyOf(yaml.load(P.withEmergencyMarker(YML, 'a\n b ' + 'x'.repeat(400)))).reason; return r.length === 240 && r.startsWith('a b x'); })());
 check('W7 Windows line endings in the file are handled', P.emergencyOf(yaml.load(P.withEmergencyMarker(YML.replace(/\n/g, '\r\n'), 'r'))).emergency === true);
 
+// ---- an update downloaded in an earlier run (v0.219.0)
+{
+  const first = P.pendingSighting(null, '0.219.0', 'run-A', 1000);
+  check('U1 first sighting: not installed now, remembered with this run', first.installNow === false && first.marker.version === '0.219.0' && first.marker.runId === 'run-A' && first.marker.at === 1000, first);
+  check('U2 the same version seen again in the SAME run (a second check): still waits', P.pendingSighting(first.marker, '0.219.0', 'run-A', 2000).installNow === false);
+  const second = P.pendingSighting(first.marker, '0.219.0', 'run-B', 3000);
+  check('U3 the same version seen in a LATER run: install now', second.installNow === true && second.marker.runId === 'run-B', second);
+  check('U4 a different version in a later run: not now (it is a new download) — and remembered', (() => { const r = P.pendingSighting(first.marker, '0.220.0', 'run-B', 3000); return r.installNow === false && r.marker.version === '0.220.0'; })());
+  check('U5 junk marker / empty version: never install', P.pendingSighting('x', '0.219.0', 'run-B', 1).installNow === false && P.pendingSighting({ version: '', runId: 'run-A' }, '', 'run-B', 1).installNow === false);
+  check('U6 a 20-second warning at start', P.PENDING_COUNTDOWN_MS === 20_000);
+}
+
 // ---- the numbers the app runs on
 check('N1 a one-minute warning, an hourly check', P.EMERGENCY_COUNTDOWN_MS === 60_000 && P.CHECK_EVERY_MS === 3_600_000);
 

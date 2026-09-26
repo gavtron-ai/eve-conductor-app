@@ -94,7 +94,7 @@ function importEventFiles(documentsPath, files) {
 // `ship-history.ndjson` since it was built, this pattern refused the name, appendAuxLines returns
 // quietly on a bad name and the reader's throw was caught — so the file never existed and Live
 // Combat's ship band forgot everything at each restart. `battle-` holds the leaderboard's killmails.
-const AUX_NAME = /^(radar|theft|fits|ship|battle)-[A-Za-z0-9._-]+\.(ndjson|json)$/;
+const AUX_NAME = /^(radar|theft|fits|ship|battle|ledger)-[A-Za-z0-9._-]+\.(ndjson|json)$/;
 
 /** returns the full path written, so a caller can VERIFY rather than assume
  * (an undefined return read as failure once already) */
@@ -140,15 +140,49 @@ function listAuxNames(documentsPath) {
 
 /** public data the app reads again by itself: tens of MB that a backup does not need to carry */
 const NOT_IN_BACKUPS = new Set(['battle-corp-killmails.ndjson']);
+// v0.226.0: the ledger file is in every backup already, as the `ledger` field (merged by ids on import)
+const IN_BACKUP_FIELD = new Set(['ledger-v1.json']);
+/** the radar's raw daily rows (written until v0.220.0, read by nothing, hundreds of MB a month) and,
+ * since v0.229.0, the pre-0.229 summary blob kept after its split — both deletable from Settings */
+const RADAR_MONTH = /^radar-\d{4}-\d{2}\.ndjson$|^radar-summary\.legacy\.json$/;
+/** the per-region summaries (v0.229.0): tens of MB each; the installer's seed carries the shared part */
+const RADAR_SUMMARY = /^radar-summary(-\d+)?\.json$/;
+/** a backup is one JSON string in the renderer; V8 refuses strings past ~512 MB–1 GB, and a
+ * 137 MB summary alone made the export throw (measured 2026-09-23: 784 MB → "Invalid string
+ * length"). Files over this are left out and NAMED in the export's result. */
+const BACKUP_MAX_BYTES = 20 * 1024 * 1024;
 
-/** every radar/aux file with its name — for backups */
+/** every aux file a backup can carry, with its content — and the ones it cannot, with why */
 function listAuxFiles(documentsPath) {
   const dir = statsDir(documentsPath);
-  return fs
-    .readdirSync(dir)
-    .filter((f) => AUX_NAME.test(f) && !NOT_IN_BACKUPS.has(f))
-    .sort()
-    .map((f) => ({ name: f, content: fs.readFileSync(path.join(dir, f), 'utf8') }));
+  const files = []; const skipped = [];
+  for (const f of fs.readdirSync(dir).filter((n) => AUX_NAME.test(n)).sort()) {
+    const full = path.join(dir, f);
+    let size = 0; try { size = fs.statSync(full).size; } catch { continue; }
+    if (NOT_IN_BACKUPS.has(f)) { skipped.push({ name: f, size, why: 'public data the app re-reads by itself' }); continue; }
+    if (IN_BACKUP_FIELD.has(f)) { skipped.push({ name: f, size, why: 'in the backup already, as its ledger field' }); continue; }
+    if (RADAR_MONTH.test(f)) { skipped.push({ name: f, size, why: 'raw radar rows — no longer written, read by nothing' }); continue; }
+    if (RADAR_SUMMARY.test(f)) { skipped.push({ name: f, size, why: 'radar history — tens of MB; the installer\'s seed carries the shared part' }); continue; }
+    if (size > BACKUP_MAX_BYTES) { skipped.push({ name: f, size, why: `${(size / 1048576).toFixed(0)} MB — too big for a JSON backup` }); continue; }
+    files.push({ name: f, content: fs.readFileSync(full, 'utf8') });
+  }
+  return { files, skipped };
 }
 
-module.exports = { FOLDER_NAME, statsDir, appendEvents, readAllEvents, listEventFiles, importEventFiles, writeAuxFile, readAuxFile, appendAuxLines, listAuxFiles, listAuxNames };
+/** the raw radar month files on disk (v0.220.0: no longer written; the user may delete them) */
+function listRadarMonths(documentsPath) {
+  const dir = statsDir(documentsPath);
+  return fs.readdirSync(dir).filter((f) => RADAR_MONTH.test(f)).sort().map((f) => { let size = 0; try { size = fs.statSync(path.join(dir, f)).size; } catch { /* gone */ } return { name: f, size }; });
+}
+/** delete ONLY the raw radar month files — nothing else matches the pattern */
+function deleteRadarMonths(documentsPath) {
+  const dir = statsDir(documentsPath);
+  let deleted = 0, bytes = 0;
+  for (const { name, size } of listRadarMonths(documentsPath)) {
+    if (!RADAR_MONTH.test(name)) continue;
+    try { fs.rmSync(path.join(dir, name)); deleted++; bytes += size; } catch { /* locked or gone — reported by the count */ }
+  }
+  return { deleted, bytes };
+}
+
+module.exports = { FOLDER_NAME, statsDir, appendEvents, readAllEvents, listEventFiles, importEventFiles, writeAuxFile, readAuxFile, appendAuxLines, listAuxFiles, listAuxNames, listRadarMonths, deleteRadarMonths, BACKUP_MAX_BYTES };

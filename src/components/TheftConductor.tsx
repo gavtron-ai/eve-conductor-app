@@ -3,7 +3,6 @@
 //   · ESS: no ESI route exists, so this lists WHERE one is (sov nullsec in
 //     range) and never pretends to know what's in the bank.
 import { useEffect, useMemo, useState } from 'react';
-import { APERTURE_BLOCK_SHORT } from '../lib/apertureAccess';
 import { useApp } from '../lib/store';
 import { suggestSystems, regionName, reachFrom, getSystem, pathTo } from '../lib/mapdata';
 import { setWaypoint } from '../lib/esiChar';
@@ -357,12 +356,12 @@ function BarCheckButton({ systemId, planetId, onDone }: {
         style={{ width: 52, fontSize: 12 }}
         onChange={(e) => setTics(e.target.value)}
         onKeyDown={(e) => { if (e.key === 'Escape') setOpenInput(false); }} />
-      <button className="btn mini" disabled={tics === '' || !Number.isFinite(Number(tics))}
+      <button className="btn mini" title="save the reading" disabled={tics === '' || !Number.isFinite(Number(tics))}
         onClick={() => {
           void applyBarReading(systemId, planetId, Math.max(0, Math.min(130, Number(tics))))
             .then(() => { setOpenInput(false); setTics(''); onDone(); });
         }}>✓</button>
-      <button className="btn mini" onClick={() => setOpenInput(false)}>✕</button>
+      <button className="btn mini" title="cancel" onClick={() => setOpenInput(false)}>✕</button>
     </span>
   );
 }
@@ -412,11 +411,12 @@ export default function TheftConductor({ view = 'skyhooks' }: { view?: 'skyhooks
   // planet IDENTITY: "#0994" told him even less — in game it is "8OYE-Z IV",
   // and the TYPE is the loot (Lava = magmatic gas, Ice = superionic ice)
   const [planets, setPlanets] = useState<Map<number, PlanetInfo>>(new Map());
+  const [planetsReady, setPlanetsReady] = useState(false); // v0.239.0: "…" while the names load, "#id" only after a lookup failed
   useEffect(() => {
     if (!raw || raw.length === 0) return;
     let alive = true;
     void planetInfo(raw.map((s) => s.planetId)).then((m) => {
-      if (alive) setPlanets(new Map(m));
+      if (alive) { setPlanets(new Map(m)); setPlanetsReady(true); }
     });
     return () => { alive = false; };
   }, [raw]);
@@ -521,7 +521,6 @@ export default function TheftConductor({ view = 'skyhooks' }: { view?: 'skyhooks
       if (hot.length > 0) m.set(t.systemId, hot);
     }
     return m;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reach, targets, activity]);
 
   async function loadRouteKills(path: { id: number; name: string }[], secs: number): Promise<void> {
@@ -703,7 +702,6 @@ export default function TheftConductor({ view = 'skyhooks' }: { view?: 'skyhooks
             title="Set the distance origin from a system list YOU copied: in Aperture, in your own web browser, open Map info → Systems, select the list and copy it, then press this. The app reads your clipboard once, when you press — it does not contact Aperture.">
             📋 import map from clipboard
           </button>
-          <span className="dim" style={{ fontSize: 12, cursor: 'help' }} title={`“Refresh from Aperture” — ${APERTURE_BLOCK_SHORT} Copy your system list from Aperture in your own browser and use “import map from clipboard”.`}>🚧 refresh from Aperture: unavailable</span>
           {mapped.length > 0 && (
             <>
               <span className="dim" style={{ fontSize: 12, cursor: 'help' }}
@@ -789,7 +787,7 @@ export default function TheftConductor({ view = 'skyhooks' }: { view?: 'skyhooks
                   <td>
                     {(() => {
                       const pl = planets.get(t.planetId);
-                      if (!pl) return <span className="dim" title={`planet id ${t.planetId}`}>#{String(t.planetId).slice(-4)}</span>;
+                      if (!pl) return <span className="dim" title={planetsReady ? `planet id ${t.planetId} — ESI did not answer for it` : 'planet name loading…'}>{planetsReady ? `#${String(t.planetId).slice(-4)}` : '…'}</span>;
                       // the in-game label is "<system> <numeral>" — the row
                       // already names the system, so show the numeral
                       const numeral = pl.name.startsWith(t.systemName)
@@ -801,7 +799,7 @@ export default function TheftConductor({ view = 'skyhooks' }: { view?: 'skyhooks
                           {numeral}
                           {pl.type && (
                             <span className={pl.type === 'Lava' ? 'flag warn' : 'flag info'}
-                              style={{ marginLeft: 6 }}>
+                              style={{ marginLeft: 6 }}>{' '}
                               {pl.type}
                             </span>
                           )}

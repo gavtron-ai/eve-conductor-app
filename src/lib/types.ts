@@ -72,6 +72,13 @@ export interface Settings {
   raidAlert?: boolean;
   /** how many stargate jumps from a mapped system still counts as "near" */
   raidAlertJumps?: number;
+  /**
+   * v0.225.0 (audit A2): the hubs whose regions the market radar snapshots. null (or absent, in a
+   * save from before) = automatic — the duty hubs of the team's traders, or Jita when no trader
+   * has one. Before 0.225.0 the radar swept all five built-in regions for every install, whichever
+   * markets the user traded: measured 2026-09-23 at 43,296 requests and ≈1.3 GB on the wire a day.
+   */
+  radarHubIds?: string[] | null;
 
   // ---- per-player setup (v0.60.34) -------------------------------------
   // These two used to be hardcoded to ONE player's setup. They drive real

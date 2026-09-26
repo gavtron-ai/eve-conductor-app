@@ -30,6 +30,7 @@ import {
   startPush, startRestore, stopPush, pushState, subscribePush, withCreated, clearPushLog,
 } from '../lib/fitPush';
 import FitInspector from './FitInspector';
+import { minOf, maxOf } from '../lib/nums';
 
 const OVERRIDES_KEY = 'eve-conductor-fit-library-v1';
 const loadOverrides = (): LibraryOverrides => {
@@ -242,8 +243,8 @@ export default function FitLibrary({ characterIds, onLockChange }: {
   const totalFits = chars.reduce((n, c) => n + c.fits.length, 0);
   /** when EVE will next have anything new to say, across the scanned set */
   const expiries = chars.map((c) => c.expiresIn).filter((v): v is number => typeof v === 'number');
-  const freshestIn = expiries.length > 0 ? Math.min(...expiries) : null;
-  const staleIn = expiries.length > 0 ? Math.max(...expiries) : null;
+  const freshestIn = expiries.length > 0 ? minOf(expiries) : null;
+  const staleIn = expiries.length > 0 ? maxOf(expiries) : null;
   const readable = chars.filter((c) => !c.error);
   const writable = chars.filter((c) => c.canWrite && !c.error);
   const blocked = plan.chars.filter((p) => p.blocked);
@@ -667,7 +668,7 @@ export default function FitLibrary({ characterIds, onLockChange }: {
                     className={`${e.included ? '' : 'excluded'} ${e.key === selectedKey ? 'sel' : ''} ${e.key === compareKey ? 'cmp' : ''}`}
                     onClick={() => setSelectedKey(e.key)}>
                     <td className="c-inc">
-                      <input type="checkbox" checked={e.included} onChange={() => toggleInclude(e)} disabled={applying || pending !== null} />
+                      <input type="checkbox" aria-label="include this fit" checked={e.included} onChange={() => toggleInclude(e)} disabled={applying || pending !== null} />
                     </td>
                     <td className="c-hull">
                       {e.sources.length > 1 && (

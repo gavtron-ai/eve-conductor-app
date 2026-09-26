@@ -6,9 +6,9 @@ import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useApp } from '../lib/store';
 import {
   COLS_CHOICES, MAX_BOARDS, MAX_ITEMS, SIZE_CELLS, SIZE_LABEL, activeBoard, addBoard, addItem, cellAt, colsOf, configureItem, moveItem, removeBoard, removeItem,
-  renameBoard, repack, resizeItem, rowsUsed, sanitizeHome, setBoardCols, withItems, type DashItem, type DashSize, type HomeState,
+  renameBoard, repack, resizeItem, rowsUsed, sanitizeHome, setBoardCols, withItems, type DashItem, type HomeState,
 } from '../lib/homeGrid';
-import { dashTitle, dashletOf, optionOf, sizesOf } from '../lib/dashlets';
+import { dashTitle, dashletOf, optionOf, sizesOf, starterItems } from '../lib/dashlets';
 import { DashletBody, headView } from './HomeDashlets';
 import DashletStore from './DashletStore';
 import { destOf, type SavedView } from '../lib/favorites';
@@ -24,12 +24,6 @@ const GAP = 12;
 // bigger letters. Below CELL_MIN the board scrolls sideways rather than crush a dashlet.
 const CELL_MIN = 104;
 const TYPE_MIN = 0.8, TYPE_MAX = 1.3;
-/** what "✨ start me off" lays down: one of each shelf, sized to read well together */
-const STARTER: [string, DashSize][] = [
-  ['chain-isk', 'L'], ['chain-ways', 'L'], ['raid-windows', 'L'], ['eve-clock', 'S'], ['logins', 'S'],
-  ['pi-planets', 'M'], ['net-worth', 'M'], ['chain-exits', 'M'],
-  ['lb-medals', 'L'], ['kill-feed', 'L'], ['profit-days', 'M'], ['pi-resets', 'M'], ['market-events', 'M'], ['shortcuts', 'M'],
-];
 
 export default function HomeModule({ onGo }: { onGo: (dest: string, view?: SavedView) => void }) {
   const raw = useApp((s) => s.home);
@@ -104,7 +98,7 @@ export default function HomeModule({ onGo }: { onGo: (dest: string, view?: Saved
   const boxOf = (i: Pick<DashItem, 'x' | 'y' | 'size'>) => ({ left: i.x * step, top: i.y * step, width: SIZE_CELLS[i.size].w * cell + (SIZE_CELLS[i.size].w - 1) * GAP, height: SIZE_CELLS[i.size].h * cell + (SIZE_CELLS[i.size].h - 1) * GAP });
   const startMeOff = () => {
     let items = board.items;
-    for (const [kind, size] of STARTER) items = addItem(items, kind, size, undefined, cols);
+    for (const [kind, size] of starterItems()) items = addItem(items, kind, size, undefined, cols); // v0.245.0: nothing that cannot work today
     setItems(items, 'starter board laid down');
   };
 

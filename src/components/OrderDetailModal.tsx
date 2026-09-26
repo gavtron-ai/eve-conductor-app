@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { ESI_BASE } from '../lib/constants';
 import { esiFetch } from '../lib/esiRate';
-import { attributeBrokerFees, ledger } from '../lib/ledger';
+import { attributeBrokerFees, ledger, useLedger } from '../lib/ledger';
 import { getType } from '../lib/typedb';
 import { getStation, getSystem } from '../lib/mapdata';
 import { openMarketWindowEverywhere, type MyOrder } from '../lib/esiChar';
@@ -27,6 +27,7 @@ interface LadderRow {
  * counted in dashboard totals, but EVE doesn't say which order they belong to.
  */
 export default function OrderDetailModal({ order, onClose }: { order: MyOrder; onClose: () => void }) {
+  useLedger((st) => st.version); // re-render when the ledger is restored or written
   const item = getType(order.type_id);
   const isBuy = order.is_buy_order === true;
   const station = getStation(order.location_id);
@@ -185,7 +186,7 @@ export default function OrderDetailModal({ order, onClose }: { order: MyOrder; o
       estReturn,
       paceSource: myPace > 0 ? 'your fills' : 'region volume share',
     } as const;
-  }, [order, isBuy, settings, fillValue, fillTax, fillQty, placedMs, matchedFees, matchedFeeTotal, regionStats]);
+  }, [order, isBuy, settings, fillValue, fillTax, fillQty, placedMs, matchedFees, matchedFeeTotal, regionStats, daysLeft]);
 
   if (!item) return null;
   return (

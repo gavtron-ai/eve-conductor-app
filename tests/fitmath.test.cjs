@@ -1,3 +1,5 @@
+// v0.232.0 (audit E7): runs against the fresh sim/lib compile the runner produces — until then a frozen
+// copy in tests/r3 (up to 300 lines behind the shipped code) kept these passing on old behaviour.
 // Fixtures for the v60.31 fit-math fixes, against the SHIPPED compiled code.
 //
 //  A. toEsfFit() — every drone in the BAY used to be handed to the engine as
@@ -7,8 +9,8 @@
 //     lowSlots=0; every slot comes from the fitted SUBSYSTEMS, which were
 //     never read, so a T3 opened with an empty fitting window.
 
-const { toEsfFit } = require('./r3/dogmaFit.js');
-const { rackSizes, normalizeFitLayout, emptyVariation, newWizardFit } = require('./r3/wizardFits.js');
+const { toEsfFit } = require('./sim/lib/dogmaFit.js');
+const { rackSizes, normalizeFitLayout, emptyVariation } = require('./sim/lib/wizardFits.js');
 
 let pass = 0, fail = 0;
 const eq = (label, got, want) => {
@@ -173,7 +175,7 @@ eq('...and reported to the user', shrunk.movedToCargo.length, 1);
 // Library and another in the wizard, and the wizard's was the inflated one.
 // A rule that decides money must have exactly one implementation.
 // ---------------------------------------------------------------------------
-const { variationEsfFitFull } = require('./r3/wizardFits.js');
+const { variationEsfFitFull } = require('./sim/lib/wizardFits.js');
 
 const wizFit = { id: 'w', name: 'Vexor', hullId: VEXOR, variations: [] };
 const wizVar = (drones) => ({

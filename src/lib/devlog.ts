@@ -1,3 +1,4 @@
+import { create } from 'zustand';
 // WHAT THE APP ACTUALLY DID — the renderer half of the dev log.
 //
 // The user runs this daily and does not test each change immediately. This
@@ -88,21 +89,68 @@ export function logState(area: string, key: string, value: unknown, data?: unkno
   log('info', area, `${key}: ${s}${had ? '' : ' (first seen)'}`, data);
 }
 
+// QUIET TICKS (v0.228.0, audit E2). "tick ok" every 6 s from the ship watcher was 856 lines a day
+// (raid watch 355, trends 178, planets 164, wallet 88) and real events were buried. With
+// `quiet`, a success is written only when its result differs from the last written one, when an
+// hour has passed (with how many identical ticks went unwritten), or as the first success after
+// a failure. Failures are always written.
+export const QUIET_TICK_MS = 60 * 60_000;
+interface RunMemo { result: string; loggedAt: number; quiet: number }
+const runMemo = new Map<string, RunMemo>();
+
 /** time an operation and record how it ended — the shape most collector
  * questions reduce to ("did it run, did it work, how long did it take") */
-export async function logRun<T>(area: string, what: string, fn: () => Promise<T>): Promise<T> {
-  const t0 = Date.now();
+export async function logRun<T>(area: string, what: string, fn: () => Promise<T>, opts?: { quiet?: boolean; now?: () => number }): Promise<T> {
+  const now = opts?.now ?? Date.now;
+  const t0 = now();
+  const key = `${area}:${what}`;
   try {
     const out = await fn();
-    log('info', area, `${what} ok`, { ms: Date.now() - t0, result: summarize(out) });
+    const summary = summarize(out);
+    const memo = runMemo.get(key);
+    const same = memo !== undefined && memo.result === JSON.stringify(summary ?? null);
+    if (!opts?.quiet || !same || now() - memo.loggedAt >= QUIET_TICK_MS) {
+      log('info', area, `${what} ok`, { ms: now() - t0, result: summary, ...(memo && memo.quiet > 0 ? { quietTicks: memo.quiet } : {}) });
+      runMemo.set(key, { result: JSON.stringify(summary ?? null), loggedAt: now(), quiet: 0 });
+    } else {
+      memo.quiet++;
+    }
     return out;
   } catch (e) {
     log('error', area, `${what} FAILED`, {
-      ms: Date.now() - t0,
+      ms: now() - t0,
       error: e instanceof Error ? e.message : String(e),
     });
+    runMemo.delete(key); // the next success is written, whatever it says
     throw e;
   }
+}
+
+// SWALLOWED PERSISTENCE ERRORS (v0.228.0, audit E1). Eighteen catch blocks around a cache,
+// work-in-progress or history write carried on in silence — right to carry on, wrong to say
+// nothing: a raid event or a radar day could be lost with no trace. Every such catch now calls
+// swallowed(): a warning in the log (one per site per 10 minutes, so a full disk cannot flood
+// it) and a count the Collectors dashlet shows.
+export const SWALLOW_QUIET_MS = 10 * 60_000;
+const swallowedAt = new Map<string, number>();
+export interface PersistHealth { failures: number; last: { area: string; what: string; at: number; error: string } | null }
+export const usePersistHealth = create<PersistHealth>()(() => ({ failures: 0, last: null }));
+/** call from a catch on a persistence path that must not stop the caller */
+export function swallowed(area: string, what: string, e: unknown, nowMs = Date.now()): void {
+  const error = (e instanceof Error ? e.message : String(e)).slice(0, 200);
+  usePersistHealth.setState((h) => ({ failures: h.failures + 1, last: { area, what, at: nowMs, error } }));
+  const key = `${area}:${what}`;
+  const prev = swallowedAt.get(key);
+  if (prev !== undefined && nowMs - prev < SWALLOW_QUIET_MS) return;
+  swallowedAt.set(key, nowMs);
+  log('warn', area, `${what} failed — carried on without it${prev === undefined ? '' : ' (repeating; one line per 10 min)'}`, { error });
+}
+
+/** fixtures only */
+export function _resetRunMemoForTests(): void {
+  runMemo.clear();
+  swallowedAt.clear();
+  usePersistHealth.setState({ failures: 0, last: null });
 }
 
 /** keep a result line short: counts and scalars, never whole payloads */

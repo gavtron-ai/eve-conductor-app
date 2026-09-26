@@ -31,6 +31,8 @@ export const DEFAULT_SETTINGS: Settings = {
   raidAlertJumps: 3,
   transitShipName: '',
   apertureUrl: '',
+  // v0.225.0: null = follow the traders' duty hubs (types.ts)
+  radarHubIds: null,
 };
 
 export const FUZZWORK_AGGREGATES = 'https://market.fuzzwork.co.uk/aggregates/';

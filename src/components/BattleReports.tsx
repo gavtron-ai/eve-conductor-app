@@ -21,6 +21,7 @@ import { PilotFitPanel, PANEL_CARD, TypeIconId, useTypeIcons, type PilotKillmail
 import { fightWhen } from '../lib/fightSplit';
 import { FightRoster, FightTimeline } from './BattleExtras';
 import { iskShort } from '../lib/format';
+import { minOf, maxOf } from '../lib/nums';
 
 /** EVE's public image CDN — ship icons, portraits, group logos */
 const shipIcon = (typeId: number): string => `https://images.evetech.net/types/${typeId}/icon?size=64`;
@@ -97,6 +98,7 @@ export default function BattleReports() {
   const [selIdx, setSelIdx] = useState(cachedSel);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [needLogin, setNeedLogin] = useState(false);
   const [stale, setStale] = useState(false);
   const [noLiveFeed, setNoLiveFeed] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -130,8 +132,11 @@ export default function BattleReports() {
     try {
       const chars = useAuth.getState().characters;
       if (chars.length === 0) {
-        throw new Error('log in a character first — the corporation comes from your pilot, never from code');
+        // v0.238.0 (round-two U1): a normal state, not a failure — said calmly, not thrown
+        setNeedLogin(true);
+        return;
       }
+      setNeedLogin(false);
       const corp = await corporationOf(chars[0].characterId);
       // every logged-in character with a live token feeds its OWN killmails
       // straight from ESI (live); the corp-wide list comes from zKill's
@@ -237,6 +242,7 @@ export default function BattleReports() {
           </button>
         </div>
         {busy && <div className="hint">reading the corp killboard…</div>}
+        {needLogin && <div className="hint">Log a character in (⚙ Settings) to see your corporation&apos;s fights — the corporation comes from your pilot.</div>}
         {error && <div className="hint">battle report failed: {error}</div>}
         {stale && (
           <div className="dim" style={{ fontSize: 12, marginTop: 4 }}>
@@ -434,7 +440,7 @@ export function BattlePilot({ view, d, onView, onClose }: { view: PilotView; d: 
   // what they did, from the FULL roster (v0.204.2) — the top-damage list holds eight per side
   const me = [...(d.roster?.ours ?? []), ...(d.roster?.theirs ?? [])].find((r) => r.pilotId === view.pilotId);
   const times = allLosses.map((l) => l.t ?? 0).filter((t) => t > 0);
-  const win = times.length > 0 ? { t0: Math.min(...times), t1: Math.max(...times) } : { t0: 0, t1: 0 };
+  const win = times.length > 0 ? { t0: minOf(times), t1: maxOf(times) } : { t0: 0, t1: 0 };
   // a loss row was clicked → THAT killmail is the evidence; a leader's hull →
   // whichever of their losses in this battle were that hull
   const focus = view.killId !== null ? theirLosses.filter((l) => l.killmailId === view.killId) : theirLosses.filter((l) => l.shipId === view.shipId);

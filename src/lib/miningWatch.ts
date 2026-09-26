@@ -45,6 +45,9 @@
 //     resumes, so the slow ones locking rocks are not named;
 //   · the character has docked or left the system they mined in — an
 //     unload trip;
+//   · ESI says the character is logged off — ADVISORY ONLY (rule 4, v0.220.0): the
+//     online flag lags for minutes after a login, so it may silence a "not mining"
+//     line, never stop the watch — the log lines are the truth about who is mining;
 //   · the character changed ship — a new fit, history discarded;
 //   · a lone miner stopping (one character IS the whole crew).
 // A reduced alert clears once the rate is back for a few cycles, or after
@@ -270,7 +273,7 @@ export function updateWatch(
       if (loc.shipTypeId !== null) m.homeShipTypeId = loc.shipTypeId;
     }
     m.active = false; m.quiet = false; m.quietSince = null; m.cur = 0; m.peak = 0;
-    if (!loc.online || m.events.length === 0) {
+    if (m.events.length === 0) {
       m.status = 'idle';
       // drop miners with nothing left to remember
       if (m.events.length === 0) continue;
@@ -332,7 +335,8 @@ export function updateWatch(
       const moved = m.homeSystemId !== null && loc.systemId !== null && loc.systemId !== m.homeSystemId;
       const grace = fleet.moveEndedAt !== null && last < fleet.moveEndedAt
         && now < fleet.moveEndedAt + Math.max(MOVE_GRACE_MIN_MS, MOVE_GRACE_PERIODS * (m.period as number));
-      if (loc.docked || moved || fleetMove || grace) { m.alertKind = null; m.alertSince = null; continue; }
+      // !online: ESI's word that they logged off explains the silence — it never decides the status
+      if (loc.docked || moved || fleetMove || grace || !loc.online) { m.alertKind = null; m.alertSince = null; continue; }
       const since = m.alertKind === 'stopped' && m.alertSince !== null ? m.alertSince : now;
       m.alertKind = 'stopped'; m.alertSince = since;
       if (now - since <= opts.keepStoppedMs) alerts.push({ charId: m.charId, charName: m.charName, kind: 'stopped', since });

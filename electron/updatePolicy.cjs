@@ -28,6 +28,8 @@ const EMERGENCY_COUNTDOWN_MS = 60_000;
 /** how often the feed is checked (was 4 h — too slow for an emergency; the file is ~400 bytes) */
 const CHECK_EVERY_MS = 60 * 60_000;
 const REASON_MAX = 240;
+/** an update downloaded in an EARLIER run installs at this start after this much warning */
+const PENDING_COUNTDOWN_MS = 20_000;
 
 /** is this feed entry marked as an emergency? Only a real boolean `true` counts. */
 function emergencyOf(info) {
@@ -47,4 +49,20 @@ function withEmergencyMarker(yml, reason) {
   return kept.join('\n') + `\nemergency: true\nemergencyReason: ${JSON.stringify(clean)}\n`;
 }
 
-module.exports = { emergencyOf, withEmergencyMarker, EMERGENCY_COUNTDOWN_MS, CHECK_EVERY_MS };
+/**
+ * AN UPDATE THAT WAS NEVER INSTALLED (v0.219.0). electron-updater installs a downloaded update from
+ * the app's quit hook — a Task Manager kill never runs it, and the next start just re-validates the
+ * cached installer and shows the banner again (Aperture's developer: "didn't update even after
+ * quitting from the task manager"). So: the app remembers, per run, which version it has downloaded;
+ * when the SAME version is downloaded again in a LATER run, the app has been restarted without
+ * installing it, and it installs now. A download in the current run still waits for a restart.
+ * @param marker  what was persisted by the last sighting ({version, runId, at}) or null
+ * @param runId   this process's id — different every start
+ */
+function pendingSighting(marker, version, runId, now) {
+  const m = marker && typeof marker === 'object' ? marker : null;
+  const installNow = !!m && typeof version === 'string' && version !== '' && m.version === version && typeof m.runId === 'string' && m.runId !== runId;
+  return { installNow, marker: { version: String(version || ''), runId: String(runId), at: now } };
+}
+
+module.exports = { emergencyOf, withEmergencyMarker, pendingSighting, EMERGENCY_COUNTDOWN_MS, PENDING_COUNTDOWN_MS, CHECK_EVERY_MS };

@@ -1,4 +1,5 @@
-// Fixtures for the SHIPPED radar.ts (compiled, not re-implemented).
+// Fixtures for the SHIPPED radar.ts (compiled, not re-implemented — since v0.225.0 the fresh sim/lib
+// compile the runner produces; until then a frozen August copy in tests/cl, see PLAN v0.224.1).
 // The bug under test: a WIP file from a PAST day was silently ignored by
 // restoreRadarWip, and the first tick of the new day then overwrote it — so
 // closing the app before UTC midnight and reopening after it destroyed that
@@ -22,7 +23,7 @@ global.window = {
   },
 };
 
-const radar = require('./cl/radar.js');
+const radar = require('./sim/lib/radar.js');
 
 let pass = 0, fail = 0;
 const eq = (label, got, want) => {
@@ -59,17 +60,19 @@ files.set('radar-wip.json', JSON.stringify({
 (async () => {
   await radar.restoreRadarWip();
 
-  // 1. yesterday reached the PERMANENT monthly archive
+  // 1. NO monthly ndjson any more: v0.220.0 (audit B1) stopped the write-only radar-YYYY-MM
+  //    files (326 MB a month, read by nothing). Until v0.225.0 this fixture asserted the append
+  //    against a frozen August compile in tests/cl and kept passing — see PLAN v0.224.1 (E7).
   const month = YESTERDAY.slice(0, 7);
   const archive = appended.find((a) => a.name === `radar-${month}.ndjson`);
-  eq('yesterday was appended to the monthly ndjson', Boolean(archive), true);
+  eq('yesterday is NOT appended to a monthly ndjson (stopped in v0.220.0)', Boolean(archive), false);
 
-  const archivedTypes = (archive?.lines ?? []).map((l) => JSON.parse(l).t).sort();
-  // BOTH the reprice row AND the churn-only row survive; the empty one does not
-  eq('archive holds the reprice row AND the churn-only row', archivedTypes, [34, 35]);
-
-  // 2. the rolling summary learned about it
-  const summary = JSON.parse(files.get('radar-summary.json') ?? '[]');
+  // 2. the rolling summary learned about it — BOTH the reprice row AND the churn-only row
+  //    survive the rollover; the genuinely empty one does not
+  // v0.229.0: one compact file per region — decoded with the main-process codec (the renderer's twin)
+  const summary = require('../electron/radarSummary.cjs').decodeRegion(files.get('radar-summary-10000002.json') ?? '{"v":2,"r":10000002,"entries":[]}');
+  eq('the old single blob is not written any more', files.has('radar-summary.json'), false);
+  eq('summary holds the reprice row AND the churn-only row, not the empty one', summary.map((e) => e.t).sort(), [34, 35]);
   const e34 = summary.find((e) => e.t === 34 && e.s === 0);
   eq('summary has a day entry for type 34', e34?.days?.length, 1);
   eq('...with yesterday\'s date', e34?.days?.[0]?.d, YESTERDAY);

@@ -262,6 +262,9 @@ table.data td {
   color: var(--ink-2);
 }
 table.data tr:last-child td { border-bottom: none; }
+/* v0.239.0: the ⚖ policy page's tables are prose, not numbers — they wrap; the app default (nowrap)
+   pushed the third column off the modal behind a horizontal scrollbar */
+table.policy-table td, table.policy-table th { white-space: normal; vertical-align: top; text-align: left; }
 /* Theft Conductor reads at a glance or not at all (v0.107.2): its tables
    run larger than the app default */
 .theft table.data td { font-size: 14px; }
@@ -2065,6 +2068,10 @@ button.dl-tile:hover { background: var(--surface-2); }
 .store-have { font-size: 10.5px; font-weight: 600; color: var(--good); border: 1px solid var(--good); border-radius: 999px; padding: 0 7px; }
 .store-info p { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--ink-2); }
 .store-info p.store-needs { color: var(--muted); font-size: 11.5px; }
+/* v0.245.0: a dashlet that cannot work today — the preview dimmed, a banner with the reason, ＋ add off */
+.store-card.store-off .store-preview { opacity: 0.4; filter: grayscale(0.7); }
+.store-card.store-off .store-info h3, .store-card.store-off .store-info p:not(.store-banner) { opacity: 0.6; }
+.store-info p.store-banner { color: #e0a83c; background: rgba(224, 168, 60, 0.09); border: 1px solid rgba(224, 168, 60, 0.45); border-radius: 8px; padding: 6px 9px; font-size: 11.5px; line-height: 1.4; }
 .store-row { display: flex; align-items: center; gap: 8px; margin-top: auto; padding-top: 6px; flex-wrap: wrap; }
 .store-row select { font-size: 12px; padding: 2px 6px; }
 

@@ -19,13 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
----
-
-Bundled third-party components:
-
-- The fitting engine wasm is a build of the EVEShipFit team's dogma-engine
-  (MIT) — see src/vendor/dogma-engine/LICENSE.
-- Bundled EVE static data derives from CCP's SDE and ESI. EVE Online and all
-  related logos and designs are the intellectual property of CCP hf. This
-  project is not affiliated with or endorsed by CCP hf.

@@ -27,6 +27,7 @@ export interface ChartShip {
 }
 
 import { shipColour } from '../lib/teamColours';
+import { maxOf } from '../lib/nums';
 
 const n0 = (v: number) => Math.round(v).toLocaleString();
 const kmLabel = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(0)} km` : `${Math.round(m)} m`);
@@ -104,8 +105,8 @@ export default function BattleChart({
   }, [ships, target, targetAngle, targetSpeed, layer, sustained, maxRange]);
 
   const yMax = showTotal
-    ? Math.max(1, ...series.total.map((p) => p.y))
-    : Math.max(1, ...series.perShip.flatMap((p) => p.points.map((q) => q.y)));
+    ? Math.max(1, maxOf(series.total.map((p) => p.y)))
+    : Math.max(1, maxOf(series.perShip.flatMap((p) => p.points.map((q) => q.y))));
   const step = Math.pow(10, Math.floor(Math.log10(yMax))) / 2;
   const yTop = Math.max(step, Math.ceil(yMax / step) * step);
 

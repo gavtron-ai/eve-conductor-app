@@ -13,6 +13,7 @@
 // Everything is a live index + immutable killmails, so both are cached hard.
 import { esiFetch } from './esiRate';
 import { getType } from './typedb';
+import { maxOf } from './nums';
 
 const ESI = 'https://esi.evetech.net/latest';
 
@@ -167,7 +168,7 @@ export async function fetchRouteKills(
     return {
       systemId: s.id, systemName: s.name,
       shipKills: player.length,
-      lastKillMs: times.length ? Math.max(...times) : null,
+      lastKillMs: times.length ? maxOf(times) : null,
       bubble: kills.some((k) => k.bubble),
       where: summarize(kills),
       kills,

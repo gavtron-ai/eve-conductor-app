@@ -4,7 +4,6 @@
 // strength 9 range 18 km at all-V). Every expected number hand-walked.
 const { simulateBattleEvents } = require('./sim/lib/battleEvents.js');
 const { runMonteCarlo, hasRandomMechanics } = require('./sim/lib/battleMonteCarlo.js');
-const { mulberry32, streamSeed, streamKey, ROLL } = require('./sim/lib/battleRng.js');
 
 let pass = 0, fail = 0;
 const eq = (l, g, w) => {

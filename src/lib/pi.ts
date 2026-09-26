@@ -21,8 +21,9 @@
 // Before there are two snapshots the app says "measuring", the same way the
 // price watcher says "analyzing cadence".
 import { esiAuth } from './esiChar';
-import { useAuth, type CharAccount } from './auth';
+import { useAuth, pilotHandleOf, type CharAccount } from './auth';
 import { useApp } from './store';
+import { serverNow } from './clock';
 import { getType } from './typedb';
 import { pinRole, STORAGE_ROLES } from './piTypes';
 import { loadSchematics, type Schematic } from './piSchematics';
@@ -32,7 +33,7 @@ import { systemLabel, resolveSystems, isWormhole } from './systemNames';
 import { BUILTIN_HUBS } from './constants';
 import { mergeCarryForward } from './piCarry';
 import { fetchAggregates } from './market';
-import { logInfo, logWarn } from './devlog';
+import { logInfo, logWarn, swallowed } from './devlog';
 import { notifyPi } from './notify';
 
 /** unattended collector: yields to the overlay and to whatever is on screen */
@@ -109,8 +110,8 @@ const capacity = new Map<number, number>(
 function saveCapacities(): void {
   try {
     localStorage.setItem(CAP_KEY, JSON.stringify(Object.fromEntries(capacity)));
-  } catch {
-    // the cache is a convenience; a full localStorage must not break PI
+  } catch (e) {
+    swallowed('pi', 'capacity cache save', e); // the cache is a convenience; a full localStorage must not break PI
   }
 }
 
@@ -174,7 +175,7 @@ function loadSnaps(): SnapStore {
     return {};
   }
 }
-let snaps: SnapStore = loadSnaps();
+const snaps: SnapStore = loadSnaps();
 
 /** keep a short history per planet — enough to measure a rate, not a log */
 const MAX_SNAPS = 12;
@@ -189,8 +190,8 @@ function recordSnapshot(key: string, s: PlanetSnapshot): void {
   snaps[key] = list.slice(-MAX_SNAPS);
   try {
     localStorage.setItem(SNAP_KEY, JSON.stringify(snaps));
-  } catch {
-    // history is a nicety; the current state still displays
+  } catch (e) {
+    swallowed('pi', 'storage history save', e); // history is a nicety; the current state still displays
   }
 }
 
@@ -344,7 +345,7 @@ async function ensurePlanetNames(ids: number[], charId: number): Promise<void> {
   }));
   try {
     localStorage.setItem(NAME_KEY, JSON.stringify(Object.fromEntries(planetNames)));
-  } catch { /* cosmetic */ }
+  } catch (e) { swallowed('pi', 'planet name cache save', e); /* cosmetic */ }
 }
 
 export const planetNameOf = (id: number): string | null => planetNames.get(id) ?? null;
@@ -391,7 +392,7 @@ export function buildPlanetState(
   row: EsiPlanetRow,
   detail: EsiPlanetDetail,
   markPrice: (typeId: number) => number,
-  now = Date.now(),
+  now = serverNow(),
   /** the SDE schematic table — lets factory starvation be judged against
    * actual input STOCK instead of a stale cycle timestamp (v0.179) */
   schem: Map<number, Schematic> | null = null,
@@ -676,6 +677,7 @@ export async function runPiTick(): Promise<number> {
 
   const states: PlanetState[] = [];
   let failed = 0;
+  const unreadable: string[] = []; // one summary line per tick, never one warning per character (round-two R3)
   /** charId → planet ids a SUCCESSFUL list fetch reported — drives the
    * carry-forward semantics (see piCarry.ts) */
   const listed = new Map<number, Set<number>>();
@@ -686,9 +688,7 @@ export async function runPiTick(): Promise<number> {
       rows = (await esiAuth<EsiPlanetRow[]>(`/characters/${c.characterId}/planets/`, undefined, c.characterId, LANE)).data;
     } catch (e) {
       failed++;
-      logWarn('pi', `${c.characterName}: could not read the planet list`, {
-        error: e instanceof Error ? e.message : String(e),
-      });
+      unreadable.push(e instanceof Error ? e.message : String(e));
       continue;
     }
     listed.set(c.characterId, new Set(rows.map((r) => r.planet_id)));
@@ -710,7 +710,7 @@ export async function runPiTick(): Promise<number> {
           )).data);
         } catch (e) {
           failed++;
-          logWarn('pi', `${c.characterName}: could not read planet ${r.planet_id} — SKIPPED`, {
+          logWarn('pi', `${pilotHandleOf(c.characterId)}: could not read planet ${r.planet_id} — SKIPPED`, {
             error: e instanceof Error ? e.message : String(e),
             why: 'an unreadable planet must not be recorded as empty',
           });
@@ -752,7 +752,7 @@ export async function runPiTick(): Promise<number> {
     for (const r of rows) {
       const d = details.get(r.planet_id);
       if (!d) continue; // failed read — already logged, never guessed at
-      const st = buildPlanetState(c, r, d, mark, Date.now(), schem);
+      const st = buildPlanetState(c, r, d, mark, serverNow(), schem); // extractor expiry is EVE time
       st.observedAt = Date.now();
       states.push(st);
       // record the observation AFTER computing, so the rate uses the
@@ -767,6 +767,9 @@ export async function runPiTick(): Promise<number> {
   // the last-known state OR its timestamp — bumping lastRun here laundered
   // 3-hour-old data as fresh and hid the staleness banner (caught by the
   // rig, v0.175). The freshness backoff schedules the retry.
+  if (unreadable.length > 0) {
+    logWarn('pi', `planet list unreadable for ${unreadable.length} of ${chars.length} character(s)`, { first: unreadable[0].slice(0, 160) });
+  }
   if (listed.size === 0) {
     logInfo('pi', 'tick observed nothing — last-known state left untouched', {
       characters: chars.length, failedReads: failed,
@@ -834,7 +837,7 @@ function loadAlerted(): AlertedStore {
     return {};
   }
 }
-let alerted: AlertedStore = loadAlerted();
+const alerted: AlertedStore = loadAlerted();
 
 /** re-raise a problem that is STILL happening after this long */
 const REMIND_AFTER_MS = 12 * 3_600_000;
@@ -843,7 +846,7 @@ const REMIND_AFTER_MS = 12 * 3_600_000;
  * Which planets deserve a message right now. Pure, so the decision can be
  * tested without sending anything.
  */
-export function piAlertsToSend(states: PlanetState[], now = Date.now()): PlanetState[] {
+export function piAlertsToSend(states: PlanetState[], now = serverNow()): PlanetState[] {
   const cfg = useApp.getState().alerts.pi;
   if (cfg && cfg.enabled === false) return [];
   const out: PlanetState[] = [];
@@ -861,7 +864,7 @@ export function piAlertsToSend(states: PlanetState[], now = Date.now()): PlanetS
 }
 
 /** record that these were sent, so the next tick stays quiet */
-export function markPiAlerted(states: PlanetState[], now = Date.now()): void {
+export function markPiAlerted(states: PlanetState[], now = serverNow()): void {
   for (const s of states) alerted[planetKey(s.charId, s.planetId)] = { problem: s.problem, at: now };
   // planets that are fine again drop out, so recovering re-arms the alert
   const live = new Set(states.map((s) => planetKey(s.charId, s.planetId)));
@@ -870,7 +873,7 @@ export function markPiAlerted(states: PlanetState[], now = Date.now()): void {
   }
   try {
     localStorage.setItem(ALERTED_KEY, JSON.stringify(alerted));
-  } catch { /* alert state is a nicety */ }
+  } catch (e) { swallowed('pi', 'alert state save', e); /* alert state is a nicety */ }
 }
 
 /** clear the memory of what has been alerted — used when a planet recovers */
@@ -878,5 +881,5 @@ export function clearPiAlert(charId: number, planetId: number): void {
   delete alerted[planetKey(charId, planetId)];
   try {
     localStorage.setItem(ALERTED_KEY, JSON.stringify(alerted));
-  } catch { /* nicety */ }
+  } catch (e) { swallowed('pi', 'alert state clear', e); /* nicety */ }
 }

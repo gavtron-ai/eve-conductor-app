@@ -49,7 +49,7 @@ export default function SearchBar() {
       <input
         ref={inputRef}
         type="text"
-        placeholder="Search any market item… (e.g. PLEX, Tritanium, Hulk)"
+        placeholder="Search items… (PLEX, Hulk, Tritanium)"
         value={query}
         onChange={(e) => update(e.target.value)}
         onKeyDown={onKeyDown}

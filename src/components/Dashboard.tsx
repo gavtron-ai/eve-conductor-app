@@ -9,6 +9,7 @@ import {
   computeStats,
   exportCsv,
   ledger,
+  useLedger,
   onMarketValue,
   regionOfLocation,
   syncAllLedgers,
@@ -20,6 +21,7 @@ import Tip from './Tip';
 import ItemDetailModal from './ItemDetailModal';
 import NetWorthChart from './NetWorthChart';
 import { useApp } from '../lib/store';
+import { maxOf, minOf } from '../lib/nums';
 
 // dataviz palette (validated for this dark surface): series-1 blue, series-2 aqua
 const C_BUY = '#3987e5';
@@ -33,7 +35,7 @@ const RANGES = [
 ];
 
 function HBars({ rows, color }: { rows: [string, number][]; color: string }) {
-  const max = Math.max(1, ...rows.map(([, v]) => Math.abs(v)));
+  const max = Math.max(1, maxOf(rows.map(([, v]) => Math.abs(v))));
   return (
     <div>
       {rows.map(([label, v]) => (
@@ -65,10 +67,10 @@ function CumulativeChart({ points }: { points: [number, number][] }) {
   }
   const xs = points.map((p) => p[0]);
   const ys = points.map((p) => p[1]);
-  const x0 = Math.min(...xs);
-  const x1 = Math.max(...xs);
-  const yMin = Math.min(0, ...ys);
-  const yMax = Math.max(1, ...ys);
+  const x0 = minOf(xs);
+  const x1 = maxOf(xs);
+  const yMin = Math.min(0, minOf(ys));
+  const yMax = Math.max(1, maxOf(ys));
   const X = (t: number) => PAD.l + ((t - x0) / Math.max(1, x1 - x0)) * (W - PAD.l - PAD.r);
   const Y = (v: number) => PAD.t + (1 - (v - yMin) / (yMax - yMin)) * (H - PAD.t - PAD.b);
   const path = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${X(p[0]).toFixed(1)},${Y(p[1]).toFixed(1)}`).join(' ');
@@ -115,7 +117,7 @@ function FlowChart({ days }: { days: { t: number; bought: number; sold: number }
   if (days.length === 0) {
     return <div className="empty" style={{ padding: '30px 0' }}>No activity in this range yet.</div>;
   }
-  const max = Math.max(1, ...days.map((d) => Math.max(d.bought, d.sold)));
+  const max = Math.max(1, maxOf(days.map((d) => Math.max(d.bought, d.sold))));
   const slot = (W - PAD.l - PAD.r) / days.length;
   const bw = Math.max(2, Math.min(10, slot / 2 - 2));
   const Y = (v: number) => PAD.t + (1 - v / max) * (H - PAD.t - PAD.b);
@@ -181,6 +183,7 @@ export default function Dashboard() {
   const [error, setError] = useState<string | null>(null);
   const [market, setMarket] = useState<{ ask: number; escrow: number } | null>(null);
   const [version, setVersion] = useState(0); // bump to recompute after sync
+  const ledgerVersion = useLedger((st) => st.version); // restored from its file, or written by a sync
   const [detailTypeId, setDetailTypeId] = useState<number | null>(null);
   /** null = the whole team's books; otherwise one character's slice */
   const [charFilter, setCharFilter] = useState<number | null>(null);
@@ -189,12 +192,16 @@ export default function Dashboard() {
   const toggleExcludeBooks = useApp((s) => s.toggleExcludeBooks);
 
   const sinceMs = rangeDays > 0 ? Date.now() - rangeDays * 86_400_000 : 0;
+  // version / ledgerVersion / excludedFromBooks are the ledger store's change counters: computeStats and
+  // attributeBrokerFees read the store directly, so they recompute when those move — deliberate, not a
+  // missing read (the lint rule cannot see through the store)
   const stats = useMemo(
     () => computeStats(sinceMs, charFilter),
-    // excludedFromBooks length changes recompute the books
-    [sinceMs, version, excludedFromBooks, charFilter],
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- store change counters (see above)
+    [sinceMs, version, ledgerVersion, excludedFromBooks, charFilter],
   );
-  const feeAttr = useMemo(() => attributeBrokerFees(sinceMs), [sinceMs, version]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- store change counters (see above)
+  const feeAttr = useMemo(() => attributeBrokerFees(sinceMs), [sinceMs, version, ledgerVersion]);
 
   async function sync() {
     if (syncing || !characterId) return;
@@ -415,7 +422,7 @@ export default function Dashboard() {
       }
     }
     return out;
-  }, [stats, stockByType, stockSynced, sellsByType, charFilter, characters]);
+  }, [stats, stockByType, stockSynced, sellsByType, charFilter, characters, excludedFromBooks]);
 
   const { sorted: sortedInv, clickHeader: clickInv, indicator: indInv } = useSort<InvRow, InvCol>(
     invRows,

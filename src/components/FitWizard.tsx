@@ -225,6 +225,10 @@ export default function FitWizard({ chars }: { chars: CharAccount[] }) {
   const [fHull, setFHull] = useState(true);
   const [fRoom, setFRoom] = useState(false);
   const [showInfo, setShowInfo] = useState(false);
+  // v0.239.0: renaming is an inline field — window.prompt() throws "prompt() is not supported." in
+  // Electron (measured on 44.4.5), so the two ✎ buttons did nothing in the installed app
+  const [renaming, setRenaming] = useState<'fit' | 'variation' | null>(null);
+  const [renameDraft, setRenameDraft] = useState('');
   /** live stats per character, fed back by the panel — drives fRoom */
   const [liveStats, setLiveStats] = useState<Record<number, FitStats>>({});
   /** whose skills/room the filters use (first selected character) */
@@ -249,6 +253,11 @@ export default function FitWizard({ chars }: { chars: CharAccount[] }) {
     !!data && takesCharges(data as unknown as DogmaLookup, moduleType);
 
   // browse trees, EVE-style (built once per data load, filtered per keystroke)
+  // the tree is keyed on the target's identity fields, not the target object (rebuilt every render)
+  const targetKind = target?.kind ?? '';
+  const targetRack = target?.kind === 'slot' || target?.kind === 'charge' ? target.rack : '';
+  const targetChargeFor = target?.kind === 'charge' ? variation?.[target.rack]?.[target.index]?.typeId ?? '' : '';
+  const targetForType = target?.kind === 'chargesAll' ? target.forType ?? '' : '';
   const moduleTree = useMemo(() => {
     if (!data) return [];
     const cat = data as unknown as CatalogShapes;
@@ -269,11 +278,8 @@ export default function FitWizard({ chars }: { chars: CharAccount[] }) {
     }
     if (target.kind === 'drones') return buildMarketTree(cat, (id) => data.types[id]?.categoryID === 18);
     return buildMarketTree(cat, () => true); // cargo: the whole market
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, target?.kind,
-    target?.kind === 'slot' || target?.kind === 'charge' ? target.rack : '',
-    target?.kind === 'charge' ? variation?.[target.rack]?.[target.index]?.typeId ?? '' : '',
-    target?.kind === 'chargesAll' ? target.forType ?? '' : '']);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on the target's identity fields above, not the object
+  }, [data, targetKind, targetRack, targetChargeFor, targetForType]);
   /** eligibility filters, applied before the text filter. Each states its
    * own honest limit in the checkbox tooltip. */
   const eligibleTree = useMemo(() => {
@@ -985,7 +991,7 @@ export default function FitWizard({ chars }: { chars: CharAccount[] }) {
                       if (row) row.qty = Math.max(1, Number(e.target.value) || 1);
                       return v;
                     })} />
-                  <button className="btn mini" onClick={() => updateVariation((v) => {
+                  <button className="btn mini" title="remove from the fit" onClick={() => updateVariation((v) => {
                     v[kind] = v[kind].filter((x) => x.typeId !== q.typeId);
                     return v;
                   })}>×</button>
@@ -1043,19 +1049,32 @@ export default function FitWizard({ chars }: { chars: CharAccount[] }) {
             }}>
             🗑 variation
           </button>
-          <button className="btn" title="Rename this fit (in-game saves use “fit - variation”)."
-            onClick={() => {
-              const next = window.prompt('Fit name', fit.name);
-              if (next && next.trim()) updateFit({ ...fit, name: next.trim() });
-            }}>✎ fit</button>
-          <button className="btn" title="Rename the current variation." disabled={!variation}
-            onClick={() => {
-              if (!variation) return;
-              const next = window.prompt('Variation name', variation.name);
-              if (next && next.trim()) {
-                updateFit({ ...fit, variations: fit.variations.map((v) => (v.id === variation.id ? { ...v, name: next.trim() } : v)) });
-              }
-            }}>✎ variation</button>
+          {renaming ? (
+            <form style={{ display: 'inline-flex', gap: 4, alignItems: 'center' }}
+              onSubmit={(e) => {
+                e.preventDefault();
+                const next = renameDraft.trim();
+                if (next) {
+                  if (renaming === 'fit') updateFit({ ...fit, name: next });
+                  else if (variation) updateFit({ ...fit, variations: fit.variations.map((v) => (v.id === variation.id ? { ...v, name: next } : v)) });
+                }
+                setRenaming(null);
+              }}>
+              <input autoFocus value={renameDraft} onChange={(e) => setRenameDraft(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Escape') setRenaming(null); }}
+                aria-label={renaming === 'fit' ? 'Fit name' : 'Variation name'} placeholder={renaming === 'fit' ? 'Fit name' : 'Variation name'}
+                style={{ width: 220 }} />
+              <button className="btn primary" type="submit" title="Save the name (Enter)">✓</button>
+              <button className="btn" type="button" title="Keep the old name (Esc)" onClick={() => setRenaming(null)}>✕</button>
+            </form>
+          ) : (
+            <>
+              <button className="btn" title="Rename this fit (in-game saves use “fit - variation”)."
+                onClick={() => { setRenameDraft(fit.name); setRenaming('fit'); }}>✎ fit</button>
+              <button className="btn" title="Rename the current variation." disabled={!variation}
+                onClick={() => { if (!variation) return; setRenameDraft(variation.name); setRenaming('variation'); }}>✎ variation</button>
+            </>
+          )}
           <button className="btn" title="Ship info: the hull's trait bonuses, like the in-game info window."
             onClick={() => setShowInfo(true)}>ⓘ ship info</button>
           <button className="btn" title="Swap this fit's hull — the ship tree opens; modules that don't fit the new layout move to cargo, visibly."

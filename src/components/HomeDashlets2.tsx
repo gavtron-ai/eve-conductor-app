@@ -21,7 +21,7 @@ import { piPlanets, piLastRun } from '../lib/pi';
 import { raidEvents } from '../lib/raidWatch';
 import { loadNetWorthSeries } from '../lib/networth';
 import { loadTrendEvents } from '../lib/trends';
-import { computeStats } from '../lib/ledger';
+import { computeStats, useLedger } from '../lib/ledger';
 import { lastTeamOrderFailures } from '../lib/esiChar';
 import { esiErrorState } from '../lib/esiRate';
 import { miningWatchView } from '../lib/overlayFeed';
@@ -32,6 +32,7 @@ import { destOf, favLabel, sanitizeFavorites } from '../lib/favorites';
 import { RELEASE_NOTES } from '../help/releaseNotes';
 import { DayBars, Detail, Dot, Empty, FitList, Foot, Head, Hist24, Img, Row, StackBar, charFace, corpLogo, shipRender, typeIcon } from './DashKit';
 import { AMBER, GOLD, piTone, signed, type DashletProps } from './DashShared';
+import { maxOf } from '../lib/nums';
 
 // the type list is the MARKET's: a capsule is not on it, and a killmail is full of them
 const typeName = (id: number) => getType(id)?.name ?? (CAPSULES.has(id) ? 'Capsule' : `type ${id}`);
@@ -95,7 +96,7 @@ function RaidHot({ spec, cfg, onGo }: DashletProps) {
   const ev = useResource('raid-events', raidEvents, 60_000);
   const d = useMemo(() => (ev.value ? raidHot(ev.value, now, days, 12) : null), [ev.value, now, days]);
   if (!d) return <Empty>Reading the raid log…</Empty>;
-  const max = Math.max(1, ...d.rows.map((r) => r.raided));
+  const max = Math.max(1, maxOf(d.rows.map((r) => r.raided)));
   return (
     <>
       <Detail>
@@ -270,7 +271,7 @@ function WealthLayers(_: DashletProps) {
           ))}
         </FitList>
       </Detail>
-      <Foot warn={now - d.at > 3 * 3_600_000}>{iskShort(d.total)} in all · goods at the Jita ask · snapshot {agoShort(now - d.at)}</Foot>
+      <Foot warn={now - d.at > 3 * 3_600_000}>{iskShort(d.total)} in all · goods at Jita's measured sale prices · snapshot {agoShort(now - d.at)}</Foot>
     </>
   );
 }
@@ -299,7 +300,8 @@ function Wallets(_: DashletProps) {
 function ProfitDays({ spec, cfg }: DashletProps) {
   const now = useBeat(60_000);
   const days = Number(optionOf(spec, cfg, 'range'));
-  const stats = useResource(`ledger-stats-${days}`, async () => computeStats(Date.now() - days * 86_400_000), 2 * 60_000);
+  const lv = useLedger((st) => st.version);
+  const stats = useResource(`ledger-stats-${days}-${lv}`, async () => computeStats(Date.now() - days * 86_400_000), 2 * 60_000);
   const d = useMemo(() => (stats.value ? profitByDay(stats.value.sales, now, days) : null), [stats.value, now, days]);
   if (!d) return <Empty>Reading the wallet ledger…</Empty>;
   return (
@@ -313,7 +315,8 @@ function ProfitDays({ spec, cfg }: DashletProps) {
 }
 function Inventory({ onGo }: DashletProps) {
   const now = useBeat(60_000);
-  const stats = useResource('ledger-stats-all', async () => computeStats(0), 5 * 60_000);
+  const lv = useLedger((st) => st.version);
+  const stats = useResource(`ledger-stats-all-${lv}`, async () => computeStats(0), 5 * 60_000);
   const d = useMemo(() => (stats.value ? inventoryDigest(stats.value.inventory, 12) : null), [stats.value]);
   if (!d) return <Empty>Reading the wallet ledger…</Empty>;
   if (d.lots === 0) return <Empty>The ledger holds no unsold stock — everything it saw you buy has sold.</Empty>;
@@ -369,7 +372,8 @@ function MarketEvents({ onGo }: DashletProps) {
 }
 function BestSellers({ spec, cfg, onGo }: DashletProps) {
   const days = Number(optionOf(spec, cfg, 'range'));
-  const stats = useResource(`ledger-stats-${days}`, async () => computeStats(Date.now() - days * 86_400_000), 2 * 60_000);
+  const lv = useLedger((st) => st.version);
+  const stats = useResource(`ledger-stats-${days}-${lv}`, async () => computeStats(Date.now() - days * 86_400_000), 2 * 60_000);
   const d = useMemo(() => (stats.value ? bestSellers(stats.value.sales, 12) : null), [stats.value]);
   if (!d) return <Empty>Reading the wallet ledger…</Empty>;
   if (d.items === 0) return <Empty>No sales in the last {rangeWords(days)}.</Empty>;
@@ -587,7 +591,7 @@ function CorpHulls({ spec, cfg, onGo }: DashletProps) {
   const { d, since, short, now } = useBoard(Number(optionOf(spec, cfg, 'range')));
   const h = useMemo(() => (d ? hullsFlown(d.mails, d.corpId, since, 14) : null), [d, since]);
   if (!d || !h) return <NoBoard />;
-  const max = Math.max(1, ...h.rows.map((r) => r.uses));
+  const max = Math.max(1, maxOf(h.rows.map((r) => r.uses)));
   return (
     <>
       <Detail>
@@ -699,7 +703,7 @@ function CorpDaysDash({ spec, cfg }: DashletProps) {
   const days = useMemo(() => (d ? corpDays({ mails: d.mails, corpId: d.corpId, since }, now) : []), [d, since, now]);
   if (!d) return <NoBoard />;
   const kills = days.reduce((t, x) => t + x.kills, 0), losses = days.reduce((t, x) => t + x.losses, 0);
-  const max = Math.max(1, ...days.map((x) => Math.max(x.kills, x.losses)));
+  const max = Math.max(1, maxOf(days.map((x) => Math.max(x.kills, x.losses))));
   const best = days.reduce<typeof days[number] | null>((b, x) => (x.kills > (b?.kills ?? 0) ? x : b), null);
   return (
     <>
@@ -722,7 +726,7 @@ function CorpDaysDash({ spec, cfg }: DashletProps) {
 function Logins(_: DashletProps) {
   const now = useBeat(30_000);
   const chars = useAuth((s) => s.characters);
-  const d = useMemo(() => loginsDigest(chars.map((c) => ({ characterId: c.characterId, name: shortLabel(c), refreshToken: c.refreshToken, expiresAt: c.expiresAt, lastSync: c.lastSync, wallet: c.wallet })), lastTeamOrderFailures()), [chars, now]);
+  const d = useMemo(() => loginsDigest(chars.map((c) => ({ characterId: c.characterId, name: shortLabel(c), refreshToken: c.refreshToken, expiresAt: c.expiresAt, lastSync: c.lastSync, wallet: c.wallet })), lastTeamOrderFailures()), [chars]);
   if (chars.length === 0) return <Empty>No characters logged in — ⚙ Settings → add a character.</Empty>;
   return (
     <>

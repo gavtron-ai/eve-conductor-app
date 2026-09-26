@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { readLogTail, logDirPath, flushLog } from '../lib/devlog';
 import { useStock } from '../lib/stock';
-import { useApp } from '../lib/store';
+import { useApp, useHubs } from '../lib/store';
+import { regionName } from '../lib/mapdata';
+import { automaticRadarHubIds, resolveRadarRegions, sweepCost, lastSweepPages, DIFFS_PER_DAY, WIRE_BYTES_PER_PAGE } from '../lib/radar';
 import { brokerFeeRate, salesTaxRate } from '../lib/fees';
 import { BUILTIN_HUBS, DEFAULT_SETTINGS } from '../lib/constants';
 import { isElectron, ssoLogin, useAuth, dutyLabel } from '../lib/auth';
@@ -14,6 +16,7 @@ import { sendTestNotification } from '../lib/notify';
 import { exportBackup, importBackupText } from '../lib/backup';
 import { currentSetup, saveSetup, setupPath } from '../lib/appConfig';
 import { useFreshness } from '../lib/freshness';
+import { redactCharacters } from '../lib/redact';
 
 // NEVER a second copy of the port. The main process reports the callback the
 // login server actually binds; a hardcoded copy here was wrong (:53137, the
@@ -58,8 +61,8 @@ function EveLoginSection() {
       <div className="sso-section">
         <h3 className="section-title">EVE login</h3>
         <div className="hint">
-          EVE login needs the desktop app (it opens your browser and catches the login callback
-          locally). Run <code>npm run dev:app</code> or use the installed app.
+          This is the browser preview. EVE login needs the desktop app (it opens your browser and
+          catches the login callback locally) — install EVE Conductor from its release page to log in.
         </div>
       </div>
     );
@@ -318,9 +321,10 @@ function YourSetupSection() {
         />
       </div>
       <p className="hint">
-        The chain summary (Aperture → <b>Σ Summary</b>) counts jumps from here. <b>Florida</b> is the
-        default; change it only if your map labels home differently (a custom name if the map uses
-        one, else the J-code). Clear it to follow whatever the map itself marks as home.
+        Kept for the chain summary (Aperture → <b>Σ Summary</b>), which is switched off with the
+        Aperture link and does nothing until it returns. <b>Florida</b> is the default; change it only
+        if your map labels home differently (a custom name if the map uses one, else the J-code).
+        Clear it to follow whatever the map itself marks as home.
       </p>
     </div>
   );
@@ -358,6 +362,61 @@ function AppWindowSection() {
   );
 }
 
+/** v0.225.0 (audit A2): which regions the market radar sweeps, with the measured cost of each */
+function MarketRadarSection() {
+  const settings = useApp((s) => s.settings);
+  const setSettings = useApp((s) => s.setSettings);
+  const hubs = useHubs();
+  const chars = useAuth((s) => s.characters);
+  const auto = settings.radarHubIds == null;
+  const autoIds = automaticRadarHubIds(chars, hubs);
+  const ids = settings.radarHubIds ?? autoIds;
+  const regions = resolveRadarRegions(settings.radarHubIds, chars, hubs);
+  const cost = sweepCost(regions, lastSweepPages);
+  const hubName = (id: string) => hubs.find((h) => h.id === id)?.name ?? id;
+  const toggle = (id: string, on: boolean) => setSettings({ radarHubIds: on ? [...ids.filter((x) => x !== id), id] : ids.filter((x) => x !== id) });
+  return (
+    <div className="sso-section">
+      <h3 className="section-title">Market radar</h3>
+      <div className="checkline">
+        <input id="radarAuto" type="checkbox" checked={auto}
+          onChange={(e) => setSettings({ radarHubIds: e.target.checked ? null : [...ids] })} />
+        <label htmlFor="radarAuto" title="Every character marked as a hub trader (EVE login section) names a duty hub; the radar follows those. With no trader, Jita alone.">
+          Follow my traders&apos; duty hubs automatically{auto && <> — now {autoIds.map(hubName).join(', ')}</>}
+        </label>
+      </div>
+      {hubs.map((h) => {
+        const pages = lastSweepPages.get(h.regionId);
+        return (
+          <div className="checkline" key={h.id}>
+            <input id={`radarHub-${h.id}`} type="checkbox" disabled={auto} checked={ids.includes(h.id)}
+              onChange={(e) => toggle(h.id, e.target.checked)} />
+            <label htmlFor={`radarHub-${h.id}`}>
+              {h.name} — {regionName(h.regionId)}{' '}
+              <span className="dim">{pages ? `${pages} pages a sweep · ≈${(pages * DIFFS_PER_DAY).toLocaleString()} requests a day` : 'cost not measured yet'}</span>
+            </label>
+          </div>
+        );
+      })}
+      <div className="hint">
+        Every 30 minutes the radar reads the <b>entire order book</b> of each watched region and diffs it
+        against the last read — that is where measured trade flow, reprice tempo and competitor counts
+        come from, and it is this app&apos;s biggest single use of CCP&apos;s API.{' '}
+        {cost.pagesPerSweep === null ? (
+          <>Nothing measured yet — the first sweep tells.</>
+        ) : (
+          <>Right now: <b>{regions.length} region{regions.length === 1 ? '' : 's'}, {cost.pagesPerSweep} pages a sweep ≈ {(cost.requestsPerDay ?? 0).toLocaleString()} requests
+          and ≈ {Math.round(((cost.requestsPerDay ?? 0) * WIRE_BYTES_PER_PAGE) / 1e6).toLocaleString()} MB a day</b>
+          {cost.unknown.length > 0 && <> (+ {cost.unknown.length} region{cost.unknown.length === 1 ? '' : 's'} not measured yet)</>}.</>
+        )}{' '}
+        Watch only the markets you trade: a region&apos;s history begins when it is watched and cannot be
+        collected afterwards. The 30-minute cadence is the measurement&apos;s resolution (an order that
+        appears and fills inside one window is invisible to a diff), so the region choice is the lever.
+      </div>
+    </div>
+  );
+}
+
 function AlertsSection() {
   const alerts = useApp((s) => s.alerts);
   const setAlerts = useApp((s) => s.setAlerts);
@@ -377,14 +436,14 @@ function AlertsSection() {
       <div className="field-grid" style={{ marginTop: 8 }}>
         <label title="Mirrors every alert to your phone. Install the free 'ntfy' app (iPhone/Android), subscribe to a topic with a hard-to-guess name, and paste its URL here — e.g. https://ntfy.sh/eve-conductor-x7k2p9. Anyone who knows the topic name can read it, so make it unguessable.">Phone push (ntfy URL)</label>
         <input type="text" style={{ width: '100%' }} value={alerts.ntfyUrl}
-          placeholder="https://ntfy.sh/your-secret-topic (optional)"
+          placeholder="https://ntfy.sh/your-secret-topic (optional — ntfy.sh only; a self-hosted server is outside the app's security policy)"
           onChange={(e) => setAlerts({ ntfyUrl: e.target.value })} spellCheck={false} />
       </div>
       <button className="btn" style={{ marginTop: 8 }} onClick={sendTestNotification}>
         Send test alert
       </button>
       <div className="hint">
-        Desktop alerts come from the watcher (checks ~every 5 min while the app runs). For
+        Desktop alerts come from the trend watcher (every 5 min while the app runs). For
         iPhone: App Store → <b>ntfy</b> → subscribe to your topic → paste the topic URL above.
         Alerts contain only item/system/price — still, pick an unguessable topic name.
       </div>
@@ -397,14 +456,31 @@ function BackupSection() {
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  // v0.220.0: the radar's raw month files — written until this version, read by nothing, hundreds
+  // of MB. Listed here with their size; the app deletes nothing by itself.
+  const [radarMonths, setRadarMonths] = useState<{ name: string; size: number }[]>([]);
+  const loadRadarMonths = () => { void window.appInfo?.stats?.radarMonths?.().then((m) => setRadarMonths(m ?? [])).catch(() => setRadarMonths([])); };
+  useEffect(loadRadarMonths, []);
+  const radarMonthsMb = radarMonths.reduce((t, m) => t + m.size, 0) / 1048576;
+  async function deleteRadarMonths() {
+    if (busy) return;
+    setBusy(true); setError(null);
+    try {
+      const r = await window.appInfo?.stats?.deleteRadarMonths?.();
+      setStatus(r ? `Deleted ${r.deleted} radar month file(s), ${(r.bytes / 1048576).toFixed(0)} MB freed.` : 'Nothing deleted.');
+      loadRadarMonths();
+    } catch (e) { setError(e instanceof Error ? e.message : String(e)); } finally { setBusy(false); }
+  }
 
   async function doExport() {
     if (busy) return;
     setBusy(true);
     setError(null);
     try {
-      const dest = await exportBackup();
-      setStatus(dest ? `Backup saved: ${dest}` : 'Export cancelled.');
+      const { dest, skipped } = await exportBackup();
+      setStatus(dest
+        ? `Backup saved: ${dest}${skipped.length > 0 ? ` — left out: ${skipped.map((f) => `${f.name} (${f.why})`).join('; ')}` : ''}`
+        : 'Export cancelled.');
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -434,8 +510,9 @@ function DiagnosticsPanel() {
   // and the recent log, ready to paste.
   const copyReport = async () => {
     await flushLog();
-    const tail = await readLogTail(200);
     const chars = useAuth.getState().characters;
+    // names and ids of every logged-in character are replaced by "pilot #n" before this leaves the machine (v0.236.0)
+    const tail = redactCharacters(await readLogTail(200), chars);
     const s = useApp.getState();
     const header = [
       '=== EVE Conductor bug report ===',
@@ -483,7 +560,7 @@ function DiagnosticsPanel() {
           {copied ? 'copied ✓' : 'Copy all'}
         </button>
         <button className="btn mini"
-          title="Copies version, platform, current module, team shape (counts only — no character names) and the last 200 log lines, ready to paste into Discord."
+          title="Copies version, platform, current module, team shape (counts only) and the last 200 log lines with every character name and id replaced by pilot #n, ready to paste into Discord."
           onClick={() => void copyReport().catch(() => {})}>
           {reported ? 'report copied ✓' : '🐛 Copy bug report'}
         </button>
@@ -569,6 +646,18 @@ function DiagnosticsPanel() {
         revoking your sessions). Trend history in the Do-Not-Delete folder survives
         reinstalls by itself; the backup carries a copy anyway so ONE file moves everything.
       </div>
+      {radarMonths.length > 0 && (
+        <div className="hint" style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span>
+            <b>Old radar files: {radarMonths.length} file{radarMonths.length === 1 ? '' : 's'}, {radarMonthsMb.toFixed(0)} MB</b> in the stats folder — raw rows written by
+            versions before 0.220.0 (read by nothing), and the single summary blob 0.229.0 split into one file per region (kept once, as a fallback).
+            Safe to delete; nothing else is touched.
+          </span>
+          <button className="btn mini" onClick={() => void deleteRadarMonths()} disabled={busy} title={radarMonths.map((m) => m.name).join(', ')}>
+            Delete {radarMonthsMb.toFixed(0)} MB
+          </button>
+        </div>
+      )}
       {status && <div className="hint" style={{ color: 'var(--good)' }}>{status}</div>}
       {error && <div className="form-error">{error}</div>}
     </div>
@@ -679,11 +768,12 @@ export default function SettingsModal({ onClose }: { onClose: () => void }) {
   return (
     <div className="overlay" onClick={onClose}>
       <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <h2>Trading settings</h2>
+        <h2>Settings</h2>
 
         <EveLoginSection />
       <YourSetupSection />
       <AppWindowSection />
+        <MarketRadarSection />
         <AlertsSection />
         <BackupSection />
         <HubManager />

@@ -38,6 +38,7 @@ import { iskShort } from '../lib/format';
 import FeedPanel from './FeedPanel';
 import { parseJournal, lastUndocks, computeUndockCuts, UNDOCK_KEY } from '../lib/undockJournal';
 import { getType } from '../lib/typedb';
+import { maxOf } from '../lib/nums';
 
 interface LogFileMeta {
   file: string;
@@ -180,8 +181,8 @@ function windowStats(events: GameLogEvent[]): WindowStats | null {
     [...m.entries()].sort((a, b) => b[1].dmg - a[1].dmg).slice(0, n);
   return {
     t0, t1, outTotal, inTotal,
-    peakOut10s: Math.max(0, ...out10.values()) / 10,
-    peakIn10s: Math.max(0, ...in10.values()) / 10,
+    peakOut10s: Math.max(0, maxOf(out10.values())) / 10,
+    peakIn10s: Math.max(0, maxOf(in10.values())) / 10,
     missOut, hitsOut, neutOutGj, neutInGj, repInHp, repEvents,
     byTarget: topApp(byTarget, 10), bySource: top(bySource, 10),
     byWeapon: topApp(byWeapon, 10), byAttacker: topApp(byAttacker, 10),
@@ -305,7 +306,7 @@ export function FlowChart({ events, logins, reships, kills, ships, fights, domai
   }
   const A = cumulative ? cumOut : out;
   const B = cumulative ? cumIn : inc;
-  const yMax = Math.max(10, ...A, ...B);
+  const yMax = Math.max(10, maxOf(A), maxOf(B));
   const xOf = (s: number) => PAD_L + (s / nS) * (W - PAD_L - PAD_R);
   const xOfT = (t: number) => PAD_L + ((t - d0) / span) * (W - PAD_L - PAD_R);
   const yOf = (v: number) => BASE - (v / yMax) * (BASE - TOP);
@@ -491,12 +492,12 @@ function QualityBar({ rows, misses }: { rows: [string, number][]; misses: number
  * separate into visible bands. Horizontal bars: bins are categories. */
 function VolleyHistogram({ volleys }: { volleys: number[] }) {
   if (volleys.length === 0) return <div className="dim">no volleys</div>;
-  const max = Math.max(...volleys);
+  const max = maxOf(volleys);
   const BINS = 10;
   const step = Math.max(1, Math.ceil(max / BINS / 10) * 10);
   const counts = new Array<number>(BINS).fill(0);
   for (const v of volleys) counts[Math.min(BINS - 1, Math.floor(v / step))] += 1;
-  const cMax = Math.max(...counts);
+  const cMax = maxOf(counts);
   return (
     <div>
       {counts.map((c, i) => (c > 0 || (i > 0 && counts[i - 1] > 0)
@@ -546,7 +547,7 @@ export function CapChart({ events, domain, width, onPickTime, picking }: {
       while (lo < hi && neut[lo].t < t - winMs) { if (neut[lo].kind === 'neutOut') sO -= neut[lo].amount ?? 0; else sI -= neut[lo].amount ?? 0; lo += 1; }
       out[sIdx] = sO / (winMs / 1000); inc[sIdx] = sI / (winMs / 1000);
     } }
-  const yMax = Math.max(1, ...out, ...inc);
+  const yMax = Math.max(1, maxOf(out), maxOf(inc));
   const xOf = (sIdx: number) => PAD_L + (sIdx / nS) * (W - PAD_L - PAD_R);
   const upOf = (v: number) => MID - (v / yMax) * AMP;
   const dnOf = (v: number) => MID + (v / yMax) * AMP;
@@ -627,8 +628,8 @@ function MiningChart({ events, logins, domain, width, onPickTime, picking }: {
       norm[s] = sN / perMin; crit[s] = sC / perMin; resid[s] = sR / perMin;
     }
   }
-  const upMax = Math.max(10, ...norm.map((v, i) => v + crit[i]));
-  const dnMax = Math.max(10, ...resid);
+  const upMax = Math.max(10, maxOf(norm.map((v, i) => v + crit[i])));
+  const dnMax = Math.max(10, maxOf(resid));
   const xOf = (s: number) => PAD_L + (s / nS) * (W - PAD_L - PAD_R);
   const xOfT = (t: number) => PAD_L + ((t - d0) / span) * (W - PAD_L - PAD_R);
   const upOf = (v: number) => MID - (v / upMax) * (MID - TOP);
@@ -728,7 +729,7 @@ function RateChart({ events, logins, domain, width, valueOf, color, fmtY, ariaLa
       rate[s] = sum / (winMs / 60_000);
     }
   }
-  const yMax = Math.max(1e-9, ...rate);
+  const yMax = Math.max(1e-9, maxOf(rate));
   const xOf = (s: number) => PAD_L + (s / nS) * (W - PAD_L - PAD_R);
   const xOfT = (t: number) => PAD_L + ((t - d0) / span) * (W - PAD_L - PAD_R);
   const yOf = (v: number) => BASE - (v / yMax) * (BASE - TOP);

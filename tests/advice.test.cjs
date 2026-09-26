@@ -1,3 +1,5 @@
+// v0.232.0 (audit E7): runs against the fresh sim/lib compile the runner produces — until then a frozen
+// copy in tests/r3 (up to 300 lines behind the shipped code) kept these passing on old behaviour.
 // Fixtures for adviceFor() — the column the user ACTS from, every day.
 //
 // THE BUG: nothing in this function ever saw the cost basis, so an order
@@ -6,7 +8,7 @@
 // than the one already losing money. The ⚠ loss chip two columns to the left
 // said the opposite at the same time.
 
-const { adviceFor } = require('./r3/orderAdvice.js');
+const { adviceFor } = require('./sim/lib/orderAdvice.js');
 
 let pass = 0, fail = 0;
 const ok = (label, cond, extra = '') => {

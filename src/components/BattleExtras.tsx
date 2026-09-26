@@ -12,6 +12,7 @@ import { useMemo, useRef, useState } from 'react';
 import type { FightDigest, RosterRow, TimelinePoint } from '../lib/battleNarrative';
 import { TIMELINE_MODES, nearestIndex, seriesMax, stepPath, timelineSeries, valueAt, type TimelineMode } from '../lib/fightTimeline';
 import { iskShort } from '../lib/format';
+import { maxOf } from '../lib/nums';
 
 const OURS = '#4da3ff';
 const THEIRS = '#ff5b5b';
@@ -133,7 +134,7 @@ const lostIsk = (r: RosterRow): number => r.losses.reduce((s, l) => s + l.iskNum
 function RosterSide({ title, colour, rows, sort, onPilot }: { title: string; colour: string; rows: RosterRow[]; sort: RosterSort; onPilot: (v: PilotOpen) => void }) {
   const sorted = useMemo(() => rows.slice().sort((a, b) => (sort === 'dmg' ? b.dmg - a.dmg : sort === 'kills' ? b.kills - a.kills || b.dmg - a.dmg
     : sort === 'lost' ? lostIsk(b) - lostIsk(a) || b.dmg - a.dmg : a.name.localeCompare(b.name))), [rows, sort]);
-  const maxDmg = Math.max(1, ...rows.map((r) => r.dmg));
+  const maxDmg = Math.max(1, maxOf(rows.map((r) => r.dmg)));
   const open = (r: RosterRow, ship?: { id: number; name: string }) => {
     const hull = ship ?? r.ships[0] ?? { id: 0, name: '' };
     const died = r.losses.find((l) => l.shipId === hull.id);

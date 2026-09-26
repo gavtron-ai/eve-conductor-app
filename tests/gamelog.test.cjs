@@ -196,5 +196,16 @@ const eq = (l, g, w) => {
     [['Veldspar', 100], ['Scordite', 50]]);
 }
 
+// ---- G16: a trailing CR or a BOM never decides whether a line parses (v0.218.0) ----
+// The client writes CRLF; a chunked reader handed the last line of every chunk over with its CR,
+// LINE_RE's `.` does not match CR, and every such mining line was lost.
+{
+  const raw = '[ 2026.09.23 04:14:33 ] (mining) <color=0x77ffffff>You mined <font size=12><color=#ff8dc169>147<color=0x77ffffff><font size=10> units of <color=0xffffffff><font size=12>Gneiss IV-Grade';
+  eq('G16a clean line parses', parseGameLogLine(raw).kind, 'mine');
+  eq('G16b …and so does the same line with a trailing CR', [parseGameLogLine(raw + String.fromCharCode(13)).kind, parseGameLogLine(raw + String.fromCharCode(13)).amount], ['mine', 147]);
+  eq('G16c …and with a BOM in front (the first line of a file)', parseGameLogLine(String.fromCharCode(0xfeff) + raw).kind, 'mine');
+  eq('G16d a crit line with a CR is still a crit, not a mine', parseGameLogLine('[ 2026.09.23 04:17:11 ] (mining) Critical mining success! You mined an additional 413 units of Gneiss IV-Grade' + String.fromCharCode(13)).kind, 'mineCrit');
+}
+
 console.log(`\ngamelog.test: ${pass} passed, ${fail} failed`);
 if (fail > 0) process.exitCode = 1;

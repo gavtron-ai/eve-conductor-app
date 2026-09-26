@@ -233,7 +233,11 @@ const upd = (st, s, L, now, o = OPTS) => W.updateWatch(st, s, L, now, o);
   r = upd(base(), keepB, locs({ [A]: loc({ shipTypeId: 17476 }), [B]: loc({ shipTypeId: 32880 }) }), 2073 * S);
   eq('D3 A reshipped: history dropped, idle, not named', [r.state.miners.some((m) => m.charId === A), r.alerts], [false, []]);
   r = upd(base(), keepB, locs({ [A]: loc({ online: false }), [B]: loc({ shipTypeId: 32880 }) }), 2073 * S);
-  eq('D4 A logged off: idle, not named', [r.state.miners[0].status, r.alerts], ['idle', []]);
+  eq('D4 A logged off (ESI): measured from its lines like anyone — stopped — but the silence is explained, not named', [r.state.miners[0].status, r.alerts], ['stopped', []]);
+  // RULE 4 (v0.220.0): ESI's online flag lags minutes after a login; a miner whose lines keep
+  // arriving is watched from those lines, whatever the flag says — it used to be set idle
+  r = upd(base(), [...keepB, ...samples(A, 'Alpha', bursts(1800 * S, 180 * S, 2, 2))], locs({ [A]: loc({ online: false }), [B]: loc({ shipTypeId: 32880 }) }), 2073 * S);
+  eq('D6 A "offline" to ESI but still writing lines: ok, cur = peak', [r.state.miners[0].status, r.state.miners[0].cur, r.state.miners[0].peak, r.alerts], ['ok', 8, 8, []]);
   // a character the app has no login for: no location → dock/move cannot suppress, the alert stands
   r = upd(base(), keepB, locs({ [B]: loc({ shipTypeId: 32880 }) }), 2073 * S);
   eq('D5 A unknown to ESI: still named', kinds(r.alerts), [`${A}:stopped`]);

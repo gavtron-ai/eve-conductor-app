@@ -43,6 +43,49 @@ export const TRADE_HELP: ModuleHelp = {
       ),
     },
     {
+      id: 'basis', title: 'Where every number comes from',
+          figure: (
+            <Fig caption="Rule 1 of this app: a listing is not a price. Every ISK figure traces to one of four kinds of evidence, and the screen says which.">
+              <Table head={['Kind', 'What it is', 'Trusted for']}
+                rows={[
+                  ['executed trades', 'what actually changed hands — ESI market history (yesterday and back), your own wallet transactions and journal, the radar\'s measured fills', 'prices, volumes, profit'],
+                  ['your own fees & pace', 'broker fee and sales tax from YOUR skills and standings; how fast YOUR orders filled or were repriced', 'margins, defense cost, sell time'],
+                  ['a live book with its timestamps', 'the current order book read from ESI, each order with the time it was placed or last changed', 'heat, tempo, transitions between two reads'],
+                  ['a listing', 'one number somebody typed into an order — what they hope for', 'only ever named as such: an ask, a bid, a spread'],
+                ]} />
+            </Fig>
+          ),
+          body: (
+            <>
+              <p>The table below walks every money number in this module (audit item F9, v0.231.0). Hover any header in the app for the same statement in place.</p>
+              <Table head={['Number', 'Screen', 'Basis', 'Source']}
+                rows={[
+                  ['Buy @ / Bid cost @', 'Trade Finder', 'listing — the cheapest 5% of sell listings at the source (a lone bait order cannot set it); in bid mode the top bid plus your broker fee', 'Fuzzwork aggregates of the live book, 10–30 min old'],
+                  ['Sell @ (order), Quick margin', 'Trade Finder', 'listing — the destination\'s lowest sell listing you would match; the top 5% of bids you would dump into', 'Fuzzwork aggregates'],
+                  ['Margin, Profit/trip, Profit/day, Order cost', 'Trade Finder', 'arithmetic on the two listings above minus YOUR broker fee and sales tax', 'your skills and standings (Settings)'],
+                  ['Sell time, Day vol, Qty', 'Trade Finder', 'executed trades — units traded per calendar day in the destination region, the lower of the 30- and 90-day figures; quiet days count as zero', 'ESI market history'],
+                  ['Real high (7d), 2w history, Trend, ⚠ price high / dump?', 'Trade Finder', 'executed trades — daily min / average / max actually paid', 'ESI market history'],
+                  ['Heat, Defense/day, Adj profit/day', 'Trade Finder', 'a live book with its timestamps — each order\'s issued time gives the reprice tempo; capped at YOUR own historical reprice pace', 'ESI live orders; your wallet journal'],
+                  ['Bid fill/day', 'Trade Finder (bid mode)', 'executed trades — the share of daily volume that printed at the day\'s low (sells into bids)', 'ESI market history'],
+                  ['Buy @, Sell @, Profit, Order cost', 'Auto Haul', 'listings at the source and the destination (order mode: the lowest sell listing; instant: standing buys), minus YOUR fees; Qty capped by executed daily volume', 'Fuzzwork aggregates; ESI history'],
+                  ['Realized profit, ROI, revenue without cost, fees, inventory at cost', 'Dashboard', 'executed trades — YOUR wallet transactions and journal, matched FIFO', 'ESI wallet (the ledger file)'],
+                  ['Trading value: stock, transit, listed', 'Dashboard, Home', 'measured Jita sales over 7 days (the radar\'s fills) → your own cost → the Jita ask, named as a listing and counted in the log', 'radar summary; ledger; Fuzzwork'],
+                  ['Escrow, wallets', 'Dashboard, Home', 'your own orders\' escrow and wallet balances', 'ESI, your characters'],
+                  ['Price, value, days left, pace', 'My Orders, the order popup', 'your own orders (price × remaining); pace from YOUR fills and the order\'s history', 'ESI own orders; the ledger'],
+                  ['Undercuts, rival tempo, fill clocks', 'Trends', 'transitions between consecutive reads of the live book, and your own orders\' events', 'ESI live orders; the radar'],
+                  ['Flow, fills, reprices, competitors', 'Radar', 'executed trades and transitions — full-book diffs every 30 min: a fill is a volume drop on the same order id', 'ESI regional order books'],
+                  ['Best price (Radar)', 'Radar', 'listing — the best price on the book at the read, named so', 'ESI regional order books'],
+                  ['Sell, Buy, Spread, vs Jita, Buy vol, Orders', 'Item Explorer (hub table)', 'listings on the books, named so in every header', 'Fuzzwork aggregates'],
+                  ['Bought/day, Sold/day', 'Item Explorer (hub table), item groups', 'executed trades — the radar\'s fills per day, normalised to the hours it was watching', 'radar summary'],
+                  ['Hauls', 'Home', 'your own haul log — what you recorded', 'the app\'s haul log'],
+                  ['Planets value', 'Home, PI', 'stored quantities at Jita listings — the tile says so', 'ESI planets; Fuzzwork'],
+                  ['ISK destroyed / lost', 'Home, Battle', 'zKillboard\'s valuation of public killmails', 'zKillboard'],
+                ]} />
+              <Limit>What no screen claims: a spread between two listings is never an opportunity on its own — every finder row must also show trades (Day vol, Real high) before it is ranked, and the Explorer\'s Bought/Sold columns are the trades beside its listings.</Limit>
+            </>
+          ),
+    },
+    {
       id: 'search', title: 'The search bar & the watchlist',
       body: (
         <>

@@ -163,5 +163,15 @@ check('G5 a missing link ends it: July not whole → complete from 1 August, how
 check('G6 this month read 5 days ago but the lists only reach back 2: kills in between are missing → complete only from the lists; the same when the month on record is last month', L.heldFloor({ now, recentFloor: R, curYm: '2026-09', curReadAt: now - 5 * DAY, whole: ['2026-08'] }) === R && L.heldFloor({ now, recentFloor: R, curYm: '2026-08', curReadAt: now - DAY, whole: ['2026-07'] }) === R);
 check('G7 a list that was not full is everything zKillboard has (0); nothing read yet → nothing claimed', L.heldFloor({ now, recentFloor: 0, curYm: null, curReadAt: null, whole: [] }) === 0 && L.heldFloor({ now, recentFloor: null, curYm: '2026-09', curReadAt: now, whole: ['2026-08'] }) === null);
 
+// C1 (v0.220.0): corpDays over everything held (since = null) used to spread every mail's time
+// into Math.min — 150,000 are allowed and V8 refuses ~125,000 arguments (measured)
+{
+  const many = [];
+  for (let i = 0; i < 200_000; i++) many.push({ id: i + 1, t: T0 + i * 60_000, value: 1, victim: { ally: 0, corp: 1, char: 1, ship: 1, dmg: 0 }, attackers: [] });
+  let rows = null, threw = null;
+  try { rows = X.corpDays({ mails: many, corpId: 999, fights: [], since: null, until: null }, T0 + 200_000 * 60_000); } catch (e) { threw = String(e); }
+  check('C1 200,000 mails, everything held: no overflow, rows come back', threw === null && Array.isArray(rows) && rows.length > 0, threw ?? (rows && rows.length));
+}
+
 console.log(`leaderboard.test: ${pass} passed, ${fail} failed`);
 process.exit(fail > 0 ? 1 : 0);

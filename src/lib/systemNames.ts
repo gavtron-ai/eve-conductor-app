@@ -9,6 +9,7 @@
 // So: bundled map first (instant, offline), then ESI's public
 // /universe/systems/{id}/ once per system, cached persistently.
 import { getSystem } from './mapdata';
+import { swallowed } from './devlog';
 import { ESI_BASE } from './constants';
 import { esiFetch } from './esiRate';
 
@@ -35,8 +36,8 @@ function remember(id: number, v: SystemInfo): void {
   cache.set(id, v);
   try {
     localStorage.setItem(KEY, JSON.stringify(Object.fromEntries(cache)));
-  } catch {
-    // the cache is a convenience — never break a screen over it
+  } catch (e) {
+    swallowed('names', 'system-name cache save', e); // the cache is a convenience — never break a screen over it
   }
 }
 

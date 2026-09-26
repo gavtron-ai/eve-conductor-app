@@ -5,6 +5,12 @@ const sso = require('./sso.cjs');
 const stats = require('./stats.cjs');
 const windowState = require('./windowState.cjs');
 const devlog = require('./devlog.cjs');
+const { isSafeExternal } = require('./safeOpen.cjs');
+/** the one way a page opens a link: the system browser, http(s) only, refusals logged */
+function openExternalSafe(url) {
+  if (isSafeExternal(url)) { shell.openExternal(url); return; }
+  devlog.append(app.getPath('documents'), [{ level: 'warn', area: 'main', msg: 'refused to open a non-http link', data: { url: String(url).slice(0, 80) } }]);
+}
 const appConfig = require('./appConfig.cjs');
 const overlay = require('./overlay.cjs');
 const cloneStore = require('./cloneStore.cjs');
@@ -30,10 +36,40 @@ try {
   // a fresh machine has no legacy folder — the default (new name) is correct
 }
 
-ipcMain.handle('sso-login', (_event, clientId) => sso.login(clientId));
-ipcMain.handle('sso-refresh', (_event, { clientId, refreshToken }) =>
-  sso.refresh(clientId, refreshToken),
-);
+// TOKENS AT REST (v0.235.0, audit E4): every login and refresh lands in the encrypted vault
+// (electron/tokenVault.cjs); a window's refresh is answered from the vault when its pair is
+// still fresh (another window may have refreshed already), single-flight per character, and
+// EVE is asked only with the vault's own refresh token — a rotated token is never reused.
+const vault = require('./tokenVault.cjs');
+const refreshInFlight = new Map();
+ipcMain.handle('sso-login', async (_event, clientId) => {
+  const t = await sso.login(clientId);
+  vault.set(t);
+  return t;
+});
+ipcMain.handle('sso-refresh', (_event, { clientId, refreshToken, characterId }) => {
+  const id = Number(characterId) || 0;
+  const d = vault.decideRefresh(id ? vault.get(id) : null, refreshToken, Date.now());
+  if (d.action === 'reuse') return { ...d.tokens, characterId: id };
+  if (d.action === 'none') return Promise.reject(new Error('Not logged in.'));
+  if (!refreshInFlight.has(id)) {
+    refreshInFlight.set(id, sso.refresh(clientId, d.refreshToken).then((t) => { vault.set(t); return t; }).finally(() => refreshInFlight.delete(id)));
+  }
+  return refreshInFlight.get(id);
+});
+ipcMain.on('tokens-available', (event) => { event.returnValue = vault.available(); });
+ipcMain.handle('tokens-load', () => vault.all());
+ipcMain.handle('tokens-save', (_event, list) => { let kept = 0; for (const t of Array.isArray(list) ? list : []) if (vault.set(t)) kept++; return kept; });
+ipcMain.handle('tokens-forget', (_event, characterId) => vault.forget(Number(characterId)));
+// v0.237.0: the main process's own login-host request count today (the policy page folds it in)
+ipcMain.handle('sso-meter', () => sso.ssoMeter());
+// v0.238.0 (round-two R6): the third-party notices generated at build (scripts/build-notices.mjs) and
+// shipped beside the app's resources; Help → About shows them. null when the file is not there.
+ipcMain.handle('notices-read', () => {
+  const candidates = [path.join(process.resourcesPath || '', 'THIRD-PARTY-NOTICES.txt'), path.join(__dirname, '..', 'build', 'THIRD-PARTY-NOTICES.txt')];
+  for (const p of candidates) { try { return fs.readFileSync(p, 'utf8'); } catch { /* next */ } }
+  return null;
+});
 ipcMain.on('sso-scopes', (event) => {
   event.returnValue = sso.SCOPES;
 });
@@ -64,8 +100,23 @@ app.userAgentFallback = `${app.userAgentFallback.replace(/\s?EVEConductor\/[^\s]
 
 app.whenReady().then(() => {
   try {
+    const vs = vault.status();
+    devlog.append(app.getPath('documents'), [{
+      level: vs.available && !vs.loadFailed ? 'info' : 'warn', area: 'tokens',
+      msg: vs.loadFailed ? 'the token vault could not be read — it is left as it is; log in again to rebuild it' : vs.available ? `token vault: ${vs.count} character(s) encrypted at rest` : 'no encryption on this machine — tokens stay in the browser store as before',
+    }]);
     const baseline = require('./baseline.cjs');
     const src = path.join(process.resourcesPath ?? '', 'baseline');
+    // v0.229.0: the pre-0.229 summary blob becomes one compact file per region — BEFORE the seed
+    // is copied or merged, so a seed's region file can never land on top of unsplit history
+    const mig = require('./radarSummary.cjs').migrateRadarSummary(stats.statsDir(app.getPath('documents')));
+    if (mig) {
+      devlog.append(app.getPath('documents'), [{
+        level: 'error' in mig ? 'warn' : 'info', area: 'radar',
+        msg: 'error' in mig ? `radar summary split failed — the blob is left as it was: ${mig.error}` : `radar summary split into ${mig.regions.length} region file(s): ${(mig.bytesBefore / 1048576).toFixed(1)} MB → ${(mig.bytesAfter / 1048576).toFixed(1)} MB in ${mig.ms} ms; the blob kept as radar-summary.legacy.json`,
+        data: mig,
+      }]);
+    }
     const res = baseline.seedBaseline(src, stats.statsDir(app.getPath('documents')));
     if (res.seeded.length > 0) {
       devlog.append(app.getPath('documents'), [{
@@ -141,30 +192,53 @@ try {
   autoUpdater.on('update-not-available', (i) => updLog('info', `up to date (feed offers ${i?.version ?? '?'})`));
   autoUpdater.on('update-available', (i) => updLog('info', `update available: ${i?.version} — downloading`));
   autoUpdater.on('error', (e) => updLog('warn', `update check failed: ${e instanceof Error ? e.message : String(e)}`));
-  // EMERGENCY UPDATES (v0.217.0, electron/updatePolicy.cjs): an update the owner marked as an
-  // emergency at go-live installs BY ITSELF after a one-minute visible warning — silent install,
-  // relaunch, collectors resume. An ordinary update waits for the user, exactly as before.
+  // WHEN A DOWNLOADED UPDATE INSTALLS (electron/updatePolicy.cjs):
+  //   ordinary   — on quit or restart, as always (v0.187);
+  //   pending    — v0.219.0: the same version was downloaded in an EARLIER run and the app was
+  //                restarted without installing it (a Task Manager kill skips the quit hook) → it
+  //                installs by itself at this start, after a 20-s visible countdown;
+  //   emergency  — v0.217.0: the owner marked the release at go-live → installs by itself after a
+  //                one-minute warning. Silent install, relaunch, collectors resume.
   const updatePolicy = require('./updatePolicy.cjs');
-  let emergencyTimer = null;
+  // the app remembers which version it downloaded in which run (userData/pending-update.json); the
+  // same version downloaded again in a LATER run = restarted without installing → install now
+  const runId = `${process.pid}:${Date.now()}`;
+  const markerPath = () => path.join(app.getPath('userData'), 'pending-update.json');
+  const readMarker = () => { try { return JSON.parse(fs.readFileSync(markerPath(), 'utf8')); } catch { return null; } };
+  const writeMarker = (m) => { try { if (m) fs.writeFileSync(markerPath(), JSON.stringify(m)); else fs.rmSync(markerPath(), { force: true }); } catch { /* nicety */ } };
+  autoUpdater.on('update-not-available', () => writeMarker(null));
+  let installTimer = null;
+  const installIn = (ms, why) => {
+    if (installTimer) return;
+    installTimer = setTimeout(() => {
+      updLog('warn', why);
+      try { autoUpdater.quitAndInstall(true, true); } catch (e) { updLog('warn', `install failed: ${e instanceof Error ? e.message : String(e)}`); installTimer = null; }
+    }, ms);
+  };
   autoUpdater.on('update-downloaded', (i) => {
+    const version = i?.version ?? '';
     const em = updatePolicy.emergencyOf(i);
-    const installAt = em.emergency ? Date.now() + updatePolicy.EMERGENCY_COUNTDOWN_MS : 0;
-    updLog(em.emergency ? 'warn' : 'info', em.emergency
-      ? `EMERGENCY update ${i?.version} downloaded — installing by itself in ${updatePolicy.EMERGENCY_COUNTDOWN_MS / 1000}s: ${em.reason}`
-      : `update ${i?.version} downloaded — installs on quit`);
+    const pend = updatePolicy.pendingSighting(readMarker(), version, runId, Date.now());
+    writeMarker(pend.marker);
+    const mode = em.emergency ? 'emergency' : pend.installNow ? 'pending' : 'ordinary';
+    const countdown = mode === 'emergency' ? updatePolicy.EMERGENCY_COUNTDOWN_MS : mode === 'pending' ? updatePolicy.PENDING_COUNTDOWN_MS : 0;
+    const installAt = countdown ? Date.now() + countdown : 0;
+    updLog(mode === 'ordinary' ? 'info' : 'warn', mode === 'emergency'
+      ? `EMERGENCY update ${version} downloaded — installing by itself in ${countdown / 1000}s: ${em.reason}`
+      : mode === 'pending'
+        ? `update ${version} was downloaded in an earlier run and never installed (the app was not quit) — installing by itself in ${countdown / 1000}s`
+        : `update ${version} downloaded — installs on quit or restart (or by itself at the next start)`);
     for (const w of BrowserWindow.getAllWindows()) {
-      try { w.webContents.send('update-ready', { version: i?.version ?? '', emergency: em.emergency, reason: em.reason, installAt }); } catch { /* window may be closing */ }
+      try { w.webContents.send('update-ready', { version, emergency: em.emergency, pending: pend.installNow, reason: em.reason, installAt }); } catch { /* window may be closing */ }
     }
-    if (em.emergency && !emergencyTimer) {
-      emergencyTimer = setTimeout(() => {
-        updLog('warn', `EMERGENCY update ${i?.version}: restarting into it now`);
-        try { autoUpdater.quitAndInstall(true, true); } catch (e) { updLog('warn', `emergency install failed: ${e instanceof Error ? e.message : String(e)}`); emergencyTimer = null; }
-      }, updatePolicy.EMERGENCY_COUNTDOWN_MS);
-    }
+    if (mode === 'emergency') installIn(countdown, `EMERGENCY update ${version}: restarting into it now`);
+    else if (mode === 'pending') installIn(countdown, `update ${version}: restarting into it now (downloaded in an earlier run)`);
   });
   ipcMain.handle('update-restart', () => { autoUpdater.quitAndInstall(); });
   app.whenReady().then(() => {
     if (!app.isPackaged) return;
+    // the marker is stale once the version it names is what is running (the update did install)
+    try { const m = readMarker(); if (m && m.version === app.getVersion()) writeMarker(null); } catch { /* nicety */ }
     const check = () => { autoUpdater.checkForUpdates().catch(() => { /* logged above */ }); };
     setTimeout(check, 15_000);              // let startup settle first
     setInterval(check, updatePolicy.CHECK_EVERY_MS);   // then every hour (was 4 h — too slow for an emergency)
@@ -213,8 +287,10 @@ ipcMain.handle('hauls-read', () => appConfig.readHauls(app.getPath('documents'))
 ipcMain.handle('hauls-write', (_e, file) => appConfig.writeHauls(app.getPath('documents'), file));
 
 
-// ---- the corp killboard read as a PAGE (live) rather than the cached API ----
+// ---- zKillboard: the JSON API only, through zkill.cjs (spaced, identified, cached as the API asks; the
+// page scraper of 0.99–0.199 is gone) ----
 ipcMain.handle('zkill-corp-kills', (_e, corpId, page) => zkill.corpKillmails(Number(corpId) || 0, Number(page) || 1));
+ipcMain.handle('zkill-meter', () => zkill.zkillMeter());
 ipcMain.handle('zkill-corp-recent', (_e, a) => zkill.corpRecent(Number(a && a.corpId) || 0, String((a && a.kind) || '')));
 ipcMain.handle('zkill-corp-month', (_e, a) => zkill.corpMonth(Number(a && a.corpId) || 0, String((a && a.kind) || ''), Number(a && a.year) || 0, Number(a && a.month) || 0, Number(a && a.page) || 1));
 ipcMain.handle('zkill-char-kills', (_e, charId) => zkill.charKillmails(Number(charId) || 0));
@@ -252,6 +328,9 @@ ipcMain.handle('stats-aux-write', (_e, { name, content }) => stats.writeAuxFile(
 ipcMain.handle('stats-aux-read', (_e, name) => stats.readAuxFile(app.getPath('documents'), name));
 ipcMain.handle('stats-aux-append', (_e, { name, lines }) => stats.appendAuxLines(app.getPath('documents'), name, lines));
 ipcMain.handle('stats-aux-files', () => stats.listAuxFiles(app.getPath('documents')));
+// v0.220.0: the raw radar month files — listed for Settings, deleted only on the user's press
+ipcMain.handle('stats-radar-months', () => stats.listRadarMonths(app.getPath('documents')));
+ipcMain.handle('stats-radar-months-delete', () => stats.deleteRadarMonths(app.getPath('documents')));
 ipcMain.handle('stats-aux-names', () => stats.listAuxNames(app.getPath('documents')));
 ipcMain.handle('stats-import', (_event, files) =>
   stats.importEventFiles(app.getPath('documents'), files),
@@ -434,7 +513,7 @@ function createWindow() {
 
   // External links open in the system browser, not inside the app
   win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    openExternalSafe(url);
     return { action: 'deny' };
   });
 
@@ -514,7 +593,7 @@ function createModuleWindow(moduleId, saved) {
   });
   win.__moduleId = id;
   win.webContents.setWindowOpenHandler(({ url }) => {
-    shell.openExternal(url);
+    openExternalSafe(url);
     return { action: 'deny' };
   });
   if (saved && saved.maximized) win.maximize();
@@ -570,7 +649,7 @@ function openChainSummary() {
     },
   });
   chainWin.setMenuBarVisibility(false);
-  chainWin.webContents.setWindowOpenHandler(({ url }) => { shell.openExternal(url); return { action: 'deny' }; });
+  chainWin.webContents.setWindowOpenHandler(({ url }) => { openExternalSafe(url); return { action: 'deny' }; });
   if (process.env.VITE_DEV_SERVER_URL) {
     chainWin.loadURL(`${process.env.VITE_DEV_SERVER_URL}#chain-summary`);
   } else {

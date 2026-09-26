@@ -12,7 +12,7 @@
 // asks the main window to read again. This window writes nothing to the
 // shared store (the setup-window lesson: a second store instance would
 // clobber the main one); its one preference lives under its own key.
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { ChainExtract } from '../lib/apertureExtract';
 import {
   CHAIN_SORT_NATURAL, chainBranches, hopsFrom, onBranch, rockFamiliesIn, sortChainRows, summarize,
@@ -206,16 +206,16 @@ export function ChainSummaryView({ embedded = null }: { embedded?: ChainSummaryE
     if (embedded && !embedded.reading) embedded.onRefresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-  const refresh = () => {
+  const refresh = useCallback(() => {
     if (!APERTURE_FEATURES_AVAILABLE) return;
     logUser('chain: refresh requested');
     if (embedded) embedded.onRefresh(); else window.appInfo?.chain?.refresh();
-  };
+  }, [embedded]);
   useEffect(() => {
     if (!auto || !APERTURE_FEATURES_AVAILABLE) return undefined;
     const t = setInterval(refresh, AUTO_MS);
     return () => clearInterval(t);
-  }, [auto]);
+  }, [auto, refresh]);
   useEffect(() => { try { localStorage.setItem(HOME_KEY, home); } catch { /* nicety */ } }, [home]);
 
   // prices for every gas and ore the tables can value — one shared fetch (lib/chainPrices.ts)
@@ -354,7 +354,7 @@ export function ChainSummaryView({ embedded = null }: { embedded?: ChainSummaryE
     };
     timings.current.vizMs = Math.round(performance.now() - t0);
     return out;
-  }, [parsed, summary, hops, linkedOnly, branchInfo, branchPick, originSystem]);
+  }, [parsed, summary, hops, linkedOnly]);
   // one line per NEW reading with where this window's time went
   useEffect(() => {
     if (!data || !summary) return;

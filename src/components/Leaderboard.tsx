@@ -9,12 +9,13 @@ import {
   type BoardInput, type BoardSpec, type PilotStats,
 } from '../lib/leaderboard';
 import { boardText, corpDays, hallOfFame, pilotProfile, type Record1 } from '../lib/leaderboardExtras';
-import { HISTORY_MONTHS, inputFor, openBoard, resolveBoardNames, resumeHistory, stopHistory, useBoard, type BoardData } from '../lib/leaderboardData';
+import { HISTORY_MONTHS, NEED_LOGIN, inputFor, openBoard, resolveBoardNames, resumeHistory, stopHistory, useBoard, type BoardData } from '../lib/leaderboardData';
 import { agoShort } from '../lib/homeDigests';
 import { iskShort } from '../lib/format';
 import { getType } from '../lib/typedb';
 import { logUser } from '../lib/devlog';
 import { Hist24 } from './DashKit';
+import { maxOf } from '../lib/nums';
 
 const face = (id: number, size = 64) => `https://images.evetech.net/characters/${id}/portrait?size=${size}`;
 const render = (id: number) => `https://images.evetech.net/types/${id}/render?size=64`;
@@ -88,7 +89,7 @@ function PilotCard({ char, inp, ctx, move, onClose, onDuel }: { char: number; in
           </div>
           <span style={{ flex: 1 }} />
           <button className="btn mini" onClick={() => onDuel(char)} title="put this pilot in the head-to-head">⚔ head to head</button>
-          <button className="btn mini" onClick={onClose}>✕</button>
+          <button className="btn mini" title="close" onClick={onClose}>✕</button>
         </header>
         <div className="lb-profile-tiles">
           {[[`${s.kills} – ${s.losses}`, 'kills – losses'], [iskShort(s.iskShare), 'ISK destroyed (by share)'], [s.iskLost ? iskShort(s.iskLost) : '0', 'ISK lost'], [String(s.finalBlows), 'final blows'],
@@ -105,7 +106,7 @@ function PilotCard({ char, inp, ctx, move, onClose, onDuel }: { char: number; in
               ); })}
             </div>
             <h4>When he is on a killmail <span className="dim">by EVE hour</span></h4>
-            <div style={{ height: 70, display: 'flex' }}><Hist24 hours={p.hours} color="var(--accent)" peak={p.hours.indexOf(Math.max(...p.hours))} /></div>
+            <div style={{ height: 70, display: 'flex' }}><Hist24 hours={p.hours} color="var(--accent)" peak={p.hours.indexOf(maxOf(p.hours))} /></div>
             <h4>The people in his story</h4>
             <div className="lb-people">
               {p.buddy && <button onClick={() => ctx.open(p.buddy!.char)} title="the corp mate on the most of his kills — open their card"><img src={face(p.buddy.char)} alt="" /><span><b>{ctx.nameOf(p.buddy.char)}</b><i>wingman · {p.buddy.n} shared kill{p.buddy.n === 1 ? '' : 's'}</i></span></button>}
@@ -189,7 +190,7 @@ function HeadToHead({ stats, ctx, pair, setPair }: { stats: PilotStats[]; ctx: C
 function Records({ inp, ctx, now }: { inp: BoardInput; ctx: Ctx; now: number }) {
   const h = useMemo(() => hallOfFame(inp), [inp]);
   const days = useMemo(() => corpDays(inp, now), [inp, now]);
-  const max = Math.max(1, ...days.map((d) => Math.max(d.kills, d.losses)));
+  const max = Math.max(1, maxOf(days.map((d) => Math.max(d.kills, d.losses))));
   const rec = (icon: string, title: string, r: Record1 | null, value: string, extra?: string) => (
     <div className="lb-record" onClick={r?.mail ? () => openUrl(`https://zkillboard.com/kill/${r.mail}/`) : undefined} style={r?.mail ? { cursor: 'pointer' } : undefined} title={r?.mail ? 'open the killmail on zKillboard' : undefined}>
       <span className="ico">{icon}</span>
@@ -272,7 +273,7 @@ export default function Leaderboard() {
   const medals = useMemo(() => medalTable(stats), [stats]);
   // the window before — compared with only when it is held WHOLE, or an arrow would be a guess
   const canCompare = !cov.short && beforeIsHeld(data?.heldSince ?? null, before);
-  const moves = useMemo(() => (inp && before && canCompare ? rankMoves(medals, medalTable(pilotStats(inputFor(data!, before.since, before.until)))) : null), [inp, before, canCompare, medals]);
+  const moves = useMemo(() => (inp && before && canCompare ? rankMoves(medals, medalTable(pilotStats(inputFor(data!, before.since, before.until)))) : null), [inp, before, canCompare, medals, data]);
   const inWindow = useMemo(() => (data ? data.mails.filter((m) => (cov.since === null || m.t >= cov.since) && (span.until === null || m.t < span.until)).length : 0), [data, cov.since, span.until]);
   const mine = useMemo(() => new Set(data?.myChars ?? []), [data]);
   const nameOf = (id: number) => data?.names.get(id) ?? `pilot ${id}`;
@@ -327,7 +328,7 @@ export default function Leaderboard() {
             {cells.map((c) => (
               <button key={c.ym} className={`lb-cell ${c.state}${c.inView ? ' view' : ''}`} onClick={() => setWin(`m:${c.ym}`)}
                 title={`${c.ym} — ${c.mails.toLocaleString()} killmail${c.mails === 1 ? '' : 's'} held · ${c.state === 'whole' ? 'the whole month' : c.state === 'current' ? 'this month, to date' : c.state === 'partial' ? 'only part of it (not yet read whole)' : c.state === 'reading' ? 'being read right now' : 'nothing yet'}${c.inView ? ' · in the range on screen' : ''} — click to show this month`}>
-                <i style={{ height: `${Math.max(c.mails > 0 ? 12 : 0, Math.round((c.mails / Math.max(1, ...cells.map((x) => x.mails))) * 100))}%` }} />
+                <i style={{ height: `${Math.max(c.mails > 0 ? 12 : 0, Math.round((c.mails / Math.max(1, maxOf(cells.map((x) => x.mails)))) * 100))}%` }} />
                 <span>{c.ym.slice(5) === '01' ? c.ym.slice(2, 4) : c.ym.slice(5)}</span>
               </button>
             ))}
@@ -354,7 +355,7 @@ export default function Leaderboard() {
           {data.unpriced > 0 && <span className="warn"> · {data.unpriced} killmail{data.unpriced === 1 ? ' has' : 's have'} no price yet: ISK boards are a floor</span>}
           <span className="dim"> · {moves ? 'arrows compare with the span before' : 'no arrows: the span before is not held whole'} · newest read {agoShort(now - data.at)}</span>
         </>) : busy ? 'Reading the corp’s public killmails…' : ''}
-        {error && <span className="err"> {error}</span>}
+        {error && <span className={error.includes(NEED_LOGIN) ? 'dim' : 'err'}> {error}</span>}
       </div>
       <div className="lb-fair">
         Everyone is measured with the same ruler: <b>public killmails only</b> — nothing from your own logs or wallet. A killmail never sees logistics, boosts or scouts, for anyone, and tackle only as an <b>assist</b>; this is a bit of fun, not a performance review.

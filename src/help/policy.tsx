@@ -167,6 +167,28 @@ export const POLICY_THIRD_PARTY: { service: string; rules: ReactNode; how: React
   },
 ];
 
+/** the cadence of every recurring request the app makes, and what it measured (v0.221.0, rule 22:
+ * a number for every service, not a reassurance). The live counts beside it come from lib/netMeter. */
+export const POLICY_TRAFFIC: { service: string; cadence: ReactNode; measured: ReactNode }[] = [
+  {
+    service: 'ESI (CCP) — characters',
+    cadence: <>Online flag per character every 55 s (5 min when nobody is watching). Ship and location <b>only for pilots who are online</b>: every 6 s while the overlay window is on screen or the mining watch is on, otherwise once a minute. Implants and clones every ~2 min, online pilots only. Planets every 11 min; wallet and trend books every 5 min.</>,
+    measured: <>Before 0.221.0 the overlay asked ship + location for <i>every</i> character every 6 s — 12 characters ≈ 345,000 requests a day. After: 12 characters with 4 online and the overlay open all day ≈ 132,000 (the fixture&apos;s count); with the overlay closed and the mining watch off, a few thousand. Measured by the request meter on 2026-09-25 — twelve characters, most of them online for most of the day, the overlay on throughout: <b>470,220</b> ESI requests; 91,115 the day before, 26,297 the day before that. The formula above at full stretch; a copy with one or two characters stays in the low thousands.</>,
+  },
+  {
+    service: 'ESI (CCP) — market radar',
+    cadence: <>The whole order book of each <b>watched</b> region every 30 minutes, six pages at a time, on the lowest-priority lane. Watched = the hubs chosen in ⚙ Settings → Market radar: by default the duty hubs of your traders, or Jita alone (since 0.225.0; before, all five built-in regions for everyone).</>,
+    measured: <>Per region and sweep on 2026-09-23: The Forge 408 pages, Domain 184, Sinq Laison 117, Heimatar 73, Metropolis 120; 48 sweeps a day. All five (every install before 0.225.0): <b>≈ 43,300 requests and ≈ 1.3 GB on the wire a day</b>. Jita alone: ≈ 19,600 requests and ≈ 0.6 GB; Jita + Amarr: ≈ 28,400. The Settings section shows your own selection&apos;s cost, and the Collectors dashlet counts what was actually sent.</>,
+  },
+  { service: 'ESI (CCP) — Trade Finder scans', cadence: <>When you press Scan: the daily trade history of every candidate item at each destination region, once per item per UTC day (cached), 8 reads in flight. Deep reads every candidate; Fast reads the top 100.</>, measured: <>2026-09-23, Jita → all hubs, whole market, Deep: 15,802 candidates, 16,175 ESI requests and about four and a half minutes for the day&apos;s first scan; a second deep scan the same day reads only what the day cache lacks.</> },
+  { service: 'EVE login (CCP)', cadence: <>One exchange when you log a character in; one refresh per character when its token has run out and a read needs it (a token lasts about 20 minutes, so at most three an hour per character in use). Since 0.235.0 these run in the main process, one at a time per character.</>, measured: <>Counted live below (the main process&apos;s exchanges included, since 0.237.0).</> },
+  { service: 'images (CCP)', cadence: <>One portrait or icon per row shown, from CCP&apos;s image service, cached by the browser.</>, measured: <>Counted live below.</> },
+  { service: 'zKillboard', cadence: <>One request at a time, 1.1 s apart, identified: the corp&apos;s newest lists when Battle Reports or the Leaderboard is opened (two requests), a past month once ever, a system&apos;s kills for a route check. Since 0.237.0 an answer is kept in memory for the hour zKill&apos;s own cache lasts (or as long as its Cache-Control header says), so opening a tab again within the hour asks nothing.</>, measured: <>Counted live below (the main process&apos;s calls included; a kept answer is not a request).</> },
+  { service: 'Fuzzwork', cadence: <>Price aggregates for the items on screen, at most once per 10–30 minutes per hub; the Static Data Export mirror only when the data files are rebuilt.</>, measured: <>Counted live below.</> },
+  { service: 'GitHub', cadence: <>One 400-byte feed read an hour; an installer only when a release is newer.</>, measured: <>≈ 24 a day.</> },
+  { service: 'ntfy', cadence: <>One post per alert, to your own topic, only if you set one.</>, measured: <>Counted live below.</> },
+];
+
 export const POLICY_QA: { q: ReactNode; a: ReactNode }[] = [
   {
     q: 'The buttons that open windows in the game — are those allowed?',

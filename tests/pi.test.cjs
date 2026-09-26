@@ -1,3 +1,5 @@
+// v0.232.0 (audit E7): runs against the fresh sim/lib compile the runner produces — until then a frozen
+// copy in tests/pi (up to 300 lines behind the shipped code) kept these passing on old behaviour.
 // Fixtures for the SHIPPED src/lib/pi.ts.
 //
 // PI is the one part of EVE that punishes inattention with SILENT LOSS: when
@@ -30,8 +32,8 @@ const ok = (label, cond, extra = '') => {
 const near = (label, got, want, tol) =>
   ok(label, got !== null && Math.abs(got - want) <= tol, `got=${got} want≈${want}±${tol}`);
 
-const pi = require('./pi/pi.js');
-const { pinRole, STORAGE_ROLES } = require('./pi/piTypes.js');
+const _pi = require('./sim/lib/pi.js');
+const { pinRole, STORAGE_ROLES } = require('./sim/lib/piTypes.js');
 
 // ===== A. THE GENERATED TYPE TABLE ======================================
 // classification is what decides whether a pin's capacity counts at all
@@ -53,8 +55,8 @@ const setSnaps = (list) => disk.set('etc-pi-snapshots-v1', JSON.stringify({ [KEY
 
 // a rate cannot be invented from one observation
 setSnaps([{ t: Date.now(), usedM3: 100, capM3: 10000, value: 0 }]);
-delete require.cache[require.resolve('./pi/pi.js')];
-let P = require('./pi/pi.js');
+delete require.cache[require.resolve('./sim/lib/pi.js')];
+let P = require('./sim/lib/pi.js');
 eq('one observation gives NO rate — "measuring" is the honest answer',
   P.fillRatePerHour(KEY), null);
 
@@ -64,8 +66,8 @@ setSnaps([
   { t: now - 4 * HOUR, usedM3: 100, capM3: 10000, value: 0 },
   { t: now, usedM3: 500, capM3: 10000, value: 0 },
 ]);
-delete require.cache[require.resolve('./pi/pi.js')];
-P = require('./pi/pi.js');
+delete require.cache[require.resolve('./sim/lib/pi.js')];
+P = require('./sim/lib/pi.js');
 near('two observations 4h apart, +400 m3 -> 100 m3/h', P.fillRatePerHour(KEY).m3PerHour, 100, 0.01);
 
 // A COLLECTION (a drop) must reset the baseline, not produce a negative rate
@@ -76,8 +78,8 @@ setSnaps([
   { t: now - 2 * HOUR, usedM3: 250, capM3: 10000, value: 0 },
   { t: now, usedM3: 450, capM3: 10000, value: 0 },
 ]);
-delete require.cache[require.resolve('./pi/pi.js')];
-P = require('./pi/pi.js');
+delete require.cache[require.resolve('./sim/lib/pi.js')];
+P = require('./sim/lib/pi.js');
 const r = P.fillRatePerHour(KEY);
 near('after a collection the rate measures only since the drop (100 m3/h)', r.m3PerHour, 100, 0.01);
 near('...over 4 hours, not 8', r.spanHours, 4, 0.01);
@@ -88,14 +90,14 @@ setSnaps([
   { t: now - 4 * HOUR, usedM3: 500, capM3: 10000, value: 0 },
   { t: now, usedM3: 500, capM3: 10000, value: 0 },
 ]);
-delete require.cache[require.resolve('./pi/pi.js')];
-P = require('./pi/pi.js');
+delete require.cache[require.resolve('./sim/lib/pi.js')];
+P = require('./sim/lib/pi.js');
 eq('a planet producing nothing reads 0 m3/h, not null', P.fillRatePerHour(KEY).m3PerHour, 0);
 
 // ===== C. PLANET STATE AND RANKING ======================================
 disk.clear();
-delete require.cache[require.resolve('./pi/pi.js')];
-P = require('./pi/pi.js');
+delete require.cache[require.resolve('./sim/lib/pi.js')];
+P = require('./sim/lib/pi.js');
 
 const CHAR = { characterId: 1, characterName: 'Tester' };
 const ROW = { planet_id: 40000001, solar_system_id: 30000142, planet_type: 'temperate', num_pins: 5, upgrade_level: 5, last_update: '' };
@@ -105,8 +107,8 @@ const mark = () => 1000;   // 1000 ISK per unit, whatever it is
 
 // capacity comes from ESI at runtime; seed the cache the same way it would be
 disk.set('etc-pi-capacity-v1', JSON.stringify({ [LAUNCHPAD]: 10000 }));
-delete require.cache[require.resolve('./pi/pi.js')];
-P = require('./pi/pi.js');
+delete require.cache[require.resolve('./sim/lib/pi.js')];
+P = require('./sim/lib/pi.js');
 
 const planet = (pins) => P.buildPlanetState(CHAR, ROW, { pins, links: [], routes: [] }, mark, now);
 
@@ -266,7 +268,7 @@ ok('...and the pull is the FORMULA average, above the old nominal 100/h',
   st.extractorPullPerHour > 100 * 1.15, String(st.extractorPullPerHour));
 
 // a schematic tuned to eat exactly the formula-average is judged balanced
-const YV = require('./pi/piYield.js');
+const YV = require('./sim/lib/piYield.js');
 const avgHr = YV.programAvgPerHour(100, 3600, 5 * 24 * 3600 + 2 * 24 * 3600);
 st = P.buildPlanetState(CHAR, ROW, {
   pins: [
@@ -284,8 +286,8 @@ eq('a planet eating exactly what it pulls is ok', st.problem, 'ok');
 // a collector that runs every 11 minutes must not send the same warning
 // 130 times a day — that is how people learn to ignore the one that matters
 disk.delete('etc-pi-alerted-v1');
-delete require.cache[require.resolve('./pi/pi.js')];
-P = require('./pi/pi.js');
+delete require.cache[require.resolve('./sim/lib/pi.js')];
+P = require('./sim/lib/pi.js');
 
 const full = { charId: 1, planetId: 1, problem: 'storage-full', value: 1, characterName: 'x', planetName: 'p', systemName: 's', advice: 'a', hoursToFull: null };
 const okPlanet = { ...full, planetId: 2, problem: 'ok' };

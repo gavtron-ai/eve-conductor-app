@@ -83,13 +83,33 @@ function configDir(documentsPath) {
 
 const configPath = (documentsPath) => path.join(configDir(documentsPath), FILE_NAME);
 
+/**
+ * REAL BYTES (v0.233.0, audit E6). These files are meant to be edited by hand — the README says
+ * so — and Notepad saves "UTF-8 with BOM" or "UTF-16 LE" when asked. JSON.parse refuses a byte
+ * order mark, and every reader here caught that and returned EMPTY: a config.json re-saved by
+ * Notepad silently lost the player's EVE application id and the app asked to be set up again.
+ * So: read bytes, honour the mark (UTF-8 EF BB BF, UTF-16 LE FF FE, UTF-16 BE FE FF), drop a
+ * stray U+FEFF, and only then parse. Windows line ends are fine for JSON.
+ */
+function decodeTextBytes(buf) {
+  if (buf.length >= 3 && buf[0] === 0xef && buf[1] === 0xbb && buf[2] === 0xbf) return buf.subarray(3).toString('utf8');
+  if (buf.length >= 2 && buf[0] === 0xff && buf[1] === 0xfe) return buf.subarray(2).toString('utf16le');
+  if (buf.length >= 2 && buf[0] === 0xfe && buf[1] === 0xff) {
+    const swapped = Buffer.from(buf.subarray(2));
+    swapped.swap16();
+    return swapped.toString('utf16le');
+  }
+  return buf.toString('utf8').replace(/^\uFEFF/, '');
+}
+const readJsonFile = (p) => JSON.parse(decodeTextBytes(fs.readFileSync(p)));
+
 /** the stored setup, or empty values (and the default home) when there is no file yet */
 function read(documentsPath) {
   const empty = { eveClientId: '', transitShipName: '', apertureUrl: '', chainHome: DEFAULT_CHAIN_HOME };
   try {
     const p = path.join(documentsPath, FOLDER_NAME, FILE_NAME);
     if (!fs.existsSync(p)) return empty;
-    const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
+    const raw = readJsonFile(p);
     const out = { ...empty };
     for (const k of KEYS) {
       if (typeof raw?.[k] === 'string') out[k] = raw[k];
@@ -147,7 +167,7 @@ function readClones(documentsPath) {
   try {
     const p = path.join(documentsPath, FOLDER_NAME, CLONES_FILE);
     if (!fs.existsSync(p)) return {};
-    const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
+    const raw = readJsonFile(p);
     if (!raw || typeof raw !== 'object') return {};
     const out = {};
     for (const [sig, v] of Object.entries(raw)) {
@@ -199,7 +219,7 @@ function readHauls(documentsPath) {
   try {
     const p = path.join(documentsPath, FOLDER_NAME, HAULS_FILE);
     if (!fs.existsSync(p)) return { v: 1, hauls: [] };
-    const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
+    const raw = readJsonFile(p);
     return raw && typeof raw === 'object' && Array.isArray(raw.hauls) ? raw : { v: 1, hauls: [] };
   } catch {
     return { v: 1, hauls: [] };
@@ -221,7 +241,7 @@ function writeHauls(documentsPath, file) {
 }
 
 module.exports = {
-  DEFAULT_CHAIN_HOME,
+  DEFAULT_CHAIN_HOME, decodeTextBytes, readJsonFile,
   FOLDER_NAME, FILE_NAME, CLONES_FILE, HAULS_FILE, configDir, configPath, read, write, KEYS, readHauls, writeHauls,
   readClones, writeClones,
 };

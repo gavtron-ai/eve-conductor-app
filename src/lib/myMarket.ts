@@ -9,6 +9,7 @@ import { getTeamOrders } from './esiChar';
 import { recordOrderEvents, everOwnedOrderIds } from './ledger';
 import { getStation } from './mapdata';
 import { isk, int } from './format';
+import { minOf, maxOf } from './nums';
 
 export interface MySell {
   typeId: number;
@@ -89,8 +90,8 @@ export const useMyMarket = create<MyMarketState>((set, get) => ({
             getStation(o.location_id)?.name ?? `Structure …${String(o.location_id).slice(-4)}`,
           bestOther: others.length
             ? isBuy
-              ? Math.max(...others.map((c) => c.price))
-              : Math.min(...others.map((c) => c.price))
+              ? maxOf(others.map((c) => c.price))
+              : minOf(others.map((c) => c.price))
             : null,
           ownerId: o.ownerId,
           ownerName: o.ownerName,

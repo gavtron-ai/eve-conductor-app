@@ -22,10 +22,10 @@ const DEST_ABOVE_NORM = 1.35;
  * compared against the destination's norm — that is what a good haul looks like. */
 const SRC_BELOW_NORM = 0.65;
 /** fast mode: how many stage-1 candidates get history enrichment */
-const FAST_ENRICH_LIMIT = 100;
+export const FAST_ENRICH_LIMIT = 100;
 /** fast mode: shortlist slots per item — one item×5 dests mustn't hog the funnel */
 const DESTS_PER_ITEM = 2;
-const ENRICH_CONCURRENCY = 8;
+export const ENRICH_CONCURRENCY = 8;
 /** rows returned to the UI (everything is computed; only display is capped) */
 const RESULT_LIMIT = 250;
 // Buy-order fills are estimated FROM TRADE PRINTS, not a constant: sells into

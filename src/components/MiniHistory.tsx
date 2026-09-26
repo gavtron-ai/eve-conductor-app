@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { fetchHistory } from '../lib/market';
 import { isk, int } from '../lib/format';
 import type { HistoryDay } from '../lib/types';
+import { maxOf } from '../lib/nums';
 
 const DAYS = 14;
 const W = 112;
@@ -37,7 +38,7 @@ export default function MiniHistory({ regionId, typeId }: { regionId: number; ty
   if (days === null) return <span className="dim">…</span>;
   if (days.length === 0) return <span className="dim">—</span>;
 
-  const maxVol = Math.max(1, ...days.map((d) => d?.volume ?? 0));
+  const maxVol = Math.max(1, maxOf(days.map((d) => d?.volume ?? 0)));
   const slot = W / DAYS;
   const bw = Math.max(2, slot - 2);
   return (

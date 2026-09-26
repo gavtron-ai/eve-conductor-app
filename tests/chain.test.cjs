@@ -2,6 +2,7 @@
 // pinned with hand-computed expectations. The signature rows are copied
 // from Gavin's Signature Search panel (2026-09-13 screenshot).
 const C = require('./sim/lib/chain.js');
+const { minOf, maxOf } = require('./sim/lib/nums.js');
 const T = require('./sim/lib/chainTables.js');
 
 let pass = 0, fail = 0;
@@ -122,8 +123,8 @@ const mono = (xs, cmp) => xs.every((v, i) => i === 0 || cmp(xs[i - 1], v));
 check('T1 no sort keeps the summary\'s own order', JSON.stringify(C.sortChainRows(all.rows, null)) === JSON.stringify(all.rows));
 const valued = all.rows.filter((r) => r.value.isk !== null);
 const vDesc = S('value', 'desc'), vAsc = S('value', 'asc');
-check('T2 value desc: richest first, unvalued last', vDesc[0].value.isk === Math.max(...valued.map((r) => r.value.isk)) && mono(vDesc.slice(0, valued.length).map((r) => r.value.isk), (a, b) => a >= b) && vDesc.slice(valued.length).every((r) => r.value.isk === null));
-check('T3 value asc: poorest first, unvalued STILL last', vAsc[0].value.isk === Math.min(...valued.map((r) => r.value.isk)) && mono(vAsc.slice(0, valued.length).map((r) => r.value.isk), (a, b) => a <= b) && vAsc.slice(valued.length).every((r) => r.value.isk === null));
+check('T2 value desc: richest first, unvalued last', vDesc[0].value.isk === maxOf(valued.map((r) => r.value.isk)) && mono(vDesc.slice(0, valued.length).map((r) => r.value.isk), (a, b) => a >= b) && vDesc.slice(valued.length).every((r) => r.value.isk === null));
+check('T3 value asc: poorest first, unvalued STILL last', vAsc[0].value.isk === minOf(valued.map((r) => r.value.isk)) && mono(vAsc.slice(0, valued.length).map((r) => r.value.isk), (a, b) => a <= b) && vAsc.slice(valued.length).every((r) => r.value.isk === null));
 const withHops = all.rows.filter((r) => r.hops !== null);
 const hDesc = S('hops', 'desc');
 check('T4 jumps desc: farthest first, no-distance rows last', mono(hDesc.slice(0, withHops.length).map((r) => r.hops), (a, b) => a >= b) && hDesc.slice(withHops.length).every((r) => r.hops === null) && withHops.length > 0 && hDesc.length === all.rows.length);

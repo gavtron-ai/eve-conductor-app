@@ -17,6 +17,7 @@ import {
 } from '../lib/fitSim';
 import type { FitStats } from '../lib/dogmaFit';
 import { typeNameOf } from '../lib/fitSerial';
+import { maxOf } from '../lib/nums';
 
 /** Preset targets, from the real hull attributes in the shipped bundle
  * (Rifter sig 35 / 365 m/s, Vexor 145 / 195, Raven 410 / 113). Resistances
@@ -56,8 +57,8 @@ function Chart({ series, xLabel, yLabel, marker, formatX }: {
   const W = 720, H = 260, PAD_L = 56, PAD_B = 34, PAD_T = 12, PAD_R = 12;
   const all = series.flatMap((s) => s.points);
   if (all.length === 0) return null;
-  const xMax = Math.max(...all.map((p) => p.x)) || 1;
-  const yMax = Math.max(...all.map((p) => p.y)) || 1;
+  const xMax = maxOf(all.map((p) => p.x)) || 1;
+  const yMax = maxOf(all.map((p) => p.y)) || 1;
   // a y-axis that ends on a round number reads far better than one ending on 487.3
   const step = Math.pow(10, Math.floor(Math.log10(yMax))) / 2;
   const yTop = Math.max(step, Math.ceil(yMax / step) * step);
@@ -109,12 +110,12 @@ export default function SimPanel({ stats }: { stats: FitStats }) {
   const [profileIdx, setProfileIdx] = useState(0);
 
   const preset = TARGETS[targetIdx];
-  const target: SimTarget = {
+  const target = useMemo<SimTarget>(() => ({
     name: preset.name,
     signatureRadius: sig ?? preset.signatureRadius,
     velocity: vel ?? preset.velocity,
     resonance: NO_RESISTS,
-  };
+  }), [preset, sig, vel]);
 
   const weapons: SimWeapon[] = stats.simWeapons;
 
@@ -123,7 +124,7 @@ export default function SimPanel({ stats }: { stats: FitStats }) {
   const maxRange = useMemo(() => {
     const reach = weapons.map((w) =>
       w.kind === 'missile' ? (w.maxRange ?? 0) : (w.optimal ?? 0) + 3 * (w.falloff ?? 0));
-    return Math.max(20000, Math.ceil((Math.max(0, ...reach) * 1.1) / 5000) * 5000);
+    return Math.max(20000, Math.ceil((Math.max(0, maxOf(reach)) * 1.1) / 5000) * 5000);
   }, [weapons]);
 
   const here = appliedDps(weapons, target, { distance, transversal });
@@ -135,7 +136,7 @@ export default function SimPanel({ stats }: { stats: FitStats }) {
       return transversalCurve(weapons, target, { distance, maxTransversal: 3000, steps: 120 });
     }
     return signatureCurve(weapons, target, { distance, transversal, maxSig: 1000, steps: 120 });
-  }, [weapons, axis, maxRange, transversal, distance, target.signatureRadius, target.velocity]);
+  }, [weapons, axis, maxRange, transversal, distance, target]);
 
   const axisMax = axis === 'range' ? maxRange : axis === 'transversal' ? 3000 : 1000;
   const marker = axis === 'range' ? distance : axis === 'transversal' ? transversal : target.signatureRadius;
@@ -293,7 +294,7 @@ export default function SimPanel({ stats }: { stats: FitStats }) {
               <td className="hub-name">{name}</td>
               {DAMAGE_TYPES.map((t) => {
                 // the weakest face of a layer is where a smart opponent aims
-                const worst = Math.max(...DAMAGE_TYPES.map((k) => res[k]));
+                const worst = maxOf(DAMAGE_TYPES.map((k) => res[k]));
                 return (
                   <td key={t} className={`c-num${res[t] === worst && worst > 0 ? ' bad' : ''}`}>
                     {pct(1 - res[t])}

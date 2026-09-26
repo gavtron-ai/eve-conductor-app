@@ -61,6 +61,7 @@ import { attrDef } from '../lib/skillRelevance';
 import { fetchMarketPrices, fetchAggregates } from '../lib/market';
 import { BUILTIN_HUBS } from '../lib/constants';
 import { isk } from '../lib/format';
+import { maxOf, minOf } from '../lib/nums';
 
 const n0 = (v: number) => Math.round(v).toLocaleString();
 const n1 = (v: number) => v.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -1218,7 +1219,7 @@ export default function BattleSim() {
         : w.kind === 'drone' ? 60000
           : (w.optimal ?? 0) + 3 * (w.falloff ?? 0)));
     const standing = chartShips.map((s2) => s2.range * 1.4);
-    return Math.max(20000, Math.ceil((Math.max(0, ...reach, ...standing) * 1.1) / 5000) * 5000);
+    return Math.max(20000, Math.ceil((Math.max(0, maxOf(reach), maxOf(standing)) * 1.1) / 5000) * 5000);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [JSON.stringify(chartShips.map((s2) => [s2.id, s2.range, s2.weapons.length]))]);
 
@@ -1938,7 +1939,7 @@ export default function BattleSim() {
                 // ONE number here lied the moment two attackers sat apart: it
                 // was simply the first one's range labelled as "the" range.
                 const rs = battle.attackers.map((a) => rangeOf(liveOf(a.id) ?? a));
-                const lo = Math.min(...rs), hi = Math.max(...rs);
+                const lo = minOf(rs), hi = maxOf(rs);
                 return (
                   <span><i>Range</i> {lo === hi ? km(lo) : `${km(lo)} – ${km(hi)}`}</span>
                 );
@@ -2323,7 +2324,7 @@ function CombatantCard({ r, characters, dogma, testSlot, onSolve, solving, solut
               onUpdate(c.id, { count: v });
             }} />
         </label>
-        {onRemove && <button className="btn mini" onClick={onRemove}>×</button>}
+        {onRemove && <button className="btn mini" title="remove" onClick={onRemove}>×</button>}
       </div>
       {r.stats && (
         <div className="dim battle-armament" title="every damage source the simulation extracted from this fit — drones included">

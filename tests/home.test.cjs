@@ -155,5 +155,15 @@ const ck = H.eveClock(Date.UTC(2026, 8, 20, 9, 30, 0));
 check('L2 09:30 EVE → downtime in 1 h 30; at 11:05 the server is in its downtime window and the next is 23 h 55 away', ck.hhmm === '09:30' && ck.toDowntimeMs === 5_400_000 && ck.date === '2026-09-20' && !ck.inDowntimeWindow && H.eveClock(Date.UTC(2026, 8, 20, 11, 5, 0)).inDowntimeWindow && H.eveClock(Date.UTC(2026, 8, 20, 11, 5, 0)).toDowntimeMs === 86_100_000);
 check('L3 wording: ages and countdowns', H.agoShort(30_000) === 'just now' && H.agoShort(59 * 60_000) === '59 min ago' && H.agoShort(3 * 3_600_000) === '3 h ago' && H.agoShort(3 * DAY) === '3 d ago' && H.inShort(0) === 'now' && H.inShort(61_000) === '2 min' && H.inShort(5_400_000) === '1 h 30 min');
 
+// C1 (v0.220.0): the raid log is 55,000 events and grows ~1,500 a day; a spread into Math.min
+// throws past ~125,000 arguments (measured) — this digest must survive far more than that
+{
+  const big = [];
+  for (let i = 0; i < 200_000; i++) big.push({ t: now - i * 60_000, systemId: 1, planetId: 1, kind: i % 5 ? 'survived' : 'raided' });
+  let ws = null, threw = null;
+  try { ws = H.raidLogDigest(big, now).watchedSince; } catch (e) { threw = String(e); }
+  check('C1 200,000 raid events: no overflow, watchedSince is the oldest', threw === null && ws === now - 199_999 * 60_000, threw ?? ws);
+}
+
 console.log(`home.test: ${pass} passed, ${fail} failed`);
 process.exit(fail > 0 ? 1 : 0);

@@ -1,3 +1,4 @@
+import { maxOf } from './nums';
 // CORP LEADERBOARD (v0.208.0; widened in v0.210.0) — PURE. The owner's brief: "only compare things
 // where you have equal stats for everyone you are comparing yourself to … a cool leaderboard style
 // thing … it is just public data and it creates a light competitive fun environment … make everyone
@@ -139,7 +140,7 @@ export function compactMail<T extends LbMail>(m: T, corpId: number, cap = 40): T
   if (drop.length === 0) return m;
   const kept = new Set([...ours, ...keep].filter((a) => a.char > 0).map((a) => a.char));
   const players = new Set(drop.filter((a) => a.char > 0 && !kept.has(a.char)).map((a) => a.char)).size;
-  return { ...m, attackers: [...ours, ...keep], others: { players: players + (m.others?.players ?? 0), dmg: drop.reduce((t, a) => t + (a.dmg ?? 0), 0) + (m.others?.dmg ?? 0), max: Math.max(m.others?.max ?? 0, ...drop.map((a) => a.dmg ?? 0)) } };
+  return { ...m, attackers: [...ours, ...keep], others: { players: players + (m.others?.players ?? 0), dmg: drop.reduce((t, a) => t + (a.dmg ?? 0), 0) + (m.others?.dmg ?? 0), max: Math.max(m.others?.max ?? 0, maxOf(drop.map((a) => a.dmg ?? 0))) } };
 }
 
 /** the mails of a window, once each */

@@ -1,6 +1,8 @@
 // Local trading ledger. ESI only keeps ~30 days of wallet history, so every sync
-// appends new transactions/fees into localStorage and the record accumulates
+// appends new transactions/fees into the ledger file and the record accumulates
 // forever — app updates never touch it. All analytics derive from this store.
+// (Until v0.226.0 the whole ledger was one localStorage value — see "WHERE THE
+// LEDGER LIVES" below for why that had to change.)
 //
 // Accounting model (dummy-proof):
 //  - Buys create inventory lots (qty × unit price). Sells consume lots FIFO;
@@ -14,6 +16,9 @@ import { useAuth } from './auth';
 import { useApp } from './store';
 import { getStation, getSystem, regionName } from './mapdata';
 import { getType, categoryOf } from './typedb';
+import { minOf } from './nums';
+import { create } from 'zustand';
+import { logInfo, logWarn, logError } from './devlog';
 
 export interface LedgerTx {
   id: number;
@@ -65,24 +70,162 @@ interface LedgerData {
   lastSync: number | null;
 }
 
-const KEY = 'etc-ledger-v1';
+// WHERE THE LEDGER LIVES (v0.226.0, audit B4). Until 0.225 the whole ledger was one localStorage
+// value, rewritten on every wallet sync, with no quota handling: Chromium allows ~10 MB per
+// origin, this install's Local Storage was already 5 MB, and at the limit setItem throws inside
+// persist() — the wallet tick fails and the ledger, the source of every profit number, silently
+// stops updating. Now it is a file in the stats folder (ledger-v1.json, written beside the old
+// copy and renamed over it in the main process — never half a file), restored once at start.
+// The localStorage copy is adopted on the first run, written to the file, READ BACK, and only
+// then removed. Every reader keeps the same synchronous `ledger` object; writers wait for the
+// restore, and a write before it is refused rather than allowed to overwrite the file with an
+// empty ledger. Only the main window writes (a pop-out keeps its changes in memory — the main
+// window re-observes them). Nothing here is silent: every refusal and failure is logged.
+const KEY = 'etc-ledger-v1'; // the pre-0.226 localStorage value; also the dev-server fallback (no file bridge)
+const FILE = 'ledger-v1.json'; // in the stats folder (electron/stats.cjs allow-list: ledger-)
 
-function load(): LedgerData {
+const EMPTY = (): LedgerData => ({ tx: [], fees: [], orderEvents: [], lastSync: null });
+export const ledger: LedgerData = EMPTY();
+let loaded = false;
+let writer = true;
+
+/** for screens: bumps on restore and on every write, so a component that reads `ledger`
+ * re-renders when the file has been loaded or the wallet sync added rows */
+export const useLedger = create<{ version: number; loaded: boolean }>()(() => ({ version: 0, loaded: false }));
+const bump = () => useLedger.setState((st) => ({ version: st.version + 1, loaded }));
+export const ledgerLoaded = (): boolean => loaded;
+
+function parseLedger(raw: string): LedgerData | null {
+  const d = JSON.parse(raw) as Partial<LedgerData> | null;
+  if (!d || !Array.isArray(d.tx) || !Array.isArray(d.fees)) return null;
+  // orderEvents came later — old saves lack it
+  return { tx: d.tx, fees: d.fees, orderEvents: Array.isArray(d.orderEvents) ? d.orderEvents : [], lastSync: d.lastSync ?? null };
+}
+function readLegacy(): LedgerData | null {
   try {
-    const d = JSON.parse(localStorage.getItem(KEY) ?? 'null');
-    if (d && Array.isArray(d.tx) && Array.isArray(d.fees)) {
-      return { orderEvents: [], ...d }; // orderEvents added later — default old saves
-    }
+    const raw = localStorage.getItem(KEY);
+    return raw ? parseLedger(raw) : null;
   } catch {
-    // fall through
+    return null;
   }
-  return { tx: [], fees: [], orderEvents: [], lastSync: null };
+}
+function adopt(d: LedgerData): void {
+  ledger.tx = d.tx;
+  ledger.fees = d.fees;
+  ledger.orderEvents = d.orderEvents;
+  ledger.lastSync = d.lastSync;
+}
+const counts = () => ({ tx: ledger.tx.length, fees: ledger.fees.length, orderEvents: ledger.orderEvents.length });
+
+/** the exact text the file holds — also what a backup carries */
+export const ledgerSnapshot = (): string => JSON.stringify(ledger);
+
+let restoreOnce: Promise<void> | null = null;
+/** load the ledger once (memoised). `writer: false` for a pop-out window: it reads, never writes. */
+export function restoreLedger(opts?: { writer?: boolean }): Promise<void> {
+  if (opts?.writer === false) writer = false;
+  if (!restoreOnce) restoreOnce = doRestore();
+  return restoreOnce;
 }
 
-export const ledger: LedgerData = load();
+async function doRestore(): Promise<void> {
+  const bridge = window.appInfo?.stats;
+  if (!bridge) {
+    // browser dev mode: localStorage, as before
+    adopt(readLegacy() ?? EMPTY());
+    loaded = true;
+    bump();
+    return;
+  }
+  let raw: string | null = null;
+  try {
+    raw = await bridge.auxRead(FILE);
+  } catch (e) {
+    logError('ledger', 'ledger file could not be read — nothing loaded, and nothing will be written over it', { error: String(e).slice(0, 200) });
+    return; // loaded stays false: every write is refused, the file is left alone
+  }
+  if (raw !== null) {
+    let d: LedgerData | null = null;
+    try {
+      d = parseLedger(raw);
+    } catch {
+      d = null;
+    }
+    if (!d) {
+      logError('ledger', 'ledger file is damaged — nothing loaded, and nothing will be written over it', { bytes: raw.length });
+      return;
+    }
+    adopt(d);
+    loaded = true;
+    bump();
+    logInfo('ledger', 'ledger restored', { ...counts(), bytes: raw.length });
+    return;
+  }
+  // no file yet: the first run of 0.226, or a fresh install — adopt the localStorage copy if there is one
+  const legacy = readLegacy();
+  adopt(legacy ?? EMPTY());
+  loaded = true;
+  bump();
+  if (!legacy) {
+    logInfo('ledger', 'ledger starts empty (no file, no earlier copy)');
+    return;
+  }
+  if (!writer) return; // a pop-out never migrates; the main window does it
+  const text = ledgerSnapshot();
+  try {
+    await bridge.auxWrite(FILE, text);
+    const back = await bridge.auxRead(FILE);
+    if (back !== text) throw new Error(`read-back mismatch (${back?.length ?? 'null'} vs ${text.length} bytes)`);
+    localStorage.removeItem(KEY);
+    logInfo('ledger', 'ledger moved from localStorage to the stats folder (written, read back, old copy removed)', { ...counts(), bytes: text.length });
+  } catch (e) {
+    logWarn('ledger', 'ledger could not be moved to the stats folder — kept in localStorage for now, will retry next start', { error: String(e).slice(0, 200) });
+  }
+}
 
-function persist() {
-  localStorage.setItem(KEY, JSON.stringify(ledger));
+// the file write is queued and coalesced: a sync that persists twice in a row writes once at the end
+let writing = false;
+let dirty = false;
+function persist(): void {
+  if (!loaded) {
+    logWarn('ledger', 'write refused — the ledger has not been restored yet (nothing overwritten)');
+    return;
+  }
+  bump();
+  if (!writer) return; // a pop-out: memory only
+  const bridge = window.appInfo?.stats;
+  if (!bridge) {
+    try {
+      localStorage.setItem(KEY, JSON.stringify(ledger));
+    } catch (e) {
+      logWarn('ledger', 'localStorage write failed (quota?) — the ledger in memory is intact, this change is not saved', { error: String(e).slice(0, 200) });
+    }
+    return;
+  }
+  dirty = true;
+  if (writing) return;
+  void (async () => {
+    writing = true;
+    try {
+      while (dirty) {
+        dirty = false;
+        await bridge.auxWrite(FILE, ledgerSnapshot());
+      }
+    } catch (e) {
+      dirty = false;
+      logWarn('ledger', 'ledger file write failed — the ledger in memory is intact, this change is not saved', { error: String(e).slice(0, 200) });
+    } finally {
+      writing = false;
+    }
+  })();
+}
+
+/** a backup import hands over the merged ledger text; it replaces memory and is written */
+export function replaceLedger(raw: string): void {
+  const d = parseLedger(raw);
+  if (!d) throw new Error('not a ledger');
+  adopt(d);
+  persist();
 }
 
 /**
@@ -115,6 +258,7 @@ export function recordOrderEvents(
   }[],
   charId?: number,
 ): number {
+  if (!loaded) return 0; // before the restore an event would be lost to the load anyway; the next refresh re-observes it
   const known = new Set(ledger.orderEvents.map((e) => `${e.orderId}:${e.issued}`));
   let added = 0;
   for (const o of orders) {
@@ -236,6 +380,7 @@ export async function syncLedger(
 ): Promise<{ newTx: number; newFees: number }> {
   const characterId = charId ?? useAuth.getState().activeId;
   if (!characterId) throw new Error('Not logged in.');
+  await restoreLedger(); // never sync into an empty ledger and write it over the file
 
   const knownTx = new Set(ledger.tx.map((t) => t.id));
   const knownFees = new Set(ledger.fees.map((f) => f.id));
@@ -269,7 +414,7 @@ export async function syncLedger(
       newTx++;
     }
     if (sawKnown || data.length < 1000) break;
-    fromId = Math.min(...data.map((t) => t.transaction_id)) - 1;
+    fromId = minOf(data.map((t) => t.transaction_id)) - 1;
   }
 
   onProgress?.('Fetching fee journal…');

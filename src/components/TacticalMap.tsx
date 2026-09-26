@@ -22,6 +22,7 @@ import { useRef, useState } from 'react';
 import type { Combatant } from '../lib/store';
 
 import { shipColour } from '../lib/teamColours';
+import { maxOf } from '../lib/nums';
 
 export interface MapShip {
   id: string;
@@ -86,7 +87,7 @@ export default function TacticalMap({ target, attackers, defenders = [], onUpdat
     ...defenders.map((d, i) => ({ ship: d, side: 'b' as const, idx: i + 1 })),
   ];
 
-  const maxRange = Math.max(5000, ...placed.map((p) => p.ship.range));
+  const maxRange = Math.max(5000, maxOf(placed.map((p) => p.ship.range)));
   const rings = ringsFor(frozenScale.current !== null
     ? Math.max(frozenScale.current, 1)
     : lockedScale !== null ? Math.max(lockedScale, 1) : maxRange);

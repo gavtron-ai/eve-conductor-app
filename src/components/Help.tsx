@@ -14,7 +14,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { MODULE_HELP, PANEL_HELP, SHARED_GROUPS } from '../helpContent';
 import type { HelpGroup, HelpPage } from '../help/types';
 import { RELEASE_NOTES } from '../help/releaseNotes';
-import { POLICY_INTRO, POLICY_ROWS, POLICY_THIRD_PARTY, POLICY_QA, POLICY_SOURCES } from '../help/policy';
+import { POLICY_INTRO, POLICY_ROWS, POLICY_THIRD_PARTY, POLICY_TRAFFIC, POLICY_QA, POLICY_SOURCES } from '../help/policy';
+import { meterSnapshot, meterTotal, type MeterDay } from '../lib/netMeter';
 import type { ModuleId } from '../lib/store';
 import { useAuth } from '../lib/auth';
 import { logUser } from '../lib/devlog';
@@ -331,6 +332,9 @@ export function PolicyButton() {
                 ))}
               </tbody>
             </table>
+            <h3 className="section-title" style={{ marginTop: 16 }}>What this copy asks of each service</h3>
+            <p className="hint">Every request the app makes is counted, by service, per day (since 0.221.0). The right-hand column is this copy, today and yesterday; the middle one is the cadence the code runs on and what was measured on the author&apos;s install. Nothing here is sent anywhere.</p>
+            <TrafficTable />
             <h3 className="section-title" style={{ marginTop: 16 }}>Questions we asked ourselves</h3>
             {POLICY_QA.map((q, i) => (
               <div key={i} style={{ margin: '6px 0 10px' }}>
@@ -382,6 +386,48 @@ export function InfoDot({ id }: { id: string }) {
 }
 
 // ---------------------------------------------------------------------------
+/** the live request counts beside the cadences (v0.221.0) */
+function TrafficTable() {
+  const [zk, setZk] = useState<{ day: string; count: number } | null>(null);
+  const [sso, setSso] = useState<{ day: string; count: number } | null>(null);
+  useEffect(() => {
+    void window.appInfo?.zkill?.meter?.().then((m) => setZk(m ?? null)).catch(() => undefined);
+    void window.appInfo?.sso?.meter?.().then((m) => setSso(m ?? null)).catch(() => undefined);
+  }, []);
+  const m = meterSnapshot();
+  // the main process's own calls — zKillboard (0.221.0) and the EVE login exchange (0.237.0) — folded in
+  const withMain = (d: MeterDay | null): MeterDay | null => {
+    if (!d) return d;
+    const hosts = { ...d.hosts };
+    if (zk && zk.day === d.day && zk.count > 0) hosts.zKillboard = (hosts.zKillboard ?? 0) + zk.count;
+    if (sso && sso.day === d.day && sso.count > 0) hosts['EVE login (CCP)'] = (hosts['EVE login (CCP)'] ?? 0) + sso.count;
+    return { day: d.day, hosts };
+  };
+  const today = withMain(m.today), yesterday = withMain(m.yesterday);
+  const countFor = (service: string, d: MeterDay | null): string => {
+    if (!d) return '—';
+    const key = service.startsWith('ESI') ? 'ESI (CCP)' : service.startsWith('images') ? 'images (CCP)' : service;
+    const n = d.hosts[key];
+    return n === undefined ? '0' : n.toLocaleString();
+  };
+  return (
+    <table className="data policy-table" style={{ fontSize: 12, marginTop: 8 }}>
+      <thead><tr><th style={{ width: '20%' }}>Service</th><th>Cadence, and what was measured</th><th style={{ width: 120 }}>today</th><th style={{ width: 120 }}>yesterday</th></tr></thead>
+      <tbody>
+        {POLICY_TRAFFIC.map((r, i) => (
+          <tr key={i}>
+            <td style={{ verticalAlign: 'top' }}>{r.service}</td>
+            <td style={{ verticalAlign: 'top' }}>{r.cadence} <span className="dim">{r.measured}</span></td>
+            <td style={{ verticalAlign: 'top', textAlign: 'right' }}>{countFor(r.service, today)}</td>
+            <td style={{ verticalAlign: 'top', textAlign: 'right' }}>{countFor(r.service, yesterday)}</td>
+          </tr>
+        ))}
+        <tr><td><b>all services</b></td><td className="dim">the two ESI rows share one count — ESI is one service</td><td style={{ textAlign: 'right' }}><b>{meterTotal(today).toLocaleString()}</b></td><td style={{ textAlign: 'right' }}><b>{yesterday ? meterTotal(yesterday).toLocaleString() : '—'}</b></td></tr>
+      </tbody>
+    </table>
+  );
+}
+
 // FIRST-RUN TOUR — shows once on a cold start with no characters, and on
 // demand via replayIntro(). Every step says the same reassurance out loud:
 // nothing here is permanent, it is all adjustable later in ⚙ Settings.

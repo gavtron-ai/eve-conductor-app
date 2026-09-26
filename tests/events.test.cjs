@@ -2,7 +2,7 @@
 // HAND before the code ran — these assert facts about how an EVE fight works,
 // with the repair amounts and clip sizes measured from the shipped engine.
 const {
-  simulateBattleEvents, DECLARED, STACKING_C, stackingFactor,
+  simulateBattleEvents, STACKING_C, stackingFactor,
 } = require('./sim/lib/battleEvents.js');
 const { capAfter, capWakeSeconds } = require('./sim/lib/moduleCycle.js');
 const { simulateBattle } = require('./sim/lib/battleTick.js');

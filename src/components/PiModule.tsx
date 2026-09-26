@@ -43,6 +43,7 @@ import { getType } from '../lib/typedb';
 import { isk, iskShort, int } from '../lib/format';
 import { logUser } from '../lib/devlog';
 import Tip from './Tip';
+import { minOf, maxOf } from '../lib/nums';
 
 const PI_SCOPE = 'esi-planets.manage_planets.v1';
 
@@ -106,7 +107,7 @@ function YieldBars({ e }: { e: PlanetState['extractors'][number] }) {
     [e.qtyPerCycle, e.cycleTimeSec, e.expiry, e.installMs],
   );
   if (sched.length < 2) return null;
-  const max = Math.max(...sched);
+  const max = maxOf(sched);
   if (max <= 0) return null;
   const doneCycles = Math.floor((Date.now() - e.installMs!) / (e.cycleTimeSec! * 1000));
   const W = sched.length; const H = 34;
@@ -480,7 +481,7 @@ function Horizon({ planets, hours, onOpen }: {
       if (p.fullAt !== null && p.fullAt <= now + span) evs.push({ t: p.fullAt, kind: 'fill' });
       if (p.capM3 > 0 && p.fullFrac >= 0.999) evs.push({ t: now, kind: 'fill' }); // already full
       if (p.extractorExpiry !== null && p.extractorExpiry <= now + span) evs.push({ t: p.extractorExpiry, kind: 'program' });
-      return { p, evs, first: Math.min(...evs.map((e) => e.t), Infinity) };
+      return { p, evs, first: minOf(evs.map((e) => e.t)) };
     })
     .filter((r) => r.evs.length > 0)
     .sort((a, b) => a.first - b.first);
@@ -513,7 +514,7 @@ function Horizon({ planets, hours, onOpen }: {
         ))}
         {rows.map(({ p, evs }, i) => {
           const y = AXIS + i * ROW + ROW / 2;
-          const first = Math.min(...evs.map((e) => e.t));
+          const first = minOf(evs.map((e) => e.t));
           return (
             <g key={planetKey(p.charId, p.planetId)} style={{ cursor: 'pointer' }}
               onClick={() => onOpen(planetKey(p.charId, p.planetId))}>

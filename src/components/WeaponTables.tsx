@@ -171,8 +171,8 @@ function AmmoRows({ fit, weaponTypeId, count, loaded, skills, implants, propRunn
         setRows([...out]);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- run is a generation counter, not a DOM node: the bump on cleanup is the cancel signal
     return () => { run.current++; };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [inputKey, weaponTypeId, count]);
 
   if (rows === null) return <div className="hint">computing {progress[1] || '…'} charges…</div>;

@@ -1,3 +1,4 @@
+import { maxOf } from './nums';
 // UNDOCK JOURNAL — the app's own record of when each character left a
 // station or structure.
 //
@@ -38,7 +39,7 @@ export function pushUndock(j: UndockJournal, charId: number, t: number): UndockJ
 export function lastUndocks(j: UndockJournal): Map<string, number> {
   const m = new Map<string, number>();
   for (const [key, arr] of Object.entries(j)) {
-    if (arr.length > 0) m.set(`#${key}`, Math.max(...arr));
+    if (arr.length > 0) m.set(`#${key}`, maxOf(arr));
   }
   return m;
 }

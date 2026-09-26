@@ -3,6 +3,7 @@
 // numbers, not the raw history — makes a whole-market deep scan cheap after its
 // first run and across app restarts. ~10k entries ≈ <1 MB of localStorage.
 import { historyStats, type HistoryStats } from './market';
+import { swallowed } from './devlog';
 
 // v6: adds crowd7/crowd30 (v5: activeDays30; v4: bidShare/estBidFill; v3: maxSold)
 const CACHE_KEY = 'etc-history-stats-v6';
@@ -32,8 +33,8 @@ function persist() {
   try {
     localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
     dirty = 0;
-  } catch {
-    // quota — the in-memory copy still works for this session
+  } catch (e) {
+    swallowed('market', 'history cache save', e); // quota — the in-memory copy still works for this session
   }
 }
 

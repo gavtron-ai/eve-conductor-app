@@ -7,7 +7,8 @@
 // There is NO live shield/armor/hull anywhere in ESI (verified against the
 // live spec), so the overlay never pretends to show health.
 import { esiAuth, tokenHasScope } from './esiChar';
-import { useAuth } from './auth';
+import { readCharState } from './charState';
+import { useAuth, pilotHandleOf } from './auth';
 import {
   cloneSignature,
   lookupClone,
@@ -34,7 +35,7 @@ import { parseJournal, pushUndock, UNDOCK_KEY } from './undockJournal';
 import { emptyWatch, updateWatch, type MiningAlert, type MinerLoc, type WatchState } from './miningWatch';
 import { emptyFeed, pollMiningSamples } from './miningFeed';
 import { miningAlertSettings, type MiningAlertSettings } from './store';
-import { logInfo } from './devlog';
+import { logInfo, swallowed } from './devlog';
 import { ALERTS_SNAPSHOT_KEY, MUTES_KEY, isMuted, miningKey, piKey, raidKey, parseMutes, pruneMutes, type AlertsSnapshot } from './overlayMutes';
 import type { OverlayChar } from '../components/Overlay';
 
@@ -222,8 +223,8 @@ function rememberSystem(id: number, v: { name: string; sec: number }) {
   sysCache.set(id, v);
   try {
     localStorage.setItem(SYS_CACHE_KEY, JSON.stringify(Object.fromEntries(sysCache)));
-  } catch {
-    // the cache is a convenience — never break the overlay over it
+  } catch (e) {
+    swallowed('overlay', 'system cache save', e); // the cache is a convenience — never break the overlay over it
   }
 }
 
@@ -251,6 +252,8 @@ async function resolveSystem(id: number): Promise<{ name: string; sec: number } 
 }
 
 let timer: ReturnType<typeof setInterval> | null = null;
+/** whether anyone can SEE the overlay right now — decides how live the character reads are (v0.221.0) */
+let overlayWindowOpen = false;
 let inflight = false;
 
 // ---- UNDOCK JOURNAL: a docked→undocked flip between location polls IS an
@@ -265,7 +268,7 @@ function recordDockState(charId: number, docked: boolean): void {
   try {
     const j = parseJournal(localStorage.getItem(UNDOCK_KEY));
     localStorage.setItem(UNDOCK_KEY, JSON.stringify(pushUndock(j, charId, Date.now())));
-  } catch { /* journal only — never let bookkeeping break the feed */ }
+  } catch (e) { swallowed('overlay', 'undock journal save', e); /* journal only — never let bookkeeping break the feed */ }
 }
 
 /**
@@ -279,7 +282,6 @@ function recordDockState(charId: number, docked: boolean): void {
  * harvestCloneNames() has followed for /clones/ since v0.139.
  */
 interface Cached<T> { data: T; until: number }
-const onlineCache = new Map<number, Cached<{ online: boolean }>>();
 const implantsCache = new Map<number, Cached<number[]>>();
 async function askWhenStale<T>(
   cache: Map<number, Cached<T>>, charId: number, defaultTtlS: number,
@@ -311,19 +313,22 @@ async function readOne(charId: number, name: string, obs: CloneObservation[]): P
     at: Date.now(),
   };
   try {
-    const [ship, online, implants, cloneScope, location] = await Promise.all([
-      esiAuth<{ ship_type_id: number; ship_name: string }>(`/characters/${charId}/ship/`, undefined, charId, OVERLAY),
-      askWhenStale(onlineCache, charId, 55, () => esiAuth<{ online: boolean }>(`/characters/${charId}/online/`, undefined, charId, OVERLAY)),
-      // the CLONE the pilot is flying — what a pod name was ever describing
-      askWhenStale(implantsCache, charId, 110, () => esiAuth<number[]>(`/characters/${charId}/implants/`, undefined, charId, OVERLAY)),
-      harvestCloneNames(charId, name, obs),
-      // WHERE they are — the security band is the thing a multiboxer needs
-      // at a glance (scope esi-location.read_location.v1, cached 5s).
-      // station_id/structure_id ride along while docked — the docked flag
-      // feeds the undock journal (the game log never records structure
-      // undocks, measured v0.168).
-      esiAuth<{ solar_system_id: number; station_id?: number; structure_id?: number }>(`/characters/${charId}/location/`, undefined, charId, OVERLAY).catch(() => null),
-    ]);
+    // v0.221.0 (audit A1): online, ship and location come from the ONE shared reader (charState):
+    // an offline pilot is asked for nothing else, an online one is read live only while someone
+    // is watching (this window open, or the mining watch on) — otherwise once a minute. The ship
+    // watcher reads the same caches, so its minute-by-minute read is free after this one.
+    const attentive = overlayWindowOpen || miningSettings().enabled;
+    const cs = await readCharState(charId, attentive);
+    if (cs.online !== false && !cs.ship) throw new Error('ship read failed');   // as before: an online pilot with no readable ship is a session problem
+    const ship = cs.ship ? { data: cs.ship } : null;
+    const location = cs.loc ? { data: cs.loc } : null;
+    // the CLONE the pilot is flying — what a pod name was ever describing; not asked while offline
+    const [implants, cloneScope] = cs.online === false
+      ? [null, { ok: false, fetched: false }]
+      : await Promise.all([
+        askWhenStale(implantsCache, charId, 110, () => esiAuth<number[]>(`/characters/${charId}/implants/`, undefined, charId, OVERLAY)),
+        harvestCloneNames(charId, name, obs),
+      ]);
     row.cloneNamesAvailable = cloneScope.ok;
     if (implants) {
       const { infos, summary } = labelFor(implants.data, name);
@@ -366,16 +371,18 @@ async function readOne(charId: number, name: string, obs: CloneObservation[]): P
       row.systemSec = sys?.sec ?? null;
       recordDockState(charId, location.data.station_id !== undefined || location.data.structure_id !== undefined);
     }
-    row.shipTypeId = ship.data.ship_type_id;
-    row.shipTypeName = typeName(ship.data.ship_type_id);
-    row.online = online?.data.online ?? false;
-    const shipName = decodeEsiName(ship.data.ship_name);
-    row.shipName = shipName;
-    // a CUSTOM pod name, only while the pilot is actually in the pod
-    row.podName =
-      ship.data.ship_type_id === CAPSULE_TYPE_ID && !isAutoShipName(shipName, name)
-        ? shipName
-        : null;
+    row.online = cs.online ?? false;
+    if (ship) {
+      row.shipTypeId = ship.data.ship_type_id;
+      row.shipTypeName = typeName(ship.data.ship_type_id);
+      const shipName = decodeEsiName(ship.data.ship_name);
+      row.shipName = shipName;
+      // a CUSTOM pod name, only while the pilot is actually in the pod
+      row.podName =
+        ship.data.ship_type_id === CAPSULE_TYPE_ID && !isAutoShipName(shipName, name)
+          ? shipName
+          : null;
+    }
   } catch {
     // an expired session must show as such, not as an empty ship
     row.error = 'session expired — re-login';
@@ -637,11 +644,11 @@ async function updateMining(rows: OverlayChar[]): Promise<void> {
   const before = new Set(miningAlerts.map(key)), after = new Set(next.alerts.map(key));
   for (const a of next.alerts) if (!before.has(key(a))) {
     const m = next.state.miners.find((x) => x.charId === a.charId);
-    logInfo('mining', `alert raised: ${a.charName} ${a.kind}`, { charId: a.charId, kind: a.kind, periodS: m?.period ? Math.round(m.period / 1000) : null, cur: m?.cur ?? null, peak: m?.peak ?? null, delayS: s.delayS });
+    logInfo('mining', `alert raised: ${pilotHandleOf(a.charId)} ${a.kind}`, { kind: a.kind, periodS: m?.period ? Math.round(m.period / 1000) : null, cur: m?.cur ?? null, peak: m?.peak ?? null, delayS: s.delayS });
   }
   for (const a of miningAlerts) if (!after.has(key(a))) {
     const m = next.state.miners.find((x) => x.charId === a.charId);
-    logInfo('mining', `alert cleared: ${a.charName} ${a.kind}`, { charId: a.charId, kind: a.kind, afterS: Math.round((now - a.since) / 1000), status: m?.status ?? 'gone' });
+    logInfo('mining', `alert cleared: ${pilotHandleOf(a.charId)} ${a.kind}`, { kind: a.kind, afterS: Math.round((now - a.since) / 1000), status: m?.status ?? 'gone' });
   }
   miningWatch = next.state;
   miningAlerts = next.alerts;
@@ -726,10 +733,14 @@ export function startOverlayFeed(): void {
     }
     return tick();
   });
+  // v0.221.0: whether the overlay window is on screen decides how live the reads are (readOne)
+  void window.appInfo?.overlay?.isOpen?.().then((on) => { overlayWindowOpen = !!on; }).catch(() => undefined);
+  if (!openHooked) { openHooked = true; window.appInfo?.overlay?.onOpenChanged?.((on) => { overlayWindowOpen = !!on; }); }
   timer = setInterval(() => void tick(), OVERLAY_POLL_MS);
 }
 
 let registryHooked = false;
+let openHooked = false;
 
 export function stopOverlayFeed(): void {
   if (timer !== null) {

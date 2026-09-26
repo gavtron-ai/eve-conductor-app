@@ -18,6 +18,9 @@ export default function ApertureBlocker({ feature }: { feature: string }) {
         <h3>{APERTURE_BLOCK_TITLE}</h3>
         <p>{APERTURE_BLOCK_BODY}</p>
         <p className="dim">{APERTURE_BLOCK_STILL}</p>
+        {!url && (
+          <p className="dim">To get a button here that opens the map in your own browser, put your corporation&apos;s map address in ⚙ Settings → Your setup → Corporation map.</p>
+        )}
         {url && (
           <div className="aperture-blocker-actions">
             <button className="btn primary" title="Opens your normal web browser — EVE Conductor itself does not contact Aperture" onClick={() => window.open(url, '_blank')}>↗ Open Aperture in your own browser</button>

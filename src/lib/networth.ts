@@ -1,10 +1,13 @@
 // The team's trading-value stack, snapshotted over time (bottom → top):
-//   1. hangar stock, marked at the current JITA ask (ledger cost when no
-//      Jita market) — trader-duty hangars only, same rule as Dashboard
+//   1. hangar stock, marked at what the item actually SOLD for in Jita over the last
+//      7 days (the radar's measured fills; own cost when nothing sold; the Jita ask —
+//      a listing — only when there is neither) — trader-duty hangars only, same rule
+//      as Dashboard. Until v0.230.0 the mark was the Jita ask first (audit D2: RULE 1,
+//      listings are not prices). The basis mix of every snapshot is logged.
 //   2. goods in transit + 3. stock inside open sell orders, same mark
 //   4. ISK escrowed in open buy orders   5. ISK in the team's wallets
 // ONE YARDSTICK (user decision v38.3): everything is valued at what it
-// would sell for via a sell order in Jita, wherever it currently sits —
+// sells for in Jita, wherever it currently sits (since v0.230.0 measured, not listed) —
 // so the chart line moves when TRADING creates value, not when goods
 // cross between differently-priced markets. (Historical points cannot be
 // re-marked: snapshots store only the layer totals, not the holdings.)
@@ -18,6 +21,26 @@ import { useAuth } from './auth';
 import { useStock, unsoldCosts } from './stock';
 import { getTeamOrders, lastTeamOrderFailures, refreshWalletBalance } from './esiChar';
 import { appendExternalEvents, loadTrendEvents, type TrendEvent } from './trends';
+import { itemExecutedPrices } from './radar';
+import { logState } from './devlog';
+
+/** which kind of number marked an item (v0.230.0) — counted per snapshot and written to the log */
+export type MarkBasis = 'executed' | 'cost' | 'listing' | 'order' | 'none';
+
+/** PURE: the mark for one item, in this order — a measured Jita sale price, the team's own
+ * cost for it, the Jita ask (a listing), the fallback (an order's own price), 0 */
+export function chooseMark(
+  executed: { price: number; units: number } | undefined,
+  cost: number | undefined,
+  ask: number | undefined,
+  fallback: number,
+): { price: number; basis: MarkBasis } {
+  if (executed && executed.units > 0 && executed.price > 0) return { price: executed.price, basis: 'executed' };
+  if (cost !== undefined && cost > 0) return { price: cost, basis: 'cost' };
+  if (ask !== undefined && ask > 0) return { price: ask, basis: 'listing' };
+  if (fallback > 0) return { price: fallback, basis: 'order' };
+  return { price: 0, basis: 'none' };
+}
 
 export interface NetWorthSnap {
   t: number;
@@ -79,22 +102,33 @@ export async function snapshotNetWorth(): Promise<boolean> {
   const holdings = allHoldings.filter((h) => !h.transit && !isHauler(h.charId) && holderCounts(h.charId));
   const transitHoldings = allHoldings.filter((h) => h.transit || isHauler(h.charId));
 
-  // ONE YARDSTICK: the Jita ask — what a sell order in Jita would fetch —
-  // for every layer, wherever the goods sit (ledger cost only when the item
-  // has no Jita market at all)
+  // ONE YARDSTICK, MEASURED (v0.230.0): what the item actually sold for in Jita over the last
+  // 7 days (the radar's fills), for every layer, wherever the goods sit; the team's own cost
+  // when nothing measurably sold; the Jita ask — a listing, not a price — only when there is
+  // neither. The mix is recorded so a chart step can be explained.
   const types = [...new Set([...holdings.map((h) => h.typeId), ...transitHoldings.map((h) => h.typeId), ...sells.map((o) => o.type_id)])];
   const jita = BUILTIN_HUBS.find((h) => h.id === 'jita')!;
   const jitaBook = types.length > 0 ? await fetchAggregates(jita, types) : new Map();
+  const executed = types.length > 0 ? await itemExecutedPrices(jita.regionId, types) : new Map();
   const costs = unsoldCosts();
+  const basis: Record<MarkBasis, number> = { executed: 0, cost: 0, listing: 0, order: 0, none: 0 };
+  const marked = new Set<number>();
   const mark = (typeId: number, fallback = 0): number => {
     const j = jitaBook.get(typeId);
-    if (j && j.sell.orderCount > 0 && j.sell.min > 0) return j.sell.min;
-    return costs.get(typeId)?.avgCost ?? fallback;
+    const m = chooseMark(executed.get(typeId), costs.get(typeId)?.avgCost, j && j.sell.orderCount > 0 ? j.sell.min : undefined, fallback);
+    if (!marked.has(typeId)) {
+      marked.add(typeId);
+      basis[m.basis]++;
+    }
+    return m.price;
   };
 
   const stock = holdings.reduce((s, h) => s + h.qty * mark(h.typeId), 0);
   const transit = transitHoldings.reduce((s, h) => s + h.qty * mark(h.typeId), 0);
   const listed = sells.reduce((s, o) => s + o.volume_remain * mark(o.type_id, o.price), 0);
+
+  // written when the mix changes (items by basis), so a step on the chart has its reason in the log
+  logState('networth', 'mark basis (items)', `executed ${basis.executed} · cost ${basis.cost} · listing ${basis.listing} · order ${basis.order} · none ${basis.none}`);
 
   const snap: NetWorthSnap = {
     t: Date.now(),

@@ -14,11 +14,11 @@
 //   transition-based, to fingerprint competitor cadence.
 import { ESI_BASE } from './constants';
 import { esiFetch } from './esiRate';
-import { logWarn } from './devlog';
+import { logWarn, logState } from './devlog';
 import { useAuth } from './auth';
 import { useApp } from './store';
 import { getTeamOrders, type MyOrder } from './esiChar';
-import { ledger, everOwnedOrderIds } from './ledger';
+import { ledger, everOwnedOrderIds, restoreLedger } from './ledger';
 import { getStation, systemsWithin } from './mapdata';
 import { notifyTrends, type FillNotice } from './notify';
 
@@ -335,6 +335,7 @@ export function lastTrendsTick(): number | null {
  * exact sales from the wallet, fires alerts. Returns events recorded.
  */
 export async function runTrendsTick(): Promise<number> {
+  await restoreLedger(); // the tick reads the ledger's orders and transactions
   if (useAuth.getState().characters.length === 0) return 0;
   const now = Date.now();
   const allOrders = await getTeamOrders('background'); // unattended watcher
@@ -365,6 +366,10 @@ export async function runTrendsTick(): Promise<number> {
       books.set(key, null);
     }
   }
+
+  // audit A4: the number the audit could not find — one ESI request per distinct (region, item) among
+  // the team's orders, every 5 minutes; written to the log whenever it changes
+  logState('trends', 'books per tick', `${books.size} (${[...books.values()].filter((b) => b === null).length} failed) for ${orders.length} orders`);
 
   const snaps = loadJson<Record<string, OrderSnap>>(SNAP_KEY, {});
   const rivalStore = loadJson<RivalStore>(RIVAL_KEY, { watched: [], rivals: {} });

@@ -14,6 +14,7 @@
 // and the module is explicit that bank contents are unknown until you're
 // in system.
 import { getSystem, regionName, findSystem, type ReachInfo } from './mapdata';
+import { swallowed } from './devlog';
 import { esiFetch } from './esiRate';
 
 const ESI_HOST = 'https://esi.evetech.net';
@@ -412,7 +413,7 @@ export async function planetInfo(ids: number[]): Promise<Map<number, PlanetInfo>
     }
     try {
       localStorage.setItem(PLANET_KEY, JSON.stringify(Object.fromEntries(planetCache)));
-    } catch { /* cache is a nicety */ }
+    } catch (e) { swallowed('theft', 'planet cache save', e); /* cache is a nicety */ }
   }
   return planetCache;
 }

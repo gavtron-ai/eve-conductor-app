@@ -3,6 +3,10 @@
 // how it leaves the building.
 //
 //   npm run export:source
+//   npm run export:source -- --dry-run     (v0.237.0) list + scan what WOULD leave; touch nothing
+//
+// The allow/prune/never lists live in goliveRules.mjs, shared with the go-live check, which runs
+// the dry run before anything is pushed.
 //
 // Layers of protection, in order:
 //   1. ALLOWLIST — only the app tree exports. The private repo's docs
@@ -20,6 +24,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { loadOwnerPatterns, PATTERNS_PATH } from './ownerPatterns.mjs';
+import { ALLOW, PRUNE, exportFileList, forbidden } from './goliveRules.mjs';
 
 const APP = path.resolve(import.meta.dirname, '..');
 const DEST = path.resolve(APP, '..', 'public-export');
@@ -31,18 +36,25 @@ const die = (m) => { console.error(m); process.exit(1); };
 const patterns = loadOwnerPatterns();
 if (patterns === null) die(`No ${PATTERNS_PATH} — the export refuses to run unscanned.`);
 
-/** top-level entries of app/ that export */
-const ALLOW = new Set([
-  'src', 'electron', 'scripts', 'tests', 'build',
-  'index.html', 'package.json', 'package-lock.json', 'tsconfig.json',
-  'vite.config.ts', 'README.md', 'LICENSE',
-]);
-/** subtrees pruned wherever they appear */
-const PRUNE = new Set([
-  'node_modules', 'dist', 'release', 'handout', 'baseline', '.sde-cache',
-  '.claude', 'sim', 'pi', 'led', 'r3', 'sch',   // tests/*: compiled snapshots
-  'owner-patterns.local.json',
-]);
+const scanText = (buf) => buf.toString('utf8') + buf.toString('latin1');
+
+// DRY RUN (v0.237.0): the exact list that would leave, every file scanned, the never-list checked —
+// and nothing cloned, wiped, copied, committed or pushed. This is what the go-live check runs.
+if (process.argv.includes('--dry-run')) {
+  const list = exportFileList(APP);
+  const never = forbidden(list);
+  const hits = [];
+  for (const rel of list) {
+    const text = scanText(fs.readFileSync(path.join(APP, rel)));
+    for (const p of patterns) if (p.pattern.test(text)) hits.push(`${rel} :: ${p.label}`);
+  }
+  const by = (prefix) => list.filter((p) => p.startsWith(prefix)).length;
+  if (never.length > 0) { console.error('ON THE NEVER-LIST — the export would be refused:'); for (const n of never) console.error('  ' + n); }
+  if (hits.length > 0) { console.error('PERSONAL DATA IN THE EXPORT — the export would be refused:'); for (const h of hits) console.error('  ' + h); }
+  if (never.length > 0 || hits.length > 0) process.exit(1);
+  console.log(`dry run: ${list.length} files would leave (src ${by('src/')}, electron ${by('electron/')}, scripts ${by('scripts/')}, tests ${by('tests/')}, build ${by('build/')}) — scanned with ${patterns.length} owner patterns, clean, none on the never-list`);
+  process.exit(0);
+}
 
 const run = (cmd, args, cwd) => {
   const r = spawnSync(cmd, args, { cwd, stdio: 'inherit' });
@@ -72,7 +84,7 @@ const copy = (src, dst) => {
     return;
   }
   const buf = fs.readFileSync(src);
-  const text = buf.toString('utf8') + buf.toString('latin1');
+  const text = scanText(buf);
   for (const p of patterns) {
     if (p.pattern.test(text)) bad.push(`${path.relative(APP, src)} :: ${p.label}`);
   }
@@ -82,6 +94,14 @@ const copy = (src, dst) => {
 for (const e of fs.readdirSync(APP)) {
   if (!ALLOW.has(e)) continue;
   copy(path.join(APP, e), path.join(DEST, e));
+}
+// the never-list, over what was actually copied (the same list the dry run checked)
+const never = forbidden(exportFileList(APP));
+if (never.length > 0) {
+  console.error('ON THE NEVER-LIST — nothing was pushed:');
+  for (const n of never) console.error('  ' + n);
+  fs.rmSync(DEST, { recursive: true, force: true });
+  process.exit(1);
 }
 fs.writeFileSync(path.join(DEST, '.gitignore'), [
   'node_modules/', 'dist/', 'release/', 'handout/', 'baseline/', '.sde-cache/',
@@ -108,3 +128,9 @@ if (st.stdout.trim() === '') {
   g(['push', 'origin', 'HEAD:main']);
   console.log(`pushed: https://github.com/${REPO} (sync v${version})`);
 }
+// THE VERSION TAG (2026-09-23, code signing): it starts the public repository's windows-build workflow,
+// whose (signed) artifact `npm run publish:beta -- --from-ci` publishes. Forced, so re-exporting the same
+// version moves the tag to the newest sync and runs the build again.
+g(['tag', '-f', `v${version}`]);
+g(['push', '-f', 'origin', `refs/tags/v${version}`]);
+console.log(`tagged v${version} — the windows-build workflow runs at https://github.com/${REPO}/actions`);

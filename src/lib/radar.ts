@@ -6,17 +6,23 @@
 //   - fills (same order id, volume dropped)        → real trade flow, both sides
 //   - new / vanished orders                        → competitor churn
 //   - distinct competitor counts                   → crowding, measured live
-// Daily rollups append to radar-YYYY-MM.ndjson in the Do-Not-Delete folder;
-// radar-summary.json keeps a 31-day ring per item plus ALL-TIME hour-of-day
-// histograms (the user wants full history, daily/weekly/monthly views, and
-// no reliance on ESI's day-old history endpoint).
+// Daily rollups used to append to radar-YYYY-MM.ndjson as well (326 MB a month, read by nothing
+// — stopped in v0.220.0; Settings offers to delete the old files);
+// radar-summary-<region>.json (one compact file per region since v0.229.0 — see
+// radarSummaryFormat.ts; until then one 137 MB blob for every region) keeps a
+// 31-day ring per item plus ALL-TIME hour-of-day histograms (the user wants full
+// history, daily/weekly/monthly views, and no reliance on ESI's day-old history
+// endpoint).
 // The team's own orders are excluded from reprice/competitor counts
 // (self-echo) but their fills count in market flow, like everywhere else.
 import { ESI_BASE, BUILTIN_HUBS } from './constants';
+import { useApp } from './store';
+import type { Hub } from './types';
 import { esiFetch } from './esiRate';
-import { logInfo, logWarn } from './devlog';
+import { logInfo, logWarn, logError, swallowed } from './devlog';
 import { useAuth } from './auth';
-import { everOwnedOrderIds } from './ledger';
+import { everOwnedOrderIds, restoreLedger } from './ledger';
+import { regionFile, LEGACY_FILE, encodeRegion, decodeRegion } from './radarSummaryFormat';
 
 /** the bulk market sweep: the FIRST traffic to yield when the shared ESI
  * error budget tightens, so it can never crowd out the overlay or the
@@ -114,19 +120,67 @@ const spanOf = coveredMs;
  * left closed for a week must not claim a week of observation from one diff */
 const MAX_CREDITED_SPAN_MS = 6 * 3_600_000;
 
-/** the regions the radar watches: EVERY builtin hub's region (all five major
- * markets — the hub table's measured-flow columns need data everywhere, and
- * history can't be collected retroactively) plus any trader duty hub */
-export function radarRegions(): number[] {
-  const ids = new Set<number>(BUILTIN_HUBS.map((h) => h.regionId));
-  const chars = useAuth.getState().characters;
+// WHICH REGIONS (v0.225.0, audit A2). Until 0.224 the radar swept EVERY built-in hub's region for
+// every install — 902 pages a sweep, 48 sweeps a day, ≈43,000 requests and ≈1.3 GB on the wire
+// per user per day (measured 2026-09-23) — whichever markets the user actually traded. Now it
+// follows the hubs the user watches: by default the duty hubs of the team's traders (Jita alone
+// when there are none), or the explicit list from Settings → Market radar. The 30-minute cadence
+// stays: it is the measurement's resolution (an order that appears and fills inside one window
+// is invisible to a diff, so a slower sweep under-counts flow) — the region choice is the lever.
+export interface RadarChar { tradeRole?: 'trader' | 'hauler'; homeHubId?: string }
+
+/** the hubs the radar follows when the user made no choice: every trader's duty hub (built-in or
+ * custom — the old code only knew the built-ins), in team order, else Jita alone */
+export function automaticRadarHubIds(chars: RadarChar[], hubs: Hub[]): string[] {
+  const ids: string[] = [];
   for (const c of chars) {
-    if (c.tradeRole === 'trader' && c.homeHubId) {
-      const hub = BUILTIN_HUBS.find((x) => x.id === c.homeHubId);
-      if (hub) ids.add(hub.regionId);
-    }
+    if (c.tradeRole === 'trader' && c.homeHubId && !ids.includes(c.homeHubId) && hubs.some((h) => h.id === c.homeHubId)) ids.push(c.homeHubId);
   }
-  return [...ids];
+  return ids.length > 0 ? ids : ['jita'];
+}
+
+/** PURE: the regions to sweep for a setting (null/absent = automatic), a team, and the known hubs;
+ * unknown hub ids are dropped, a region is listed once however many hubs it holds */
+export function resolveRadarRegions(setting: string[] | null | undefined, chars: RadarChar[], hubs: Hub[]): number[] {
+  const regions: number[] = [];
+  for (const id of setting ?? automaticRadarHubIds(chars, hubs)) {
+    const hub = hubs.find((h) => h.id === id);
+    if (hub && !regions.includes(hub.regionId)) regions.push(hub.regionId);
+  }
+  return regions;
+}
+
+const knownHubs = (): Hub[] => [...BUILTIN_HUBS, ...useApp.getState().customHubs];
+
+/** the hub ids the radar follows right now (the setting, or the automatic set) */
+export function radarHubIds(): string[] {
+  return useApp.getState().settings.radarHubIds ?? automaticRadarHubIds(useAuth.getState().characters, knownHubs());
+}
+
+/** the regions the radar watches */
+export function radarRegions(): number[] {
+  return resolveRadarRegions(useApp.getState().settings.radarHubIds, useAuth.getState().characters, knownHubs());
+}
+
+/** pages each region's whole book took on its last read — known after the first sweep; what the
+ * Settings page shows as the cost of watching a region */
+export const lastSweepPages = new Map<number, number>();
+/** ≈ bytes on the wire per page: measured 2026-09-23 as ≈1.3 GB for 43,296 pages (gzip) */
+export const WIRE_BYTES_PER_PAGE = 30_000;
+
+/** PURE: what sweeping these regions costs a day at the radar's cadence, from measured page
+ * counts. Regions never swept are named in `unknown` (and left out of the sum); when NONE is
+ * known the numbers are null — never a made-up zero. */
+export function sweepCost(regions: number[], pagesOf: Map<number, number>): { pagesPerSweep: number | null; requestsPerDay: number | null; unknown: number[] } {
+  let pages = 0;
+  const unknown: number[] = [];
+  for (const r of regions) {
+    const p = pagesOf.get(r);
+    if (p === undefined) unknown.push(r);
+    else pages += p;
+  }
+  if (regions.length > 0 && unknown.length === regions.length) return { pagesPerSweep: null, requestsPerDay: null, unknown };
+  return { pagesPerSweep: pages, requestsPerDay: pages * DIFFS_PER_DAY, unknown };
 }
 
 /**
@@ -193,6 +247,7 @@ async function fetchRegionBook(regionId: number, onProgress?: (msg: string) => v
   const first = await esiFetch(`${ESI_BASE}/markets/${regionId}/orders/?order_type=all&page=1`, undefined, BULK);
   if (!first.ok) throw new Error(`ESI ${first.status} for region ${regionId}`);
   const pages = Number(first.headers.get('x-pages') ?? '1');
+  lastSweepPages.set(regionId, pages);
   interface Raw { order_id: number; type_id: number; is_buy_order: boolean; price: number; volume_remain: number }
   const book = new Map<number, RadarOrder>();
   const add = (rows: Raw[]) => {
@@ -289,24 +344,52 @@ function accumulate(regionId: number, diffs: Map<string, SideDiff>): void {
 
 // ---- persistence: daily rollup + rolling summary ----
 
-let summaryCache: Map<string, SummaryEntry> | null = null;
+// PER-REGION SUMMARY (v0.229.0, audit B2): each region's file is read once, when something
+// first asks for that region, and rewritten alone at a rollover that had rows for it. An
+// install that watches two regions never parses the other three. The pre-0.229 blob is split
+// by the main process at launch (electron/radarSummary.cjs); only if that could not happen is
+// the blob read here — once, whole, with a warning — so no history is ever invisible.
+const summaryCache = new Map<number, Map<string, SummaryEntry>>();
+/** regions whose file exists but could not be read: never written over (RULES #3) */
+const unreadable = new Set<number>();
+let legacyCache: Map<number, Map<string, SummaryEntry>> | null = null;
 let covCache: Map<number, RegionCoverage> | null = null;
 
-async function loadSummaryMap(): Promise<Map<string, SummaryEntry>> {
-  if (summaryCache) return summaryCache;
+const keyOf = (e: { r: number; t: number; s: number }): string => `${e.r}:${e.t}:${e.s}`;
+
+async function loadLegacy(bridge: NonNullable<NonNullable<Window['appInfo']>['stats']>): Promise<Map<number, Map<string, SummaryEntry>>> {
+  if (legacyCache) return legacyCache;
+  legacyCache = new Map();
+  const raw = await bridge.auxRead(LEGACY_FILE);
+  if (!raw) return legacyCache;
+  for (const e of JSON.parse(raw) as SummaryEntry[]) {
+    (legacyCache.get(e.r) ?? legacyCache.set(e.r, new Map()).get(e.r)!).set(keyOf(e), e);
+  }
+  logWarn('radar', 'the pre-0.229 summary blob is still in use — the launch-time split did not happen (see the baseline lines from the main process)', { bytes: raw.length, regions: legacyCache.size });
+  return legacyCache;
+}
+
+async function loadSummaryMap(regionId: number): Promise<Map<string, SummaryEntry>> {
+  const hit = summaryCache.get(regionId);
+  if (hit) return hit;
+  const map = new Map<string, SummaryEntry>();
   const bridge = window.appInfo?.stats;
-  summaryCache = new Map();
   if (bridge) {
     try {
-      const raw = await bridge.auxRead('radar-summary.json');
-      if (raw) {
-        for (const e of JSON.parse(raw) as SummaryEntry[]) summaryCache.set(`${e.r}:${e.t}:${e.s}`, e);
+      const raw = await bridge.auxRead(regionFile(regionId));
+      if (raw !== null) {
+        for (const e of decodeRegion(raw)) map.set(keyOf(e), e);
+      } else {
+        const from = (await loadLegacy(bridge)).get(regionId);
+        if (from) for (const [k, e] of from) map.set(k, e);
       }
-    } catch {
-      // corrupt summary rebuilds itself over the coming days
+    } catch (e) {
+      unreadable.add(regionId);
+      logError('radar', `summary for region ${regionId} could not be read — that region starts empty in memory and its file is never written over`, { error: String(e).slice(0, 200) });
     }
   }
-  return summaryCache;
+  summaryCache.set(regionId, map);
+  return map;
 }
 
 async function loadCoverageMap(): Promise<Map<number, RegionCoverage>> {
@@ -409,9 +492,13 @@ export function normalizedRates(
 async function persistRollover(rows: DayRow[]): Promise<void> {
   const bridge = window.appInfo?.stats;
   if (!bridge || rows.length === 0) return;
-  const month = rows[0].d.slice(0, 7);
-  await bridge.auxAppend(`radar-${month}.ndjson`, rows.map((r) => JSON.stringify(r)));
-  const sum = await loadSummaryMap();
+  const byRegion = new Map<number, DayRow[]>();
+  for (const row of rows) (byRegion.get(row.r) ?? byRegion.set(row.r, []).get(row.r)!).push(row);
+  for (const [regionId, regionRows] of byRegion) await persistRegionRollover(bridge, regionId, regionRows);
+}
+
+async function persistRegionRollover(bridge: NonNullable<NonNullable<Window['appInfo']>['stats']>, regionId: number, rows: DayRow[]): Promise<void> {
+  const sum = await loadSummaryMap(regionId);
   for (const row of rows) {
     const key = `${row.r}:${row.t}:${row.s}`;
     let e = sum.get(key);
@@ -429,7 +516,11 @@ async function persistRollover(rows: DayRow[]): Promise<void> {
       e.hra[h] += row.hr[h];
     }
   }
-  await bridge.auxWrite('radar-summary.json', JSON.stringify([...sum.values()]));
+  if (unreadable.has(regionId)) {
+    logWarn('radar', `region ${regionId}: the day's rows stay in memory only — its summary file was unreadable at load and is not written over`);
+    return;
+  }
+  await bridge.auxWrite(regionFile(regionId), encodeRegion(regionId, sum.values()));
 }
 
 /** one radar pass: snapshot each region, diff, accumulate; roll the day over
@@ -438,6 +529,7 @@ export async function runRadarTick(onProgress?: (msg: string) => void): Promise<
   // never diff or write the WIP before the previous session's day has been
   // recovered — a tick that raced the restore would overwrite it
   await restoreRadarWip();
+  await restoreLedger(); // own-order exclusion needs the ledger's order events
   const day = utcDay();
   if (accDay && accDay !== day) {
     // flush yesterday (stats + coverage) before touching today
@@ -451,7 +543,13 @@ export async function runRadarTick(onProgress?: (msg: string) => void): Promise<
   const exclude = everOwnedOrderIds();
   const hour = new Date().getUTCHours();
   let didDiff = false;
-  for (const regionId of radarRegions()) {
+  const regions = radarRegions();
+  if (regions.length === 0) {
+    // the user unticked every hub: nothing is swept, and the log says so once per tick
+    logInfo('radar', 'no hub watched — nothing swept (Settings → Market radar)');
+    return false;
+  }
+  for (const regionId of regions) {
     let book: Map<number, RadarOrder>;
     try {
       book = await fetchRegionBook(regionId, onProgress);
@@ -485,6 +583,7 @@ export async function runRadarTick(onProgress?: (msg: string) => void): Promise<
     }
     prevBooks.set(regionId, { book, at: takenAt });
   }
+  logInfo('radar', 'sweep done', { regions: regions.length, pages: regions.reduce((t, r) => t + (lastSweepPages.get(r) ?? 0), 0), diffed: didDiff });
   // WIP survives restarts losing at most the in-memory baseline
   const bridge = window.appInfo?.stats;
   if (bridge && didDiff) {
@@ -492,8 +591,8 @@ export async function runRadarTick(onProgress?: (msg: string) => void): Promise<
     const cov = [...covAcc.entries()].map(([r, c]) => ({ r, n: c.n, cv: c.cv, ms: c.ms }));
     try {
       await bridge.auxWrite('radar-wip.json', JSON.stringify({ day: accDay, rows, cov }));
-    } catch {
-      // wip is a nicety
+    } catch (e) {
+      swallowed('radar', 'work-in-progress save', e); // wip is a nicety
     }
   }
   return didDiff;
@@ -549,18 +648,18 @@ async function doRestoreWip(): Promise<void> {
     await persistRollover(wip.rows.filter(hasSignal));
     await persistCoverage(wip.day, covOf());
     await bridge.auxWrite('radar-wip.json', JSON.stringify({ day: utcDay(), rows: [], cov: [] }));
-  } catch {
-    // fine — the day rebuilds from the next diffs
+  } catch (e) {
+    swallowed('radar', 'day rollover write', e); // the day rebuilds from the next diffs — but say so
   }
 }
 
-/** the rolling summary for the Radar tab (today's live rows merged in) */
-export async function loadRadarSummary(): Promise<SummaryEntry[]> {
-  const sum = await loadSummaryMap();
+/** one region's rolling summary (today's live rows merged in) */
+export async function loadRadarSummary(regionId: number): Promise<SummaryEntry[]> {
+  const sum = await loadSummaryMap(regionId);
   const merged = new Map<string, SummaryEntry>();
   for (const [k, e] of sum) merged.set(k, { ...e, days: [...e.days], hfa: [...e.hfa], hra: [...e.hra] });
   for (const row of acc.values()) {
-    if (row.rp === 0 && row.fi === 0) continue;
+    if (row.r !== regionId || (row.rp === 0 && row.fi === 0)) continue;
     const key = `${row.r}:${row.t}:${row.s}`;
     let e = merged.get(key);
     if (!e) {
@@ -576,9 +675,37 @@ export async function loadRadarSummary(): Promise<SummaryEntry[]> {
   return [...merged.values()];
 }
 
+/** PURE (v0.230.0, audit D2): the average price an item actually SOLD for on the sell side of
+ * one region over the calendar days after `cutoffDay` — ISK filled ÷ units filled from the
+ * radar's full-book diffs. null when nothing filled: a listing is not a price. */
+export function executedSellPrice(e: SummaryEntry, cutoffDay: string): { price: number; units: number; isk: number } | null {
+  if (e.s !== 0) return null;
+  let units = 0;
+  let isk = 0;
+  for (const d of e.days) {
+    if (d.d <= cutoffDay) continue;
+    units += d.fi;
+    isk += d.fk;
+  }
+  if (units <= 0 || isk <= 0) return null;
+  return { price: isk / units, units, isk };
+}
+
+/** measured sale prices for many items in one region (the region's file is read once) */
+export async function itemExecutedPrices(regionId: number, typeIds: number[], nDays = 7): Promise<Map<number, { price: number; units: number; isk: number }>> {
+  const out = new Map<number, { price: number; units: number; isk: number }>();
+  const want = new Set(typeIds);
+  const cutoff = utcDay(Date.now() - nDays * 86_400_000);
+  for (const e of await loadRadarSummary(regionId)) {
+    if (e.s !== 0 || !want.has(e.t)) continue;
+    const x = executedSellPrice(e, cutoff);
+    if (x) out.set(e.t, x);
+  }
+  return out;
+}
+
 /**
- * Measured trade flow for one (region, item): units per day actually
- * BOUGHT from sell orders (ask-side fills) and SOLD into buy orders
+ * Measured trade flow for one (region, item): units per day actually * BOUGHT from sell orders (ask-side fills) and SOLD into buy orders
  * (bid-side fills) — real executed trades from full-book diffs, NOT
  * listings, 7-day coverage-normalized. Returns null when the radar does
  * not watch this region at all; zeros are honest "watched, no fills seen".
@@ -589,7 +716,7 @@ export async function itemTradeFlow(
 ): Promise<{ askUnits: number; bidUnits: number; days: number } | null> {
   const cov = (await loadRadarCoverage()).get(regionId);
   if (!cov || cov.days.length === 0) return null; // region not radar-watched
-  const sum = await loadRadarSummary();
+  const sum = await loadRadarSummary(regionId);
   const s0 = sum.find((x) => x.r === regionId && x.t === typeId && x.s === 0);
   const s1 = sum.find((x) => x.r === regionId && x.t === typeId && x.s === 1);
   const n0 = s0 ? normalizedRates(s0, cov, 7) : null;
@@ -610,7 +737,7 @@ export async function itemTradeFlows(
     for (const t of typeIds) out.set(t, null);
     return out;
   }
-  const sum = await loadRadarSummary();
+  const sum = await loadRadarSummary(regionId);
   const byType = new Map<number, { s0?: SummaryEntry; s1?: SummaryEntry }>();
   for (const e of sum) {
     if (e.r !== regionId) continue;
@@ -634,7 +761,7 @@ export async function itemFlowStatsMany(
   typeIds: number[],
 ): Promise<Map<number, { hours: number[]; fk7: number } | null>> {
   const out = new Map<number, { hours: number[]; fk7: number } | null>();
-  const sum = await loadRadarSummary();
+  const sum = await loadRadarSummary(regionId);
   const cov = (await loadRadarCoverage()).get(regionId);
   const byType = new Map<number, SummaryEntry>();
   for (const e of sum) if (e.r === regionId && e.s === 0) byType.set(e.t, e);
@@ -660,7 +787,7 @@ export async function itemFlowStats(
   regionId: number,
   typeId: number,
 ): Promise<{ hours: number[]; fk7: number } | null> {
-  const sum = await loadRadarSummary();
+  const sum = await loadRadarSummary(regionId);
   const e = sum.find((x) => x.r === regionId && x.t === typeId && x.s === 0);
   if (!e) return null;
   const cov = (await loadRadarCoverage()).get(regionId);

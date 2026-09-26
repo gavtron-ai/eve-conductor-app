@@ -11,10 +11,11 @@
 // resolve, callers get an error — never a number computed from a partial
 // fit (RULES #3). Pure conversion/extraction lives in dogmaFit.ts so node
 // fixtures exercise the exact shipped logic.
-import protobuf from 'protobufjs';
+// static decoders (generated from esf.proto — see scripts/build-esfproto.mjs): protobufjs' reflection
+// path compiles its decoders from source text, which the page's Content-Security-Policy refuses (v0.224.1)
+import { esf } from '../data/esf/esf.static.js';
 import initWasm, { init as dogmaInit, calculate as dogmaCalculate } from '../vendor/dogma-engine/esf_dogma_engine';
 import wasmUrl from '../vendor/dogma-engine/esf_dogma_engine_bg.wasm?url';
-import protoText from '../data/esf/esf.proto?raw';
 import typesUrl from '../data/esf/types.pb2?url';
 import typeDogmaUrl from '../data/esf/typeDogma.pb2?url';
 import dogmaEffectsUrl from '../data/esf/dogmaEffects.pb2?url';
@@ -66,23 +67,22 @@ declare global {
 
 let ready: Promise<EsfData> | null = null;
 
-async function fetchPb(url: string, root: protobuf.Root, message: string): Promise<Record<string, unknown>> {
+type PbDecoder = { decode(buf: Uint8Array): { entries: Record<string, unknown> } };
+async function fetchPb(url: string, message: string, decoder: PbDecoder): Promise<Record<string, unknown>> {
   const res = await fetch(url);
   if (!res.ok) throw new Error(`${message}: HTTP ${res.status}`);
   const buf = new Uint8Array(await res.arrayBuffer());
-  const decoded = root.lookupType(message).decode(buf) as unknown as { entries: Record<string, unknown> };
-  return decoded.entries;
+  return decoder.decode(buf).entries;
 }
 
 async function load(): Promise<EsfData> {
-  const root = protobuf.parse(protoText).root;
   const [types, typeDogma, dogmaAttributes, dogmaEffects, groups, marketGroups] = await Promise.all([
-    fetchPb(typesUrl, root, 'esf.Types'),
-    fetchPb(typeDogmaUrl, root, 'esf.TypeDogma'),
-    fetchPb(dogmaAttributesUrl, root, 'esf.DogmaAttributes'),
-    fetchPb(dogmaEffectsUrl, root, 'esf.DogmaEffects'),
-    fetchPb(groupsUrl, root, 'esf.Groups'),
-    fetchPb(marketGroupsUrl, root, 'esf.MarketGroups'),
+    fetchPb(typesUrl, 'esf.Types', esf.Types as PbDecoder),
+    fetchPb(typeDogmaUrl, 'esf.TypeDogma', esf.TypeDogma as PbDecoder),
+    fetchPb(dogmaAttributesUrl, 'esf.DogmaAttributes', esf.DogmaAttributes as PbDecoder),
+    fetchPb(dogmaEffectsUrl, 'esf.DogmaEffects', esf.DogmaEffects as PbDecoder),
+    fetchPb(groupsUrl, 'esf.Groups', esf.Groups as PbDecoder),
+    fetchPb(marketGroupsUrl, 'esf.MarketGroups', esf.MarketGroups as PbDecoder),
   ]);
   const data = {
     types, typeDogma, dogmaAttributes, dogmaEffects, groups, marketGroups,
@@ -117,6 +117,9 @@ export async function getEsfData(): Promise<EsfCatalog> {
 export function ensureDogma(): Promise<EsfData> {
   ready ??= load().catch((e: unknown) => {
     ready = null; // allow retry after a transient failure
+    // never silent (audit E1): every fit screen depends on this catalog, and the 0.224.0 policy refusal
+    // that stopped it loading was invisible in the log until the CSP listener happened to name it
+    logWarn('dogma', 'fit catalog failed to load — fits cannot be scored until it does', { error: String(e).slice(0, 200) });
     throw e;
   });
   return ready;

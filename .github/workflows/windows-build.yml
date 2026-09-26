@@ -1,0 +1,136 @@
+# WINDOWS BUILD, SIGNED WHEN THE SIGNER IS CONFIGURED (2026-09-23, code signing)
+#
+# Builds the Windows installer on a GitHub-hosted runner from exactly what this repository holds,
+# and — once the project's SignPath Foundation subscription exists (repository variables
+# SIGNPATH_ORGANIZATION_ID, SIGNPATH_PROJECT_SLUG, SIGNPATH_SIGNING_POLICY_SLUG and the secret
+# SIGNPATH_API_TOKEN) — signs it in two passes, because SignPath signs finished files and does not
+# unpack NSIS installers:
+#
+#   pass 1  the unpacked app's executables (the app exe and Electron's DLLs) go up as one ZIP and
+#           come back signed (artifact configuration "unpacked-executables"; signing/signpath/)
+#   pass 2  the NSIS installer is built FROM the signed folder (--prepackaged), goes up as one file
+#           and comes back signed (artifact configuration "installer")
+#   then    scripts/repair-feed.mjs recomputes latest.yml's sha512/size and the .blockmap from the
+#           signed installer — electron-updater would otherwise reject the download as corrupt
+#
+# Every signing request needs the maintainer's approval in SignPath's UI (the Foundation's policy);
+# the steps wait up to three hours for it. Without the variables the workflow builds unsigned, so
+# the public tree is always buildable. The result is a workflow artifact, published nowhere:
+# publishing stays the maintainer's decision (`npm run publish:beta -- --from-ci`), after the
+# go-live check. The owner-only baseline dataset does not exist here; electron-builder logs
+# "file source doesn't exist" and packages without it (measured 2026-09-23).
+name: windows-build
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 240
+    permissions:
+      contents: read
+    env:
+      SIGN: ${{ vars.SIGNPATH_ORGANIZATION_ID != '' && 'yes' || 'no' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build
+      - name: package the app (unpacked)
+        run: npx electron-builder --win --dir --publish never
+
+      # ---- pass 1: the executables inside the app
+      - name: collect the executables to sign
+        if: env.SIGN == 'yes'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force signing/unpacked | Out-Null
+          Get-ChildItem release/win-unpacked -File | Where-Object { $_.Extension -in '.exe', '.dll' } | Copy-Item -Destination signing/unpacked
+          Get-ChildItem signing/unpacked | ForEach-Object { $_.Name }
+          Compress-Archive -Path signing/unpacked/* -DestinationPath signing/unpacked.zip
+      - name: upload the unsigned executables
+        if: env.SIGN == 'yes'
+        id: unsigned-unpacked
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-unpacked
+          path: signing/unpacked.zip
+          if-no-files-found: error
+      - name: sign the executables (SignPath, waits for the approval)
+        if: env.SIGN == 'yes'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: unpacked-executables
+          github-artifact-id: ${{ steps.unsigned-unpacked.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 10800
+          output-artifact-directory: signing/signed-unpacked
+      - name: put the signed executables back
+        if: env.SIGN == 'yes'
+        shell: pwsh
+        run: |
+          $signed = Get-ChildItem signing/signed-unpacked -Recurse -File | Where-Object { $_.Extension -in '.exe', '.dll' }
+          if ($signed.Count -eq 0) { throw 'no signed executables came back' }
+          foreach ($f in $signed) { Copy-Item $f.FullName (Join-Path release/win-unpacked $f.Name) -Force; Write-Host "signed: $($f.Name)" }
+
+      # ---- pass 2: the installer, built from the (signed) folder
+      - name: build the installer from the packaged folder
+        run: npx electron-builder --win nsis --prepackaged release/win-unpacked --publish never
+      - name: upload the unsigned installer
+        if: env.SIGN == 'yes'
+        id: unsigned-installer
+        uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-installer
+          path: release/EVE-Conductor-Setup-*.exe
+          if-no-files-found: error
+      - name: sign the installer (SignPath, waits for the approval)
+        if: env.SIGN == 'yes'
+        uses: signpath/github-action-submit-signing-request@v3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY_SLUG }}
+          artifact-configuration-slug: installer
+          github-artifact-id: ${{ steps.unsigned-installer.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 10800
+          output-artifact-directory: signing/signed-installer
+      - name: put the signed installer back and repair the feed
+        if: env.SIGN == 'yes'
+        shell: pwsh
+        run: |
+          $signed = Get-ChildItem signing/signed-installer -Recurse -File -Filter 'EVE-Conductor-Setup-*.exe'
+          if ($signed.Count -ne 1) { throw "expected one signed installer, found $($signed.Count)" }
+          Copy-Item $signed[0].FullName (Join-Path release $signed[0].Name) -Force
+          node scripts/repair-feed.mjs release
+
+      # ---- what was built, with its signature state
+      - name: record what was built
+        shell: pwsh
+        run: |
+          Get-ChildItem release -File | Where-Object { $_.Name -match '\.(exe|blockmap|yml)$' } | Format-Table Name, Length
+          Get-Content release/latest.yml
+          foreach ($f in (Get-ChildItem release -File -Filter '*.exe')) { $s = Get-AuthenticodeSignature $f.FullName; Write-Host "$($f.Name): $($s.Status) $($s.SignerCertificate.Subject)" }
+          if ($env:SIGN -eq 'yes') {
+            $s = Get-AuthenticodeSignature (Get-ChildItem release -File -Filter 'EVE-Conductor-Setup-*.exe')[0].FullName
+            if ($s.Status -ne 'Valid') { throw "the installer is not validly signed: $($s.Status)" }
+          }
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer
+          path: |
+            release/EVE-Conductor-Setup-*.exe
+            release/EVE-Conductor-Setup-*.exe.blockmap
+            release/latest.yml
+          if-no-files-found: error

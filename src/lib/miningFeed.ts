@@ -90,7 +90,13 @@ export async function pollMiningSamples(state: FeedState, bridge: GamelogBridge,
     const nl = text.lastIndexOf('\n');
     if (nl < 0) { t.rest = text; continue; }
     t.rest = text.slice(nl + 1);
-    for (const line of text.slice(0, nl).split(/\r?\n/)) {
+    // THE CLIENT WRITES CRLF. Splitting the slice that ends just before the last LF on /\r?\n/ left
+    // the LAST line of every chunk with its CR still on, and a CR does not match the parser's `.` —
+    // so the last mining line of every poll was silently lost (v0.218.0; measured on the owner's
+    // real session file: random chunks lost 109 of 203 lines; a poll that saw one whole burst lost
+    // its last line every time). The CR is stripped per line.
+    for (const raw of text.slice(0, nl).split('\n')) {
+      const line = raw.endsWith('\r') ? raw.slice(0, -1) : raw;
       if (!line) continue;
       const e = parseGameLogLine(line);
       if (e && e.kind === 'mine') out.push({ charId: t.charId, charName: t.name, t: e.t });

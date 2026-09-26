@@ -1,3 +1,5 @@
+// v0.232.0 (audit E7): runs against the fresh sim/lib compile the runner produces — until then a frozen
+// copy in tests/rate kept these passing on old behaviour.
 // Fixtures for the SHIPPED esiRate.ts (compiled, not re-implemented).
 //
 //  A. the GLOBAL error limit — 100 non-2xx per 60s closes EVERY ESI route
@@ -27,7 +29,7 @@ const near = (label, got, want, tol) => {
   ok ? pass++ : fail++;
 };
 
-const path = require.resolve('./rate/esiRate.js');
+const path = require.resolve('./sim/lib/esiRate.js');
 const fresh = () => { delete require.cache[path]; return require(path); };
 let R = fresh();
 const H = (o = {}) => new Headers(o);

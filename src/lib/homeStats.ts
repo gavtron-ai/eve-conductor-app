@@ -2,6 +2,7 @@
 // contract as homeDigests.ts: nothing fetches, nothing guesses; each turns data the app already
 // holds into a glance, and a figure that cannot be stood behind comes back null.
 import type { WorthPoint } from './homeDigests';
+import { minOf, maxOf } from './nums';
 
 const DAY = 86_400_000;
 
@@ -58,7 +59,7 @@ export function inventoryDigest(lots: readonly LotLite[], keep = 6): InventoryDi
   }
   const rows = [...acc.values()].sort((a, b) => b.cost - a.cost || a.typeId - b.typeId);
   const live = lots.filter((l) => l.qty > 0);
-  return { atCost: rows.reduce((t, r) => t + r.cost, 0), lots: live.length, items: rows.length, oldestAt: live.length > 0 ? Math.min(...live.map((l) => l.date)) : null, top: rows.slice(0, keep) };
+  return { atCost: rows.reduce((t, r) => t + r.cost, 0), lots: live.length, items: rows.length, oldestAt: live.length > 0 ? minOf(live.map((l) => l.date)) : null, top: rows.slice(0, keep) };
 }
 
 // ---- the market talking back (the trend watcher's events)
@@ -139,7 +140,7 @@ export function raidHot(events: readonly VerdictLite[], now: number, days: numbe
 export function byEveHour(times: readonly number[]): { hours: number[]; peak: number | null; total: number } {
   const hours = new Array<number>(24).fill(0);
   for (const t of times) hours[new Date(t).getUTCHours()]++;
-  const max = Math.max(...hours);
+  const max = maxOf(hours);
   return { hours, peak: max > 0 ? hours.indexOf(max) : null, total: times.length };
 }
 export interface OutcomeDigest { raided: number; survived: number; unknown: number; rate: number | null; medianIntoMin: number | null }

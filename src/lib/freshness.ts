@@ -158,5 +158,6 @@ export function countdown(nextAt: number | null): string {
   if (ms <= 0) return 'due now';
   const m = Math.floor(ms / 60_000);
   const s = Math.floor((ms % 60_000) / 1000);
+  if (m >= 60) return `${Math.floor(m / 60)}h ${m % 60}m`; // v0.239.0: "280m 23s" read as a typo
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
 }

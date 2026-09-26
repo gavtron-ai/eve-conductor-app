@@ -3,7 +3,7 @@ import { ESI_BASE } from '../lib/constants';
 import { esiFetch } from '../lib/esiRate';
 import { useAuth, charLabel, ownerLabel } from '../lib/auth';
 import { getTeamOrders, getTeamOrderHistory, lastEsiExpiryMs, openMarketWindow, openMarketWindowEverywhere, type MyOrder } from '../lib/esiChar';
-import { recordOrderEvents, ledger, everOwnedOrderIds } from '../lib/ledger';
+import { recordOrderEvents, ledger, everOwnedOrderIds, useLedger } from '../lib/ledger';
 import { useFreshness, countdown } from '../lib/freshness';
 import { useApp } from '../lib/store';
 import { getType } from '../lib/typedb';
@@ -27,6 +27,7 @@ import ItemDetailModal from './ItemDetailModal';
 import OrderDetailModal from './OrderDetailModal';
 import StockChip from './StockChip';
 import { transitShipName } from '../lib/stock';
+import { minOf, maxOf } from '../lib/nums';
 
 // PLEX bought with real cash and dumped for ISK is a wallet injection, not
 // trading business — hide it here UNLESS the team has ever bought PLEX with
@@ -112,6 +113,7 @@ interface EsiOrder {
 }
 
 export default function MyOrders() {
+  useLedger((st) => st.version); // re-render when the ledger is restored or written
   const characters = useAuth((s) => s.characters);
   const hasChars = characters.length > 0;
   const excludedFromBooks = useApp((s) => s.excludedFromBooks);
@@ -251,8 +253,8 @@ export default function MyOrders() {
           : book.filter((c) => c.location_id === o.location_id);
         const best = (list: EsiOrder[]) =>
           list.length === 0 ? null : isBuy
-            ? Math.max(...list.map((c) => c.price))
-            : Math.min(...list.map((c) => c.price));
+            ? maxOf(list.map((c) => c.price))
+            : minOf(list.map((c) => c.price));
         const stationBest = best(atStation);
         const edge =
           stationBest !== null && stationBest > 0

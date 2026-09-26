@@ -1,3 +1,4 @@
+import { serverNow } from './clock';
 // Undercut heat: how contested a market is RIGHT NOW, measured without any
 // monitoring — every order in the book carries `issued` (when its owner set
 // its current price), so the age distribution of the front line tells you the
@@ -5,6 +6,7 @@
 // best price on that side.
 import { ESI_BASE } from './constants';
 import { esiFetch } from './esiRate';
+import { minOf, maxOf } from './nums';
 
 export interface Heat {
   /** orders on the front line (within 2% of best) */
@@ -21,13 +23,13 @@ const FRONT_LINE_BAND = 0.02;
 export function computeHeat(
   orders: { price: number; issued: string | number }[],
   side: 'sell' | 'buy',
-  now = Date.now(),
+  now = serverNow(), // order `issued` stamps are EVE time
 ): Heat | null {
   if (orders.length === 0) return null;
   const best =
     side === 'sell'
-      ? Math.min(...orders.map((o) => o.price))
-      : Math.max(...orders.map((o) => o.price));
+      ? minOf(orders.map((o) => o.price))
+      : maxOf(orders.map((o) => o.price));
   const front = orders.filter((o) =>
     side === 'sell' ? o.price <= best * (1 + FRONT_LINE_BAND) : o.price >= best * (1 - FRONT_LINE_BAND),
   );

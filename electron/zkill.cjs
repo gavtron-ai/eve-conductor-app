@@ -15,15 +15,54 @@
 //
 // zKill's stated API rules, followed here: identify yourself with a
 // User-Agent that carries contact (the public repo URL — no personal
-// email may ship), keep requests spaced, honour 429 + Retry-After.
+// email may ship), keep requests spaced, honour 429 + Retry-After, and
+// (v0.237.0, round-two R4) "cache responses locally": an answer is kept in
+// memory for as long as its own Cache-Control max-age says (an hour when
+// the header is missing), so opening Battle Reports or the Leaderboard
+// twice within the hour asks once. A cached answer counts as no request.
 
 const { USER_AGENT } = require('./ua.cjs');
 const HEADERS = { Accept: 'application/json', 'User-Agent': USER_AGENT };
+// v0.221.0: what this process asks of zKillboard, per UTC day (in memory) — folded into the app's net meter
+const meter = { day: '', count: 0, cached: 0 };
+const rollDay = () => { const d = new Date().toISOString().slice(0, 10); if (meter.day !== d) { meter.day = d; meter.count = 0; meter.cached = 0; } };
+const countRequest = () => { rollDay(); meter.count++; };
+const countCached = () => { rollDay(); meter.cached++; };
+const zkillMeter = () => ({ ...meter });
 /** at most one request in flight, and this long between two of them */
 const MIN_GAP_MS = 1100;
 const TIMEOUT_MS = 15_000;
 /** how long to wait after a 429 with no Retry-After header */
 const DEFAULT_BACKOFF_MS = 20_000;
+/** how long an answer is reused when it carries no Cache-Control max-age — zKill's own list cache */
+const CACHE_MS = 3_600_000;
+/** the longest any max-age is honoured, whatever the header says */
+const CACHE_MAX_MS = 24 * 3_600_000;
+/** answers kept at once; the oldest goes first */
+const CACHE_ENTRIES = 200;
+
+/** PURE: how long an answer may be reused, from its Cache-Control header (ms; 0 = do not keep) */
+function cacheTtlMs(cacheControl) {
+  const cc = String(cacheControl || '').toLowerCase();
+  if (/(^|[,\s])(no-store|no-cache)([,\s;]|$)/.test(cc)) return 0;
+  const m = /(^|[,\s])max-age=(\d+)/.exec(cc);
+  if (!m) return CACHE_MS;
+  return Math.min(Number(m[2]) * 1000, CACHE_MAX_MS);
+}
+
+const cache = new Map(); // url → { until, rows }
+const remember = (url, rows, ttl, now) => {
+  if (ttl <= 0) return;
+  if (cache.size >= CACHE_ENTRIES) cache.delete(cache.keys().next().value);
+  cache.set(url, { until: now + ttl, rows });
+};
+const recall = (url, now) => {
+  const hit = cache.get(url);
+  if (!hit) return null;
+  if (hit.until <= now) { cache.delete(url); return null; }
+  return hit.rows;
+};
+const cacheStats = () => ({ entries: cache.size });
 
 let chain = Promise.resolve();
 let lastAt = 0;
@@ -32,13 +71,18 @@ let lastAt = 0;
  * caller that must tell "nothing there" from "could not read" can) */
 function getRows(url, strict) {
   const FAIL = strict ? null : [];
+  const kept = recall(url, Date.now());
+  if (kept !== null) { countCached(); return Promise.resolve(kept); }
   const run = async () => {
+    const again = recall(url, Date.now()); // a call queued behind the one that fetched this very URL
+    if (again !== null) { countCached(); return again; }
     const wait = lastAt + MIN_GAP_MS - Date.now();
     if (wait > 0) await new Promise((r) => setTimeout(r, wait));
     for (let attempt = 0; attempt < 2; attempt++) {
       lastAt = Date.now();
       let res;
       try {
+        countRequest();
         res = await fetch(url, { headers: HEADERS, signal: AbortSignal.timeout(TIMEOUT_MS) });
       } catch {
         return FAIL;
@@ -51,7 +95,9 @@ function getRows(url, strict) {
       if (!res.ok) return FAIL;
       try {
         const rows = await res.json();
-        return Array.isArray(rows) ? rows : FAIL;
+        if (!Array.isArray(rows)) return FAIL;
+        remember(url, rows, cacheTtlMs(res.headers.get('cache-control')), Date.now());
+        return rows;
       } catch {
         return FAIL;
       }
@@ -179,4 +225,4 @@ async function corpMonth(corpId, kind, year, month, page) {
   return { ok: true, n: raw.length, rows: trimRows(raw) };
 }
 
-module.exports = { corpKillmails, corpMonth, corpRecent, charKillmails, systemKills, shipLosses, killRef, USER_AGENT };
+module.exports = { zkillMeter, corpKillmails, corpMonth, corpRecent, charKillmails, systemKills, shipLosses, killRef, USER_AGENT, MIN_GAP_MS, CACHE_MS, CACHE_MAX_MS, cacheTtlMs, cacheStats };

@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { loadNetWorthSeries, type NetWorthSnap } from '../lib/networth';
 import { iskShort } from '../lib/format';
 import Tip from './Tip';
+import { maxOf } from '../lib/nums';
 
 // fixed series order & colors (5-slot stack validated on the app surface
 // #1a1a19; the one 6.9-ΔE adjacent pair is covered by the labeled legend
@@ -78,7 +79,7 @@ export default function NetWorthChart() {
           const t1 = data[data.length - 1].t;
           const x = (t: number) => PAD.l + ((t - t0) / Math.max(1, t1 - t0)) * (W - PAD.l - PAD.r);
           const totals = data.map((d) => d.stock + d.transit + d.listed + d.escrow + d.wallets);
-          const maxY = Math.max(1, ...totals);
+          const maxY = Math.max(1, maxOf(totals));
           const y = (v: number) => H - PAD.b - (v / maxY) * (H - PAD.t - PAD.b);
           // cumulative tops per layer
           const cum = data.map((d) => {

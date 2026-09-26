@@ -8,6 +8,7 @@ import { useSort } from '../lib/useSort';
 import { isk, iskShort, int, pct } from '../lib/format';
 import Tip from './Tip';
 import type { Hub, SideAggregate, TypeAggregate } from '../lib/types';
+import { minOf, maxOf } from '../lib/nums';
 
 /** measured units/day per side from the radar; null = region not watched */
 type Flow = { askUnits: number; bidUnits: number; days: number } | null;
@@ -82,8 +83,8 @@ export default function HubTable({ typeId }: { typeId: number }) {
     flow: flows.get(hub.regionId),
   }));
 
-  const bestSell = Math.min(...rows.filter((r) => r.sell).map((r) => r.sell!.min));
-  const bestBuy = Math.max(...rows.filter((r) => r.buy).map((r) => r.buy!.max));
+  const bestSell = minOf(rows.filter((r) => r.sell).map((r) => r.sell!.min));
+  const bestBuy = maxOf(rows.filter((r) => r.buy).map((r) => r.buy!.max));
 
   const { sorted, clickHeader, indicator } = useSort<Row, ColKey>(rows, {
     hub: (r) => r.hub.name,
@@ -109,12 +110,12 @@ export default function HubTable({ typeId }: { typeId: number }) {
         <thead>
           <tr>
             <th className="sortable" onClick={() => clickHeader('hub')}><Tip tip="The trade hub (or your custom system/region) these prices come from.">Hub</Tip>{indicator('hub')}</th>
-            <th className="sortable" onClick={() => clickHeader('sell')}><Tip tip="The cheapest price anyone is selling for here — what YOU would pay to buy one right now.">Sell</Tip>{indicator('sell')}</th>
+            <th className="sortable" onClick={() => clickHeader('sell')}><Tip tip="The cheapest sell LISTING on the books here — what you would pay to buy one right now. A listing, not a trade; the Bought/Sold columns are the trades.">Sell</Tip>{indicator('sell')}</th>
             <th className="sortable" onClick={() => clickHeader('sell5')}><Tip tip="Average price of the cheapest 5% of sell volume. More trustworthy than the single lowest listing, which can be a 1-unit bait order.">Sell 5%</Tip>{indicator('sell5')}</th>
             <th className="sortable" onClick={() => clickHeader('buy')}><Tip tip="The highest standing buy order — what YOU would receive per unit if you sold instantly right now.">Buy</Tip>{indicator('buy')}</th>
-            <th className="sortable" onClick={() => clickHeader('spread')}><Tip tip="Gap between the cheapest sell and the highest buy. A wide spread means room for station traders.">Spread</Tip>{indicator('spread')}</th>
+            <th className="sortable" onClick={() => clickHeader('spread')}><Tip tip="Gap between the cheapest sell listing and the highest buy listing — two listings, so a lone bait order can make it look wide. Room for station traders only if the Bought/Sold columns show trades.">Spread</Tip>{indicator('spread')}</th>
             <th className="sortable" onClick={() => clickHeader('margin')}><Tip tip="Station-trading return at this hub: place a buy order at the top price, resell at the lowest sell, minus your broker fees and tax. Positive = flipping is profitable here.">Margin</Tip>{indicator('margin')}</th>
-            <th className="sortable" onClick={() => clickHeader('vsJita')}><Tip tip="How this hub's cheapest sell compares to Jita's. +10% means it's 10% more expensive here than in Jita.">vs Jita</Tip>{indicator('vsJita')}</th>
+            <th className="sortable" onClick={() => clickHeader('vsJita')}><Tip tip="How this hub's cheapest sell listing compares to Jita's. +10% means it's listed 10% higher here than in Jita — listings, not what anything sold for.">vs Jita</Tip>{indicator('vsJita')}</th>
             <th className="sortable" onClick={() => clickHeader('sellVol')}><Tip tip="Total units LISTED for sale here — supply sitting on the books, not trades.">Sell vol</Tip>{indicator('sellVol')}</th>
             <th className="sortable" onClick={() => clickHeader('buyVol')}><Tip tip="Total units WANTED by standing buy orders — demand waiting on the books, not trades.">Buy vol</Tip>{indicator('buyVol')}</th>
             <th className="sortable" onClick={() => clickHeader('fask')}><Tip tip="Units per day actually BOUGHT from sell orders here — executed trades, measured by your market radar from full-book diffs every ~30 min (7-day average, normalized to observed time). This is real demand at the asks; everything left of here is just listings. '—' = the radar doesn't watch this region (it watches your trading regions).">Bought/day</Tip>{indicator('fask')}</th>
@@ -149,14 +150,14 @@ export default function HubTable({ typeId }: { typeId: number }) {
                 {flow ? (
                   <span title={`Measured over ${flow.days} day(s) of radar coverage — sharpens daily.`}>{flowNum(flow.askUnits)}</span>
                 ) : (
-                  <span className="dim" title={flow === null ? "The radar doesn't watch this region — it snapshots your trading regions (duty hubs) every ~30 min." : 'Loading radar data…'}>—</span>
+                  <span className="dim" title={flow === null ? "The radar doesn't watch this region — it snapshots the regions of the hubs you watch (⚙ Settings → Market radar; your traders' duty hubs by default) every ~30 min." : 'Loading radar data…'}>—</span>
                 )}
               </td>
               <td>
                 {flow ? (
                   <span title={`Measured over ${flow.days} day(s) of radar coverage — sharpens daily.`}>{flowNum(flow.bidUnits)}</span>
                 ) : (
-                  <span className="dim" title={flow === null ? "The radar doesn't watch this region — it snapshots your trading regions (duty hubs) every ~30 min." : 'Loading radar data…'}>—</span>
+                  <span className="dim" title={flow === null ? "The radar doesn't watch this region — it snapshots the regions of the hubs you watch (⚙ Settings → Market radar; your traders' duty hubs by default) every ~30 min." : 'Loading radar data…'}>—</span>
                 )}
               </td>
               <td className="dim">

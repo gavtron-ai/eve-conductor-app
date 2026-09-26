@@ -1,0 +1,8 @@
+<!-- SignPath artifact configuration "installer" (pass 2 of .github/workflows/windows-build.yml):
+     the NSIS installer built from the signed folder, Authenticode-signed as one file. SignPath does
+     not unpack NSIS installers, which is why the executables inside were signed first (pass 1). -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <pe-file>
+    <authenticode-sign/>
+  </pe-file>
+</artifact-configuration>

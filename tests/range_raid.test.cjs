@@ -1,3 +1,5 @@
+// v0.232.0 (audit E7): runs against the fresh sim/lib compile the runner produces — until then a frozen
+// copy in tests/r3 (up to 300 lines behind the shipped code) kept these passing on old behaviour.
 // Fixtures for two more v60.31 fixes:
 //  A. buyOrderReaches() — MyOrders compared BUY orders station-only, so a
 //     region-range bid a few jumps out (which is taking the stock you are
@@ -37,7 +39,7 @@ const eq = (label, got, want) => {
 };
 
 // ===== A. BUY ORDER RANGE ================================================
-const { buyOrderReaches } = require('./r3/trends.js');
+const { buyOrderReaches } = require('./sim/lib/trends.js');
 
 const JITA_STATION = 60003760;
 const JITA_SYS = 30000142;
@@ -70,11 +72,17 @@ eq('...but a same-system bid still competes (same system is checked first)',
   buyOrderReaches(bid({ system_id: JITA_SYS, range: 'whatever' }), JITA_STATION, JITA_SYS), true);
 
 // ===== B. THE RAID WATCHER'S GAP RULE ====================================
-const theft = require('./r3/theft.js');
+const theft = require('./sim/lib/theft.js');
 let feed = [];
+// the watcher reads the meta variant (list + the feed's Last-Modified); the frozen copy predated it
+// …and each look must carry a NEWER Last-Modified: the watcher rightly treats an unchanged server
+// snapshot (ESI's 5-minute cache) as no new information and records nothing from it
+// (and near "now": a look stamped before a hook's window opened would read as "vanished before its window")
+let lm = Date.now() - 120_000;
+theft.fetchRaidableSkyhooksMeta = async () => ({ list: feed, lastModifiedMs: (lm += 60_000) });
 theft.fetchRaidableSkyhooks = async () => feed;
 
-const raid = require('./r3/raidWatch.js');
+const raid = require('./sim/lib/raidWatch.js');
 const MIN = 60_000;
 const hook = (planetId, endsInMin) => ({
   planetId,
@@ -101,7 +109,7 @@ const logLines = () => (files.get('theft-raids.ndjson') ?? '').split(NL).filter(
     snap: [hook(1, 30), hook(2, 30), hook(3, 30)],
   }));
   for (const k of Object.keys(require.cache)) if (k.includes('raidWatch')) delete require.cache[k];
-  const raid2 = require('./r3/raidWatch.js');
+  const raid2 = require('./sim/lib/raidWatch.js');
   await raid2.restoreRaidWip();
 
   feed = [hook(1, 30)];                          // 2 and 3 gone across the gap

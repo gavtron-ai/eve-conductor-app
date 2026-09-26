@@ -39,7 +39,7 @@ function load() {
   loaded = true;
   let raw;
   try {
-    raw = fs.readFileSync(filePath(), 'utf8');
+    raw = appConfig.decodeTextBytes(fs.readFileSync(filePath())); // v0.233.0: a byte order mark is not corruption
   } catch (err) {
     // genuinely no file yet — an empty registry IS the truth, safe to save.
     // Anything else (locked by a backup scan, permissions) is NOT.

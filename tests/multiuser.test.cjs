@@ -1,3 +1,5 @@
+// v0.232.0 (audit E7): runs against the fresh sim/lib compile the runner produces — until then a frozen
+// copy in tests/mu kept these passing on old behaviour.
 // Fixtures for the multi-user work (v0.60.34).
 //
 // ONE BUILD FOR EVERYONE (v0.60.35). Nothing personal is compiled in at all,
@@ -25,12 +27,12 @@ global.localStorage = {
 global.window = { appInfo: {}, localStorage: global.localStorage };
 
 const KEY = 'eve-trade-conductor';
-const STORE = require.resolve('./mu/store.js');
+const STORE = require.resolve('./sim/lib/store.js');
 
 /** simulate closing and reopening the app: fresh module instances, same disk */
 function launch() {
   for (const k of Object.keys(require.cache)) {
-    if (k.includes(`${require('path').sep}mu${require('path').sep}`)) delete require.cache[k];
+    if (k.includes(`${require('path').sep}sim${require('path').sep}lib${require('path').sep}`)) delete require.cache[k];
   }
   const { useApp } = require(STORE);
   return useApp;

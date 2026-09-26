@@ -16,12 +16,14 @@
 // Rebuildable caches (price history day-cache, freshness timers, watcher
 // snapshots) are deliberately NOT exported — they regenerate from ESI and
 // would bloat the file for zero preserved value.
-import { useAuth, type CharAccount } from './auth';
+import { useAuth, type CharAccount, type SkippedAux } from './auth';
+import { swallowed } from './devlog';
+import { ledgerLoaded, ledgerSnapshot, replaceLedger } from './ledger';
 
 const FORMAT = 'eve-trade-conductor-backup';
 const APP_STORE_KEY = 'eve-trade-conductor';
 const AUTH_KEY = 'eve-trade-conductor-auth';
-const LEDGER_KEY = 'etc-ledger-v1';
+const LEDGER_KEY = 'etc-ledger-v1'; // the pre-0.226 localStorage value — read only when the file has not been restored
 const STRUCT_KEY = 'etc-structure-names-v1';
 const DEV_EVENTS_KEY = 'etc-trends-events-v1';
 
@@ -49,6 +51,8 @@ export interface BackupPayload {
    * observation, and merging two machines' counts would double-count. A
    * fresh PC gets seeded; an active machine keeps its own. */
   auxFiles?: StatsFile[];
+  /** files the export could not carry (too big, or re-derivable) — informational */
+  auxSkipped?: SkippedAux[];
 }
 
 function stripTokens(authJson: string): string {
@@ -65,9 +69,12 @@ export async function buildBackup(): Promise<BackupPayload> {
   const bridge = window.appInfo?.stats;
   let statsFiles: StatsFile[] = [];
   let auxFiles: StatsFile[] = [];
+  let auxSkipped: SkippedAux[] = [];
   if (bridge) {
     statsFiles = await bridge.files();
-    auxFiles = (await bridge.auxFiles?.()) ?? [];
+    const aux = await bridge.auxFiles?.();
+    auxFiles = aux?.files ?? [];
+    auxSkipped = aux?.skipped ?? [];
   } else {
     const dev = localStorage.getItem(DEV_EVENTS_KEY);
     if (dev) {
@@ -82,19 +89,22 @@ export async function buildBackup(): Promise<BackupPayload> {
     exportedAt: Date.now(),
     appStore: localStorage.getItem(APP_STORE_KEY),
     auth: authRaw ? stripTokens(authRaw) : null,
-    ledger: localStorage.getItem(LEDGER_KEY),
+    ledger: ledgerLoaded() ? ledgerSnapshot() : localStorage.getItem(LEDGER_KEY),
     structureNames: localStorage.getItem(STRUCT_KEY),
     statsFiles,
     auxFiles,
+    auxSkipped,
   };
 }
 
-/** export to a file; returns where it went (or null if the user cancelled) */
-export async function exportBackup(): Promise<string | null> {
-  const payload = JSON.stringify(await buildBackup());
+/** export to a file; returns where it went (null if the user cancelled) and what was left out */
+export async function exportBackup(): Promise<{ dest: string | null; skipped: SkippedAux[] }> {
+  const built = await buildBackup();
+  const skipped = built.auxSkipped ?? [];
+  const payload = JSON.stringify(built);
   const name = `eve-conductor-backup-${new Date().toISOString().slice(0, 10)}.json`;
   const bridge = window.appInfo?.backup;
-  if (bridge) return bridge.save(name, payload);
+  if (bridge) return { dest: await bridge.save(name, payload), skipped };
   // browser dev: plain download
   const url = URL.createObjectURL(new Blob([payload], { type: 'application/json' }));
   const a = document.createElement('a');
@@ -102,7 +112,7 @@ export async function exportBackup(): Promise<string | null> {
   a.download = name;
   a.click();
   URL.revokeObjectURL(url);
-  return name;
+  return { dest: name, skipped };
 }
 
 // ---- import (merge) ----
@@ -210,7 +220,9 @@ async function mergeStatsFiles(files: StatsFile[]): Promise<number> {
 export async function importBackupText(text: string): Promise<string> {
   let p: BackupPayload;
   try {
-    p = JSON.parse(text) as BackupPayload;
+    // v0.233.0 (audit E6): a file re-saved by an editor may start with a byte order mark; file.text()
+    // keeps it as U+FEFF and JSON.parse refuses it — that is not a damaged backup
+    p = JSON.parse(text.replace(/^\uFEFF/, '')) as BackupPayload;
   } catch {
     throw new Error('Not a valid backup file (unreadable JSON).');
   }
@@ -226,7 +238,12 @@ export async function importBackupText(text: string): Promise<string> {
   try {
     if (p.appStore) JSON.parse(p.appStore);
     if (p.auth) JSON.parse(p.auth);
-    if (p.ledger) mergedLedger = mergeLedger(localStorage.getItem(LEDGER_KEY), p.ledger);
+    if (p.ledger) {
+      // v0.226.0: the ledger lives in its file; an import before that file was restored would be
+      // written over it — refused, with nothing applied (the log says why the restore failed)
+      if (!ledgerLoaded()) throw new Error('The ledger has not been restored from its file (see ⚙ Settings → Diagnostics) — nothing was imported.');
+      mergedLedger = mergeLedger(ledgerSnapshot(), p.ledger);
+    }
     if (p.structureNames) {
       const cur = JSON.parse(localStorage.getItem(STRUCT_KEY) ?? '{}') as Record<string, unknown>;
       mergedStructs = JSON.stringify({ ...(JSON.parse(p.structureNames) as Record<string, unknown>), ...cur });
@@ -242,7 +259,7 @@ export async function importBackupText(text: string): Promise<string> {
     parts.push('settings restored');
   }
   if (mergedLedger) {
-    localStorage.setItem(LEDGER_KEY, mergedLedger);
+    replaceLedger(mergedLedger); // memory now; the file write is queued (main process, atomic rename)
     parts.push('ledger merged');
   }
   if (mergedStructs) localStorage.setItem(STRUCT_KEY, mergedStructs);
@@ -272,8 +289,8 @@ export async function importBackupText(text: string): Promise<string> {
         } else {
           kept += 1;
         }
-      } catch {
-        // bad name / IO issue — skip the file, never fail the whole import
+      } catch (e) {
+        swallowed('backup', 'aux file import', e); // bad name / IO issue — skip the file, never fail the whole import
       }
     }
     parts.push(

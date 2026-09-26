@@ -1,26 +1,33 @@
 {
   "name": "eve-trade-conductor",
   "productName": "EVE Conductor",
-  "version": "0.217.0",
+  "version": "0.246.0",
   "description": "Cross-hub market price comparison and trading tool for EVE Online",
   "main": "electron/main.cjs",
   "private": true,
   "scripts": {
     "dev": "vite",
     "dev:app": "concurrently -k \"vite\" \"wait-on tcp:5173 && cross-env VITE_DEV_SERVER_URL=http://localhost:5173 electron .\"",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && node scripts/build-notices.mjs && vite build",
+    "build:notices": "node scripts/build-notices.mjs",
+    "lint": "eslint . --max-warnings 0",
+    "test": "node scripts/run-tests.mjs",
+    "check": "tsc --noEmit && npm run lint && npm test",
     "build:typedb": "node scripts/build-typedb.mjs",
     "build:mapdata": "node scripts/build-mapdata.mjs",
     "build:skilldb": "node scripts/build-skilldb.mjs",
     "build:esfdata": "node scripts/build-esfdata.mjs",
+    "build:esfproto": "node scripts/build-esfproto.mjs",
     "start": "npm run build && electron .",
     "dist:mac": "npm run build && electron-builder --mac",
     "dist:win": "npm run build && node scripts/check-shareable.mjs && electron-builder --win",
     "dist:all": "npm run build && electron-builder --mac --win",
     "check:shareable": "node scripts/check-shareable.mjs",
     "install:latest": "node scripts/install-latest.mjs",
-    "ship": "npm run build && node scripts/build-baseline.mjs --if-owner && node scripts/check-shareable.mjs && electron-builder --win && node scripts/check-shareable.mjs release && node scripts/install-latest.mjs",
+    "ship": "npm run check && npm run build && node scripts/build-baseline.mjs --if-owner && node scripts/check-shareable.mjs && electron-builder --win && node scripts/check-shareable.mjs release && node scripts/install-latest.mjs",
     "share": "node scripts/share.mjs",
+    "golive:check": "node scripts/golive-check.mjs",
+    "export:dry": "node scripts/export-public.mjs --dry-run",
     "publish:beta": "node scripts/publish-release.mjs",
     "baseline": "node scripts/build-baseline.mjs",
     "export:source": "node scripts/export-public.mjs"
@@ -38,9 +45,13 @@
     "@vitejs/plugin-react": "^4.3.4",
     "concurrently": "^9.1.0",
     "cross-env": "^7.0.3",
-    "electron": "^33.2.1",
-    "electron-builder": "^25.1.8",
+    "electron": "^44.4.5",
+    "electron-builder": "^26.15.3",
+    "eslint": "^10.11.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.12.0",
     "typescript": "^5.7.2",
+    "typescript-eslint": "^8.70.1",
     "vite": "^6.0.7",
     "wait-on": "^8.0.1"
   },
@@ -100,11 +111,16 @@
       {
         "from": "baseline",
         "to": "baseline"
+      },
+      {
+        "from": "build/THIRD-PARTY-NOTICES.txt",
+        "to": "THIRD-PARTY-NOTICES.txt"
       }
     ]
   },
   "allowScripts": {
-    "electron@33.4.11": true,
-    "esbuild@0.25.12": true
+    "electron@44.4.5": true,
+    "esbuild@0.25.12": true,
+    "electron-winstaller@5.4.0": false
   }
 }

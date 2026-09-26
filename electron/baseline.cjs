@@ -14,7 +14,8 @@
 //        that hour AND holds no verdict for the same planet within 12 h (MEASURED on 52,706
 //        events: the same planet never yields two verdicts less than 63.9 h apart, so ±12 h can
 //        only ever be the same window seen by two watchers). The file is only ever appended to.
-//      · radar: a whole REGION-DAY is taken from the seed only when the user has no coverage and
+//      · radar (one compact file per region since v0.229.0, electron/radarSummary.cjs): a whole
+//        REGION-DAY is taken from the seed only when the user has no coverage and
 //        no rows for that region on that day (and it is not today, nor the day in his unsaved
 //        radar-wip). The rings are merged; the ALL-TIME hour histograms are left alone — they
 //        cannot be split by day, so adding them would double-count.
@@ -23,7 +24,7 @@ const fs = require('fs');
 const path = require('path');
 
 const RAIDS = 'theft-raids.ndjson';
-const SUMMARY = 'radar-summary.json';
+const RS = require('./radarSummary.cjs');
 const COVERAGE = 'radar-coverage.json';
 const STAMP = 'baseline.json';
 const MARKER = 'baseline-merged.json';
@@ -48,9 +49,13 @@ function seedBaseline(baselineDir, statsDir) {
     return { seeded, skipped }; // no baseline packed (dev run) — nothing to do
   }
   fs.mkdirSync(statsDir, { recursive: true });
+  // v0.229.0: a region summary is COPIED only into a folder with no radar history at all; an
+  // install that has any is filled by the merge below, region by region (never a whole file
+  // dropped beside history the user measured himself)
+  const hasRadar = fs.existsSync(path.join(statsDir, COVERAGE)) || fs.existsSync(path.join(statsDir, RS.LEGACY)) || RS.listRegionFiles(statsDir).length > 0;
   for (const f of files) {
     const dest = path.join(statsDir, f);
-    if (fs.existsSync(dest)) {
+    if (fs.existsSync(dest) || (hasRadar && RS.REGION_FILE.test(f))) {
       skipped.push(f);
       continue;
     }
@@ -194,12 +199,12 @@ function mergeBaseline(baselineDir, statsDir, justSeeded = [], now = Date.now())
     } catch (e) { res.errors.push(`raids: ${e instanceof Error ? e.message : String(e)}`); }
   }
 
-  if (!justSeeded.includes(SUMMARY) && !justSeeded.includes(COVERAGE)) {
+  if (!justSeeded.includes(COVERAGE)) {
     try {
       const seedCov = readJson(path.join(baselineDir, COVERAGE));
-      const ownCovPath = path.join(statsDir, COVERAGE); const ownSumPath = path.join(statsDir, SUMMARY);
+      const ownCovPath = path.join(statsDir, COVERAGE);
       const ownCov = fs.existsSync(ownCovPath) ? readJson(ownCovPath) : [];
-      if (Array.isArray(seedCov) && Array.isArray(ownCov) && fs.existsSync(ownSumPath)) {
+      if (Array.isArray(seedCov) && Array.isArray(ownCov) && fs.existsSync(ownCovPath)) {
         const exclude = new Set([utcDay(now)]);
         // the day still sitting in the unsaved accumulator is flushed OVER that date later
         try {
@@ -208,18 +213,20 @@ function mergeBaseline(baselineDir, statsDir, justSeeded = [], now = Date.now())
           const m = /"day":"(\d{4}-\d\d-\d\d)"/.exec(buf.toString('utf8')); if (m) exclude.add(m[1]);
         } catch { /* no wip */ }
         const cand = radarCandidates(ownCov, seedCov, exclude);
-        if (cand.size > 0) {
-          // the two big files are parsed ONE AFTER THE OTHER (134 MB each, ~500 MB parsed)
-          const picked = pickSeedRows(readJson(path.join(baselineDir, SUMMARY)), cand);
-          const ownSummary = readJson(ownSumPath);
-          if (!Array.isArray(ownSummary)) throw new Error('own summary unreadable — left alone');
-          const r = applyRadar(ownSummary, ownCov, seedCov, picked, cand);
-          if (r.rowsAdded > 0 || r.daysAdded > 0) {
-            writeAtomic(ownSumPath, JSON.stringify(ownSummary));
-            writeAtomic(ownCovPath, JSON.stringify(ownCov));
-          }
-          res.radar = { regionDays: r.daysAdded, rows: r.rowsAdded };
-        } else res.radar = { regionDays: 0, rows: 0 };
+        // v0.229.0: REGION BY REGION — the seed's and the user's files for one region are parsed
+        // together (tens of MB, not two 134 MB blobs), the user's file rewritten only if it gained
+        let rowsAdded = 0, daysAdded = 0;
+        for (const regionId of cand.keys()) {
+          const one = new Map([[regionId, cand.get(regionId)]]);
+          const seedEntries = RS.readRegion(baselineDir, regionId);
+          const picked = pickSeedRows(seedEntries, one);
+          const own = RS.readRegion(statsDir, regionId); // throws on an unreadable file → left alone
+          const r = applyRadar(own, ownCov, seedCov.filter((c) => c.r === regionId), picked, one);
+          if (r.rowsAdded > 0) RS.writeRegion(statsDir, regionId, own);
+          rowsAdded += r.rowsAdded; daysAdded += r.daysAdded;
+        }
+        if (daysAdded > 0) writeAtomic(ownCovPath, JSON.stringify(ownCov));
+        res.radar = { regionDays: daysAdded, rows: rowsAdded };
       }
     } catch (e) { res.errors.push(`radar: ${e instanceof Error ? e.message : String(e)}`); }
   }
@@ -229,4 +236,4 @@ function mergeBaseline(baselineDir, statsDir, justSeeded = [], now = Date.now())
   return res;
 }
 
-module.exports = { seedBaseline, mergeBaseline, mergeRaidEvents, radarCandidates, pickSeedRows, applyRadar };
+module.exports = { seedBaseline, mergeBaseline, mergeRaidEvents, radarCandidates, pickSeedRows, applyRadar, migrateRadarSummary: RS.migrateRadarSummary };

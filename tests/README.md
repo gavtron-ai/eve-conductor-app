@@ -10,6 +10,14 @@ These files were born in a session scratchpad and moved here in v0.93.0 so
 they survive temp-dir cleanup. The copies in any old scratchpad are
 superseded by these.
 
+## One compile, no frozen copies (v0.232.0)
+
+Every fixture requires `./sim/lib/...` — the compile `npm test` (scripts/run-tests.mjs) produces from
+src/lib on every run. Until v0.232.0 eight folders (cl, fx, led, mu, pi, r3, rate, sch) held frozen
+compiles some fixtures required instead; they drifted up to 300 lines behind the shipped code and kept
+old assertions passing (audit item E7). A fixture that needs a stub (no engine, no window) seeds it
+into `require.cache` or `global` itself, and says why.
+
 ## Running
 
 The tests require the sim compiled to CommonJS in `sim/` NEXT TO the test

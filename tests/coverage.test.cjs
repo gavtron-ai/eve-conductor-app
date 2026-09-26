@@ -8,7 +8,7 @@
 // the cadence a free variable. These fixtures are the proof.
 
 global.window = { appInfo: {} };
-const { normalizedRates, coveredMs } = require('./cl/radar.js');
+const { normalizedRates, coveredMs } = require('./sim/lib/radar.js');
 
 let pass = 0, fail = 0;
 const near = (label, got, want, tol) => {

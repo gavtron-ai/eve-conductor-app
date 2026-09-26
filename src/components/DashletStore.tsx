@@ -2,7 +2,7 @@
 // Shelves on the left; on the right each dashlet as a card: a LIVE preview with your own data,
 // the question it answers, the versions it comes in (pick one), what it needs, and ＋ add.
 import { useEffect, useState } from 'react';
-import { CATEGORIES, byCategory, dashTitle, type DashCategory, type DashletSpec } from '../lib/dashlets';
+import { CATEGORIES, byCategory, dashTitle, dashletUnavailable, type DashCategory, type DashletSpec } from '../lib/dashlets';
 import { MAX_ITEMS, SIZE_CELLS, SIZE_LABEL, type Board, type DashSize } from '../lib/homeGrid';
 import { DashletBody } from './HomeDashlets';
 import type { SavedView } from '../lib/favorites';
@@ -17,11 +17,12 @@ function StoreCard({ spec, board, onAdd, onGo }: { spec: DashletSpec; board: Boa
   const [added, setAdded] = useState(0);
   const onBoard = board.items.filter((i) => i.kind === spec.id).length;
   const full = board.items.length >= MAX_ITEMS;
+  const off = dashletUnavailable(spec); // v0.245.0: dimmed, a banner says why, ＋ add is off
   const w = SIZE_CELLS[size].w * PREVIEW_CELL + (SIZE_CELLS[size].w - 1) * PREVIEW_GAP;
   const h = SIZE_CELLS[size].h * PREVIEW_CELL + (SIZE_CELLS[size].h - 1) * PREVIEW_GAP;
   const k = Math.min(1, PANE_W / w, (PANE_H - 2 * PANE_PAD) / h);
   return (
-    <article className="store-card">
+    <article className={`store-card${off ? ' store-off' : ''}`}>
       <div className="store-preview" style={{ height: PANE_H }}>
         <div style={{ width: w * k, height: h * k }}>
           <section className={`dash size-${size} in-store`} style={{ position: 'relative', width: w, height: h, zoom: k, ['--k' as string]: String(PREVIEW_CELL / 160) }}>
@@ -31,6 +32,7 @@ function StoreCard({ spec, board, onAdd, onGo }: { spec: DashletSpec; board: Boa
         </div>
       </div>
       <div className="store-info">
+        {off && <p className="store-banner" role="note">🚧 {off}</p>}
         <h3>{spec.icon} {spec.title}{onBoard > 0 && <span className="store-have" title={`already on “${board.name}”`}>on this board{onBoard > 1 ? ` ×${onBoard}` : ''}</span>}</h3>
         <p>{spec.blurb}</p>
         {spec.needs && <p className="store-needs">needs: {spec.needs}</p>}
@@ -44,7 +46,7 @@ function StoreCard({ spec, board, onAdd, onGo }: { spec: DashletSpec; board: Boa
             </select>
           ))}
           <span style={{ flex: 1 }} />
-          <button className="btn mini primary" disabled={full} title={full ? `“${board.name}” is full (${MAX_ITEMS}) — remove one, or use another board` : `put the ${SIZE_LABEL[size]} version on “${board.name}”`}
+          <button className="btn mini primary" disabled={full || off !== null} title={off ? off : full ? `“${board.name}” is full (${MAX_ITEMS}) — remove one, or use another board` : `put the ${SIZE_LABEL[size]} version on “${board.name}”`}
             onClick={() => { onAdd(spec.id, size, cfg); setAdded((n) => n + 1); }}>
             {added > 0 ? `✓ added${added > 1 ? ` ×${added}` : ''} · add another` : '＋ add'}
           </button>
@@ -57,7 +59,7 @@ function StoreCard({ spec, board, onAdd, onGo }: { spec: DashletSpec; board: Boa
 export default function DashletStore({ board, onAdd, onGo, onClose }: {
   board: Board; onAdd: (kind: string, size: DashSize, cfg?: Record<string, string>) => void; onGo: (dest: string, view?: SavedView) => void; onClose: () => void;
 }) {
-  const [cat, setCat] = useState<DashCategory>('chain');
+  const [cat, setCat] = useState<DashCategory>('theft'); // v0.243.0: opens on a shelf that works (the Chain shelf is off with the Aperture link)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);

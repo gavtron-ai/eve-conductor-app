@@ -9,7 +9,6 @@
 //   - pods (type 670 / 33328) count separately from ships
 //   - fmtIsk: >=1e9 -> x.xxb, >=1e6 -> round m, else round k
 // ESI name resolution is mocked: every id resolves to "E<id>".
-const path = require('path');
 const nar = require('./sim/lib/battleNarrative.js');
 
 let pass = 0, fail = 0;

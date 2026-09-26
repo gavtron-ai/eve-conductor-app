@@ -37,7 +37,8 @@ const SCOPES = [
   'esi-ui.open_window.v1',
   'esi-ui.write_waypoint.v1',
   'esi-universe.read_structures.v1',
-  'esi-search.search_structures.v1',
+  // v0.230.0 (audit E3): esi-search.search_structures.v1 was requested and never used by any
+  // endpoint — dropped. Tokens issued earlier keep it until their next login; harmless.
   // Battle Reports (v0.103.0): zkill's API runs ~30 min behind its own
   // website (measured — the site listed a loss all three API endpoint
   // styles were missing), so the fight feed merges each logged-in
@@ -60,7 +61,15 @@ function decodeJwtPayload(token) {
   return JSON.parse(Buffer.from(payload.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
 }
 
+// v0.237.0 (round-two S3): what this process asks of the login host, per UTC day, in memory — folded
+// into the app's net meter beside zKillboard's count, so the policy page's "counted live" holds for
+// the token exchange too (since 0.235.0 every login and refresh runs here, out of the page's sight)
+const meter = { day: '', count: 0 };
+const countRequest = () => { const d = new Date().toISOString().slice(0, 10); if (meter.day !== d) { meter.day = d; meter.count = 0; } meter.count++; };
+const ssoMeter = () => ({ ...meter });
+
 async function exchangeToken(body) {
+  countRequest();
   const res = await fetch(TOKEN_URL, {
     method: 'POST',
     headers: {
@@ -167,4 +176,4 @@ async function refresh(clientId, refreshToken) {
   });
 }
 
-module.exports = { login, refresh, SSO_PORT, CALLBACK_PATH, SCOPES };
+module.exports = { login, refresh, SSO_PORT, CALLBACK_PATH, SCOPES, ssoMeter };

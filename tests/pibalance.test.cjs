@@ -1,3 +1,5 @@
+// v0.232.0 (audit E7): runs against the fresh sim/lib compile the runner produces — until then a frozen
+// copy in tests/pi (up to 300 lines behind the shipped code) kept these passing on old behaviour.
 // Fixtures for src/lib/piBalance.ts — head-vs-factory flow balance.
 //
 // All numbers HAND-COMPUTED. The core chain fixture:
@@ -16,7 +18,7 @@ const ok = (label, cond, extra = '') => {
 const eq = (label, got, want) => ok(label, JSON.stringify(got) === JSON.stringify(want), `got=${JSON.stringify(got)} want=${JSON.stringify(want)}`);
 const near = (label, got, want, tol) => ok(label, got !== null && Math.abs(got - want) <= tol, `got=${got} want≈${want}±${tol}`);
 
-const B = require('./pi/piBalance.js');
+const B = require('./sim/lib/piBalance.js');
 
 const A = 1, Bt = 2, C = 3;
 const mkSchem = (entries) => new Map(entries);

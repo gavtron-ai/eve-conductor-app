@@ -7,6 +7,7 @@
 // Small shows Head + Foot; Medium puts Head on the left and Detail on the right (a medium dashlet
 // is wide and short); Large and Wide stack them.
 import { useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react';
+import { maxOf, minOf } from '../lib/nums';
 
 export const Head = ({ big, color, sub, title }: { big: ReactNode; color?: string; sub?: ReactNode; title?: string }) => (
   <div className="dl-head" title={title}>
@@ -56,7 +57,7 @@ export function Spark({ points, color, height = 34, fill = false }: { points: { 
   if (points.length < 2) return null;
   const W = 200, H = 60;
   const t0 = points[0].t, t1 = points[points.length - 1].t;
-  const lo = Math.min(...points.map((p) => p.v)), hi = Math.max(...points.map((p) => p.v));
+  const lo = minOf(points.map((p) => p.v)), hi = maxOf(points.map((p) => p.v));
   const x = (t: number) => (t1 === t0 ? 0 : ((t - t0) / (t1 - t0)) * W);
   const y = (v: number) => (hi === lo ? H / 2 : H - 3 - ((v - lo) / (hi - lo)) * (H - 6));
   const d = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${x(p.t).toFixed(1)},${y(p.v).toFixed(1)}`).join(' ');
@@ -70,7 +71,7 @@ export function Spark({ points, color, height = 34, fill = false }: { points: { 
 
 /** 24 bars, one per EVE hour; the peak hour is lit */
 export function Hist24({ hours, color, peak }: { hours: number[]; color: string; peak: number | null }) {
-  const max = Math.max(1, ...hours);
+  const max = Math.max(1, maxOf(hours));
   return (
     <div className="dl-hist" title="by EVE hour of day, 00 → 23">
       <div className="dl-hist-bars">
@@ -83,7 +84,7 @@ export function Hist24({ hours, color, peak }: { hours: number[]; color: string;
 
 /** bars that may go below zero (profit by day) */
 export function DayBars({ bars, fmt }: { bars: { day: string; v: number }[]; fmt: (v: number) => string }) {
-  const hi = Math.max(0, ...bars.map((b) => b.v)), lo = Math.min(0, ...bars.map((b) => b.v));
+  const hi = Math.max(0, maxOf(bars.map((b) => b.v))), lo = Math.min(0, minOf(bars.map((b) => b.v)));
   const span = hi - lo || 1;
   const zero = (hi / span) * 100;
   return (

@@ -20,7 +20,7 @@
 // bombers sit under the market's "Covert Ops", Salvation is group "Command
 // Carrier", Revelation Navy Issue is "Faction Dreadnoughts > Navy Faction").
 // The special-edition test matches exactly 68 hulls + 1 with no market group.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
 interface TypeShape {
   name: string;
@@ -198,7 +198,7 @@ export default function ShipTree({ data, query, onPick }: {
   const [tab, setTab] = useState<number | null>(null);
   const chosen = tab ?? catalog.order[0] ?? 0;
   const q = query.trim().toLowerCase();
-  const matches = (s: Node) => !q || s.name.toLowerCase().includes(q);
+  const matches = useCallback((s: Node) => !q || s.name.toLowerCase().includes(q), [q]);
   const countIn = (f: number): number => {
     const fac = catalog.byFaction.get(f);
     return fac ? [...fac.standard, ...fac.special].filter(matches).length : 0;
@@ -241,7 +241,7 @@ export default function ShipTree({ data, query, onPick }: {
     if (stray.length > 0) branch.push({ key: 'other', tiers: [{ label: 'Other', ships: stray }] });
     const special = fac.special.filter(matches).sort(tierSort);
     return { columns, branch, caps, special };
-  }, [catalog, active, data, q]);
+  }, [catalog, active, data, matches]);
 
   // ---- pan/zoom canvas, like the game: fit on open, wheel zooms around the
   // cursor, drag pans. All state lives in refs (no re-render per frame). ----
@@ -249,11 +249,11 @@ export default function ShipTree({ data, query, onPick }: {
   const sceneRef = useRef<HTMLDivElement | null>(null);
   const view = useRef({ s: 1, tx: 0, ty: 0 });
   const dragged = useRef(false);
-  const apply = () => {
+  const apply = useCallback(() => {
     const sc = sceneRef.current;
     if (sc) sc.style.transform = `translate(${view.current.tx}px, ${view.current.ty}px) scale(${view.current.s})`;
-  };
-  const fit = () => {
+  }, []);
+  const fit = useCallback(() => {
     const vp = vpRef.current, sc = sceneRef.current;
     if (!vp || !sc) return;
     const cw = sc.offsetWidth, ch = sc.offsetHeight, vw = vp.clientWidth, vh = vp.clientHeight;
@@ -261,8 +261,8 @@ export default function ShipTree({ data, query, onPick }: {
     const k = Math.max(0.25, Math.min(2.2, Math.min(vw / cw, vh / ch)));
     view.current = { s: k, tx: (vw - cw * k) / 2, ty: (vh - ch * k) / 2 };
     apply();
-  };
-  useLayoutEffect(fit, [active, q]);
+  }, [apply]);
+  useLayoutEffect(() => { fit(); }, [fit, active, q]); // refit whenever the tree's contents change (faction, search)
   useEffect(() => {
     const vp = vpRef.current;
     if (!vp) return;
@@ -285,7 +285,7 @@ export default function ShipTree({ data, query, onPick }: {
     };
     vp.addEventListener('wheel', onWheel, { passive: false });
     return () => { ro.disconnect(); window.removeEventListener('resize', fit); vp.removeEventListener('wheel', onWheel); };
-  }, []);
+  }, [fit, apply]);
   const onPointerDown = (e: React.PointerEvent) => {
     if (e.button !== 0) return;
     const start = { x: e.clientX, y: e.clientY, tx: view.current.tx, ty: view.current.ty };

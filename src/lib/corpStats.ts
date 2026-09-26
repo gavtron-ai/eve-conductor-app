@@ -53,17 +53,17 @@ export interface HullRow { ship: number; uses: number; pilots: number; lost: num
 /** what the corp flies: one use per pilot per mail, either side; capsules and unknown hulls left out */
 export function hullsFlown(mails: readonly LbMail[], corpId: number, since: number | null, keep = 8): { rows: HullRow[]; hulls: number } {
   const acc = new Map<number, { ship: number; uses: number; who: Set<number>; lost: number }>();
-  const use = (ship: number, char: number, lost: boolean) => {
+  const tally = (ship: number, char: number, lost: boolean) => {
     if (!ship || CAPSULES.has(ship) || !(char > 0)) return;
     let r = acc.get(ship);
     if (!r) { r = { ship, uses: 0, who: new Set(), lost: 0 }; acc.set(ship, r); }
     r.uses++; r.who.add(char); if (lost) r.lost++;
   };
   for (const m of dedupe(mails, since)) {
-    if (isLoss(m, corpId)) use(m.victim.ship, m.victim.char, true);
+    if (isLoss(m, corpId)) tally(m.victim.ship, m.victim.char, true);
     if (m.victim.corp === corpId) continue;
     const once = new Set<number>();
-    for (const a of m.attackers) if (a.corp === corpId && a.char > 0 && !once.has(a.char)) { once.add(a.char); use(a.ship, a.char, false); }
+    for (const a of m.attackers) if (a.corp === corpId && a.char > 0 && !once.has(a.char)) { once.add(a.char); tally(a.ship, a.char, false); }
   }
   const rows = [...acc.values()].map((r) => ({ ship: r.ship, uses: r.uses, pilots: r.who.size, lost: r.lost })).sort((a, b) => b.uses - a.uses || a.ship - b.ship);
   return { rows: rows.slice(0, keep), hulls: rows.length };

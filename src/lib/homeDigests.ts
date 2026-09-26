@@ -1,3 +1,4 @@
+import { minOf } from './nums';
 // WHAT THE HOME DASHLETS SHOW (v0.207.0) — one small PURE function per dashlet, each turning
 // data a collector ALREADY holds into the handful of numbers a glance needs. Nothing here
 // fetches; nothing here guesses: a number that cannot be stood behind comes back null and the
@@ -71,7 +72,7 @@ export function piDigest(planets: readonly PlanetLite[], now: number, keep = 8):
     urgent: planets.filter((p) => URGENT.has(p.problem)).length,
     value: planets.reduce((t, p) => t + (p.value || 0), 0),
     worst: sorted.slice(0, keep),
-    nextFullAt: future.length > 0 ? Math.min(...future) : null,
+    nextFullAt: future.length > 0 ? minOf(future) : null,
   };
 }
 
@@ -109,11 +110,15 @@ export interface RaidLite { t: number; systemId: number; planetId: number; kind:
 export interface RaidLogDigest { day: number; week: number; recent: RaidLite[]; watchedSince: number | null }
 export function raidLogDigest(events: readonly RaidLite[], now: number, keep = 6): RaidLogDigest {
   const raided = events.filter((e) => e.kind === 'raided').sort((a, b) => b.t - a.t);
+  // a loop, never a spread: the raid log passes 55,000 events and grows ~1,500 a day; V8 refuses
+  // ~125,000 spread arguments (measured), which would have crashed these dashlets within weeks (v0.220.0)
+  let oldest: number | null = null;
+  for (const e of events) if (oldest === null || e.t < oldest) oldest = e.t;
   return {
     day: raided.filter((e) => now - e.t <= 86_400_000).length,
     week: raided.filter((e) => now - e.t <= 7 * 86_400_000).length,
     recent: raided.slice(0, keep),
-    watchedSince: events.length > 0 ? Math.min(...events.map((e) => e.t)) : null,
+    watchedSince: oldest,
   };
 }
 

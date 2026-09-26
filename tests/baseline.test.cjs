@@ -87,21 +87,23 @@ const bdir = path.join(tmp, 'baseline'); const sdir = path.join(tmp, 'stats');
 fs.mkdirSync(bdir); fs.mkdirSync(sdir);
 const nd = (list) => list.map((e) => JSON.stringify(e)).join('\n') + '\n';
 fs.writeFileSync(path.join(bdir, 'theft-raids.ndjson'), nd(seed));
-fs.writeFileSync(path.join(bdir, 'radar-summary.json'), JSON.stringify(seedSummary));
+const RS = require('../electron/radarSummary.cjs');
+RS.writeRegion(bdir, 1, seedSummary); RS.writeRegion(bdir, 2, seedSummary); // v0.229.0: one file per region
 fs.writeFileSync(path.join(bdir, 'radar-coverage.json'), JSON.stringify(seedCov));
 fs.writeFileSync(path.join(bdir, 'baseline.json'), JSON.stringify({ id: 'abc', builtAt: 'x' }));
 const o2 = mkOwn();
 fs.writeFileSync(path.join(sdir, 'theft-raids.ndjson'), nd(own));
-fs.writeFileSync(path.join(sdir, 'radar-summary.json'), JSON.stringify(o2.sum));
+RS.writeRegion(sdir, 1, o2.sum);
 fs.writeFileSync(path.join(sdir, 'radar-coverage.json'), JSON.stringify(o2.cov));
 fs.writeFileSync(path.join(sdir, 'radar-wip.json'), JSON.stringify({ day: '2026-08-01', rows: [], cov: [] }));
 const now = Date.UTC(2026, 7, 5, 12);
 const seededNow = B.seedBaseline(bdir, sdir);
-check('L1 the stamp is not copied into the stats folder; nothing was missing', seededNow.seeded.length === 0 && !fs.existsSync(path.join(sdir, 'baseline.json')), seededNow);
+check('L1 the stamp is not copied into the stats folder; nothing was missing (region 2\'s seed file is NOT copied beside his history — the merge fills it)', seededNow.seeded.length === 0 && !fs.existsSync(path.join(sdir, 'baseline.json')), seededNow);
 const res = B.mergeBaseline(bdir, sdir, seededNow.seeded, now);
 check('L2 raids: 2 appended, own lines still first and untouched', res.raids.added === 2 && fs.readFileSync(path.join(sdir, 'theft-raids.ndjson'), 'utf8').startsWith(nd(own)), res.raids);
 // 08-01 is the day in his unsaved radar-wip → excluded; 08-03 is his; so only region 2's 08-02 comes in
 check('L3 radar: the wip day (08-01) and today are left out → 1 region-day, 1 row', res.radar.regionDays === 1 && res.radar.rows === 1 && res.errors.length === 0, res);
+check('L3b …written as region 2\'s own file, with that one row; region 1\'s file untouched', RS.readRegion(sdir, 2).map((e) => e.days.map((d) => d.d).join()).join('|') === '2026-08-02' && RS.readRegion(sdir, 1)[0].days.length === 2, RS.readRegion(sdir, 2));
 check('L4 no .tmp files left, marker written', !fs.readdirSync(sdir).some((f) => f.endsWith('.tmp')) && JSON.parse(fs.readFileSync(path.join(sdir, 'baseline-merged.json'), 'utf8')).id === 'abc');
 check('L5 the same baseline is never merged twice', B.mergeBaseline(bdir, sdir, [], now) === null);
 fs.writeFileSync(path.join(bdir, 'baseline.json'), JSON.stringify({ id: 'def' }));
@@ -111,16 +113,16 @@ check('L6 a new stamp with the same content merges nothing new', again && again.
 const fresh = path.join(tmp, 'fresh');
 const s3 = B.seedBaseline(bdir, fresh);
 const r3 = B.mergeBaseline(bdir, fresh, s3.seeded, now);
-check('L7 fresh install: 3 files copied, no merge work, marker written', s3.seeded.length === 3 && r3 && r3.raids === undefined && r3.radar === undefined && fs.existsSync(path.join(fresh, 'baseline-merged.json')), { s3, r3 });
+check('L7 fresh install: 4 files copied (raids, coverage, two regions), no merge work, marker written', s3.seeded.length === 4 && r3 && r3.raids === undefined && r3.radar === undefined && fs.existsSync(path.join(fresh, 'baseline-merged.json')), { s3, r3 });
 // an old bake without a stamp: copy-only, exactly as before
 fs.rmSync(path.join(bdir, 'baseline.json'));
 check('L8 no stamp → no merge', B.mergeBaseline(bdir, sdir, [], now) === null);
 // a broken own summary is left exactly as it was
 fs.writeFileSync(path.join(bdir, 'baseline.json'), JSON.stringify({ id: 'ghi' }));
-fs.writeFileSync(path.join(sdir, 'radar-summary.json'), '{broken');
+fs.writeFileSync(path.join(sdir, 'radar-summary-1.json'), '{broken');
 fs.writeFileSync(path.join(sdir, 'radar-coverage.json'), '[]');
 const broken = B.mergeBaseline(bdir, sdir, [], now);
-check('L9 an unreadable own summary: error recorded, file untouched', broken.errors.length === 1 && fs.readFileSync(path.join(sdir, 'radar-summary.json'), 'utf8') === '{broken' && fs.readFileSync(path.join(sdir, 'radar-coverage.json'), 'utf8') === '[]', broken);
+check('L9 an unreadable own summary: error recorded, file untouched', broken.errors.length === 1 && fs.readFileSync(path.join(sdir, 'radar-summary-1.json'), 'utf8') === '{broken' && fs.readFileSync(path.join(sdir, 'radar-coverage.json'), 'utf8') === '[]', broken);
 fs.rmSync(tmp, { recursive: true, force: true });
 
 console.log(`${passed} passed, ${failed} failed`);

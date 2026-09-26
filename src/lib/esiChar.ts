@@ -1,5 +1,6 @@
 // Authenticated ESI calls, per character (defaults to the active one).
 import { ESI_BASE } from './constants';
+import { swallowed } from './devlog';
 import { activeChar, ensureToken, useAuth, type OwnedShip, type Standings } from './auth';
 import { useApp } from './store';
 import { getType, isShip } from './typedb';
@@ -355,8 +356,8 @@ export async function structureName(structureId: number): Promise<string | null>
   structNames[key] = name;
   try {
     localStorage.setItem(STRUCT_KEY, JSON.stringify(structNames));
-  } catch {
-    // cache only
+  } catch (e) {
+    swallowed('esi', 'structure-name cache save', e); // cache only
   }
   return name;
 }
